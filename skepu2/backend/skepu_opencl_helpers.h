@@ -84,7 +84,7 @@ namespace skepu2
 				};
 				
 				for (size_t e = 0; e < sizeof...(Args); ++e)
-					CL_CHECK_ERROR(errors[e], "Error in OpenCL kernel argument nr " << e);
+					CL_CHECK_ERROR(errors[e], "Error in OpenCL kernel argument nr ", e);
 			}
 			
 			template<typename... Args>
@@ -358,6 +358,10 @@ namespace skepu2
 					clGetProgramBuildInfo(program, device->getDeviceID(), CL_PROGRAM_BUILD_STATUS, sizeof(cl_build_status), &build_status, NULL);
 					if (build_status != CL_SUCCESS)
 					{
+						std::cerr
+							<< "Source program:\n"
+							<< "===============\n"
+							<< source << "\n";
 						size_t log_size;
 						clGetProgramBuildInfo(program, device->getDeviceID(), CL_PROGRAM_BUILD_LOG, 0, NULL, &log_size);
 						std::string buildLog(log_size, '\0');

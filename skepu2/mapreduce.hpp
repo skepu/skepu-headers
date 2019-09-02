@@ -115,14 +115,14 @@ namespace skepu2
 			this->default_size_y = y;
 		}
 		
-		template<template<class> class Container, typename... CallArgs, REQUIRES(is_skepu_container<Container<First>>())>
+		template<template<class> class Container, typename... CallArgs, REQUIRES_VALUE(is_skepu_container<Container<First>>)>
 		Ret operator()(Container<First>& arg1, CallArgs&&... args)
 		{
 			static_assert(sizeof...(CallArgs) + 1 == numArgs, "Number of arguments not matching Map function");
 			return apply(elwise_indices, any_indices, const_indices, arg1.size(), arg1.begin(), std::forward<CallArgs>(args)...);
 		}
 		
-		template<template<class> class Container, typename... CallArgs, REQUIRES(is_skepu_container<Container<First>>())>
+		template<template<class> class Container, typename... CallArgs, REQUIRES_VALUE(is_skepu_container<Container<First>>)>
 		Ret operator()(const Container<First>& arg1, CallArgs&&... args)
 		{
 			static_assert(sizeof...(CallArgs) + 1 == numArgs, "Number of arguments not matching Map function");
@@ -130,7 +130,7 @@ namespace skepu2
 		}
 		
 		
-		template<typename Iterator, typename... CallArgs, REQUIRES(is_skepu_iterator<Iterator, First>())>
+		template<typename Iterator, typename... CallArgs, REQUIRES_VALUE(is_skepu_iterator<Iterator, First>)>
 		Ret operator()(Iterator arg1, Iterator arg1_end, CallArgs&&... args)
 		{
 			static_assert(sizeof...(CallArgs) + 1 == numArgs, "Number of arguments not matching Map function");

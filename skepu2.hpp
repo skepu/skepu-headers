@@ -8,6 +8,16 @@
 # endif
 #endif
 
+
+/* TODO: Get rid of this hack if possible. */
+#ifdef SKEPU_MERCURIUM
+#define __CUDACC__
+#include <cuda.h>
+#include <device_functions.h>
+#undef __CUDACC__
+#endif
+
+
 #include "skepu2/impl/backend.hpp"
 #include "skepu2/backend/helper_methods.h"
 #include "skepu2/impl/common.hpp"

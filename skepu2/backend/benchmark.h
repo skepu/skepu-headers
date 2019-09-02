@@ -156,7 +156,7 @@ namespace skepu2
 		template<class Tuple, size_t...Is>
 		inline void set_backend_tuple(Tuple&& tuple, BackendSpec &spec, future_std::index_sequence<Is...>)
 		{
-			int dummy[] = { 0, ((void)std::get<Is>(std::forward<Tuple>(tuple))->setBackend(spec), 0)... };
+			pack_expand((std::get<Is>(tuple).setBackend(spec))...);
 		}
 		
 		template<class Tuple>
@@ -169,7 +169,7 @@ namespace skepu2
 		template<class Tuple, size_t...Is>
 		inline void reset_backend_tuple(Tuple&& tuple, future_std::index_sequence<Is...>)
 		{
-			int dummy[] = { 0, ((void)std::get<Is>(std::forward<Tuple>(tuple))->resetBackend(), 0)... };
+			pack_expand((std::get<Is>(tuple).resetBackend())...);
 		}
 		
 		template<class Tuple>

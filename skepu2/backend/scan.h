@@ -202,6 +202,31 @@ namespace skepu2
 		
 		}; // class Scan
 	} // namespace backend
+
+#ifdef SKEPU_MERCURIUM
+template<typename T>
+class ScanImpl: public SeqSkeletonBase
+{
+public:
+	ScanImpl(T (*)(T, T));
+
+	void setScanMode(ScanMode);
+	void setStartValue(T);
+
+	template<typename OutIterator, typename In>
+	OutIterator operator()(OutIterator res, OutIterator res_end, In&& arg);
+
+	template<template<class> class Container, typename In>
+	Container<T> &operator()(Container<T>& res, In&& arg);
+};
+
+template<typename T>
+auto inline
+Scan(T (*)(T, T))
+-> ScanImpl<T>;
+
+#endif // SKEPU_MERCURIUM
+
 } // namespace skepu2
 
 

@@ -89,7 +89,7 @@ namespace skepu2
 			cl_int err;
 			size_t sizeVec = numElements * sizeof(T);
 			m_deviceDataPointer = clCreateBuffer(m_device->getContext(), CL_MEM_READ_WRITE, sizeVec, NULL, &err);
-			CL_CHECK_ERROR(err, "Error allocating memory on OpenCL device, size: " << sizeVec);
+			CL_CHECK_ERROR(err, "Error allocating memory on OpenCL device, size: ", sizeVec);
 			
 			DEBUG_TEXT_LEVEL1("Alloc OpenCL, ptr: " << m_deviceDataPointer << ", size: " << sizeVec);
 			
@@ -150,7 +150,7 @@ namespace skepu2
 				
 				size_t sizeVec = ((numElements != -1) ? numElements : m_numElements) * sizeof(T);
 				cl_int err = clEnqueueCopyBuffer(m_device->getQueue(),m_deviceDataPointer, copyToPointer, srcOffset*sizeof(T), dstOffset*sizeof(T), sizeVec, 0, NULL, NULL);
-				CL_CHECK_ERROR(err, "Error copying data to OpenCL device, size: " << sizeVec);
+				CL_CHECK_ERROR(err, "Error copying data to OpenCL device, size: ",sizeVec);
 				
 				DEBUG_TEXT_LEVEL1("DEVICE_TO_DEVICE OpenCL, size " << sizeVec);
 				
@@ -186,7 +186,7 @@ template <typename T>
 			
 			size_t sizeVec = numElements*sizeof(T);
 			cl_int err = clEnqueueWriteBuffer(m_device->getQueue(), dest_ptr, CL_TRUE, offset*sizeof(T), sizeVec, (void*)src_ptr, 0, NULL, NULL);
-			CL_CHECK_ERROR(err, "Error copying data to OpenCL device, size: " << sizeVec);
+			CL_CHECK_ERROR(err, "Error copying data to OpenCL device, size: ", sizeVec);
 			
 			DEBUG_TEXT_LEVEL1("HOST_TO_DEVICE INTERNAL OpenCL, size " << sizeVec);
 			
@@ -229,7 +229,7 @@ template <typename T>
 				err = clEnqueueWriteBuffer(m_device->getQueue(), m_deviceDataPointer, CL_TRUE, 0, sizeVec, m_hostDataPointer, 0, NULL, NULL);
 			else
 				err = clEnqueueWriteBuffer(m_device->getQueue(), m_effectiveDeviceDataPointer, CL_TRUE, 0, sizeVec, m_effectiveHostDataPointer, 0, NULL, NULL);
-			CL_CHECK_ERROR(err, "Error copying data to OpenCL device, size: " << sizeVec);
+			CL_CHECK_ERROR(err, "Error copying data to OpenCL device, size: ", sizeVec);
 			
 			DEBUG_TEXT_LEVEL1("HOST_TO_DEVICE OpenCL, size " << sizeVec);
 			
@@ -274,7 +274,7 @@ template <typename T>
 					err = clEnqueueReadBuffer(m_device->getQueue(), m_deviceDataPointer, CL_TRUE, 0, sizeVec, (void*)m_hostDataPointer, 0, NULL, NULL);
 				else
 					err = clEnqueueReadBuffer(m_device->getQueue(), m_effectiveDeviceDataPointer, CL_TRUE, 0, sizeVec, (void*)m_effectiveHostDataPointer, 0, NULL, NULL);
-				CL_CHECK_ERROR(err, "Error copying data from OpenCL device, size: " << sizeVec);
+				CL_CHECK_ERROR(err, "Error copying data from OpenCL device, size: ", sizeVec);
 				
 				DEBUG_TEXT_LEVEL1("DEVICE_TO_HOST OpenCL, size " << sizeVec);
 				

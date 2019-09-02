@@ -217,6 +217,47 @@ namespace skepu2
 		}; // class MapReduce
 		
 	} // end namespace backend
+
+#ifdef SKEPU_MERCURIUM
+template<typename Ret, typename ... Args>
+class MapReduceImpl: public SeqSkeletonBase
+{
+	static constexpr bool indexed = is_indexed<Args...>::value;
+	using First = typename pack_element<indexed ? 1 : 0, Args...>::type;
+public:
+	MapReduceImpl(Ret (*)(Args...), Ret (*)(Ret, Ret));
+
+	void setStartValue(Ret val);
+	void setDefaultSize(size_t x, size_t y = 0);
+
+	template<
+		template<class> class Container,
+		typename... CallArgs,
+		REQUIRES_VALUE(is_skepu_container<Container<First>>)>
+	Ret operator()(Container<First>& arg1, CallArgs&&... args);
+
+	template<
+		template<class> class Container,
+		typename... CallArgs,
+		REQUIRES_VALUE(is_skepu_container<Container<First>>)>
+	Ret operator()(const Container<First>& arg1, CallArgs&&... args);
+
+	template<
+		typename Iterator,
+		typename... CallArgs,
+		REQUIRES_VALUE(is_skepu_iterator<Iterator, First>)>
+	Ret operator()(Iterator arg1, Iterator arg1_end, CallArgs&&... args);
+
+	template<template<class> class Container = Vector, typename... CallArgs>
+	Ret operator()(CallArgs&&... args);
+};
+
+template<int arity, typename Ret, typename ... Args>
+auto inline
+MapReduce(Ret (*)(Args...), Ret (*)(Ret, Ret))
+-> MapReduceImpl<Ret,Args...>;
+#endif // SKEPU_MERCURIUM
+
 } // end namespace skepu2
 
 

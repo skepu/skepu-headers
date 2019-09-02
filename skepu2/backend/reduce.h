@@ -364,6 +364,57 @@ namespace skepu2
 		};
 		
 	} // end namespace backend
+
+#ifdef SKEPU_MERCURIUM
+template<typename T>
+class Reduce1D : public SeqSkeletonBase
+{
+	using RedFunc = std::function<T(T, T)>;
+
+public:
+	void setReduceMode(ReduceMode mode);
+	void setStartValue(T val);
+
+	template<template<class> class Container>
+	typename std::enable_if<is_skepu_container<Container<T>>::value, T>::type
+	operator()(Container<T>& arg);
+
+	Vector<T> &operator()(Vector<T> &res, Matrix<T>& arg);
+
+protected:
+	RedFunc redFunc;
+	Reduce1D(RedFunc red);
+
+/* TODO: Remove if possible.
+	ReduceMode m_mode = ReduceMode::RowWise;
+*/
+};
+
+template<typename T>
+class Reduce2D: public Reduce1D<T>
+{
+	using RedFunc = std::function<T(T, T)>;
+
+public:
+	T operator()(Vector<T>& arg);
+	T operator()(Matrix<T>& arg);
+
+private:
+	RedFunc colRedFunc;
+	Reduce2D(RedFunc rowRed, RedFunc colRed);
+};
+
+template<typename T>
+auto inline
+Reduce(T (* usr_fn)(T,T))
+-> Reduce1D<T>;
+
+template<typename T>
+auto inline
+Reduce(T (* row_usr_Fn)(T,T), T (* col_usr_fn)(T,T))
+-> Reduce2D<T>;
+#endif // SKEPU_MERCURIUM
+
 } // end namespace skepu2
 
 

@@ -154,7 +154,7 @@ namespace skepu2
 			ReduceMode m_mode = ReduceMode::RowWise;
 			T m_start{};
 			
-			friend Reduce1D<T> ReduceWrapper<T>(RedFunc);
+			//friend Reduce1D<T> ReduceWrapper<T>(RedFunc);
 		};
 		
 		
@@ -209,7 +209,7 @@ namespace skepu2
 			
 			T m_start{};
 			
-			friend Reduce2D<T> ReduceWrapper<T>(RedFunc, RedFunc);
+			//friend Reduce2D<T> ReduceWrapper<T>(RedFunc, RedFunc);
 		};
 	}
 	

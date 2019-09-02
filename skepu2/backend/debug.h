@@ -94,7 +94,21 @@
 #endif
 
 #ifdef SKEPU_OPENCL
-#define CL_CHECK_ERROR(err, text)  if(err != CL_SUCCESS) { std::cerr << text << ": " << err << "\n"; } // exit(0); }
+#include <CL/cl.h>
+
+template<typename ERROR_T, typename... MESSAGE_T>
+auto inline
+CL_CHECK_ERROR(ERROR_T const & err, MESSAGE_T const & ... m)
+-> void
+{
+	if(err != CL_SUCCESS)
+	{
+		/* Unpack the messages and print them. */
+		int print[sizeof...(m)] = {(std::cerr << m,0)...};
+		std::cerr  << ": " << err << "\n";
+		// exit(0);
+	}
+}
 #endif
 
 #endif

@@ -142,6 +142,27 @@ namespace skepu2
 		}; // class Map
 		
 	} // namespace backend
+
+#ifdef SKEPU_MERCURIUM
+
+template<typename Ret, typename... Args>
+class CallImpl: public SeqSkeletonBase
+{
+public:
+	CallImpl();
+	CallImpl(Ret (*)(Args...));
+
+	template<typename... CallArgs>
+	Ret operator()(CallArgs && ... args);
+};
+
+template<typename Ret, typename... Args>
+auto inline
+Call(Ret (*)(Args...))
+-> CallImpl<Ret, Args...>;
+
+#endif // SKEPU_MERCURIUM
+
 } // namespace skepu2
 
 

@@ -75,7 +75,7 @@ namespace skepu2
 			return res;
 		}
 		
-		template<typename Iterator, typename... CallArgs, REQUIRES(is_skepu_iterator<Iterator, Ret>())>
+		template<typename Iterator, typename... CallArgs, REQUIRES_VALUE(is_skepu_iterator<Iterator, Ret>)>
 		Iterator operator()(Iterator res, Iterator res_end, CallArgs&&... args)
 		{
 			static_assert(sizeof...(CallArgs) == numArgs, "Number of arguments not matching Map function");

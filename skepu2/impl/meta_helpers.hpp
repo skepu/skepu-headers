@@ -363,18 +363,18 @@ struct add_container_layer<Container, std::tuple<Types...>>
 // Apply some functor ´Func´ with the first argument taken from a tuple, for each element in the tuple,
 // and some number of other arguments
 
-template<class Func, class Tuple, size_t...Is, typename... Args>
-inline void for_each_in_tuple(Func f, Tuple&& tuple, Args&&... args, future_std::index_sequence<Is...>)
-{
-	int dummy[] = { 0, ((void)f(std::get<Is>(std::forward<Tuple>(tuple)), std::forward<Args>(args)...), 0)... };
-}
+// template<class Func, class Tuple, size_t...Is, typename... Args>
+// inline void for_each_in_tuple(Func f, Tuple&& tuple, Args&&... args, future_std::index_sequence<Is...>)
+// {
+// 	int dummy[] = { 0, ((void)f(std::get<Is>(std::forward<Tuple>(tuple)), std::forward<Args>(args)...), 0)... };
+// }
 
-template<class Func, class Tuple, typename... Args>
-inline void for_each_in_tuple(Func f, Tuple&& tuple, Args&&... args)
-{
-	for_each_in_tuple(f, std::forward<Tuple>(tuple), std::forward<Args>(args)...,
-		typename future_std::make_index_sequence<std::tuple_size<typename std::decay<Tuple>::type>::value>::type());
-}
+// template<class Func, class Tuple, typename... Args>
+// inline void for_each_in_tuple(Func f, Tuple&& tuple, Args&&... args)
+// {
+// 	for_each_in_tuple(f, std::forward<Tuple>(tuple), std::forward<Args>(args)...,
+// 		typename future_std::make_index_sequence<std::tuple_size<typename std::decay<Tuple>::type>::value>::type());
+// }
 
 // Select between two possible types based on some boolean ´Condition´
 

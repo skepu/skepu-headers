@@ -1,6 +1,7 @@
 #pragma once
 
 #define REQUIRES(...) typename std::enable_if<(__VA_ARGS__), bool>::type = 0
+#define REQUIRES_VALUE(...) typename std::enable_if<__VA_ARGS__::value, bool>::type = 0
 #define REQUIRES_DEF(...) typename std::enable_if<(__VA_ARGS__), bool>::type
 
 #define MAX_SIZE ((size_t)-1)
