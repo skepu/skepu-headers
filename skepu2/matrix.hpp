@@ -415,14 +415,17 @@ namespace skepu2
 			case Backend::Type::CUDA:
 #ifdef SKEPU_CUDA
 				this->transpose_CU(backend::Environment<int>::getInstance()->m_devices_CU[backend::Environment<int>::getInstance()->bestCUDADevID]);
+				break;
 #endif
 			case Backend::Type::OpenCL:
 #ifdef SKEPU_OPENCL
 				this->transpose_CL(0);
+				break;
 #endif
 			case Backend::Type::OpenMP:
 #ifdef SKEPU_OPENMP
 				this->transpose_OMP();
+				break;
 #endif
 			default:
 				this->transpose_CPU();
