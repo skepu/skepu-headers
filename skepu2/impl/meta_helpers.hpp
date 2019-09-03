@@ -1,6 +1,9 @@
 #pragma once
 
 #include <type_traits>
+#include <cstddef>
+#include <tuple>
+#include <functional>
 
 template<bool B>
 struct bool_constant : std::integral_constant<bool, B> { };

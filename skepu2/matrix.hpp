@@ -259,6 +259,7 @@ namespace skepu2
 		
 		Matrix<T>& operator=(const Matrix<T>& other);
 		Matrix<T>& operator=(const T& elem);
+		void set(const size_t & row, const size_t & col, const T & value);
 		
 		bool operator==(const Matrix<T>& c1);
 		bool operator!=(const Matrix<T>& c1);

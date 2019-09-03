@@ -8,15 +8,32 @@
 # endif
 #endif
 
-
 /* TODO: Get rid of this hack if possible. */
-#if defined(SKEPU_MERCURIUM) && defined(SKEPU_CUDA)
+#ifdef SKEPU_MERCURIUM_CUDA
 #define __CUDACC__
 #include <cuda.h>
 #include <device_functions.h>
 #undef __CUDACC__
 #endif
 
+#ifdef SKEPU_MPI_STARPU
+
+#include "skepu2/cluster/cluster.hpp"
+#include "skepu2/cluster/starpu_matrix_container.hpp"
+#include "skepu2/cluster/task_creator.hpp"
+#include "skepu2/cluster/matrix.hpp"
+#include "skepu2/cluster/vec.hpp"
+#include "skepu2/cluster/vector.hpp"
+#include "skepu2/cluster/matrix_iterator.hpp"
+#include "skepu2/cluster/vector_iterator.hpp"
+#include "skepu2/cluster/access_mode.hpp"
+#include "skepu2/cluster/map.hpp"
+#include "skepu2/cluster/reduce1d.hpp"
+#include "skepu2/backend/debug.h"
+
+#else
+
+#include "skepu2/cluster/cluster_fake.hpp"
 
 #include "skepu2/impl/backend.hpp"
 #include "skepu2/backend/helper_methods.h"
@@ -44,4 +61,6 @@
 #include "skepu2/backend/mapoverlap.h"
 #include "skepu2/backend/call.h"
 
+
 #endif // SKEPU_PRECOMPILED
+#endif // SKEPU_MPI_STARPU
