@@ -10,7 +10,7 @@
 
 
 /* TODO: Get rid of this hack if possible. */
-#ifdef SKEPU_MERCURIUM
+#if defined(SKEPU_MERCURIUM) && defined(SKEPU_CUDA)
 #define __CUDACC__
 #include <cuda.h>
 #include <device_functions.h>
