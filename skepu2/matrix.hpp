@@ -39,7 +39,13 @@ namespace skepu2
 		size_t rows;
 		size_t cols;
 		
+#ifdef SKEPU_CUDA
+		__host__ __device__
+#endif
 		T &operator[](size_t index)       { return this->data[index]; }
+#ifdef SKEPU_CUDA
+		__host__ __device__
+#endif
 		T  operator[](size_t index) const { return this->data[index]; }
 	};
 	

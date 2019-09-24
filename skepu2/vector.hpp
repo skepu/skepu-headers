@@ -40,7 +40,14 @@ namespace skepu2
 		Vec(T *dataptr, size_t sizearg): data{dataptr}, size{sizearg} {} 
 		Vec(): data{nullptr}, size{0} {} // empty proxy constructor
 		
+#ifdef SKEPU_CUDA
+		__host__ __device__
+#endif
 		T &operator[](size_t index)       { return this->data[index]; }
+
+#ifdef SKEPU_CUDA
+		__host__ __device__
+#endif
 		T  operator[](size_t index) const { return this->data[index]; }
 		
 		T *data;
