@@ -1,5 +1,8 @@
 #pragma once
 
+// Deprecated operators are still accessible in this version 
+#define SKEPU_ENABLE_DEPRECATED_OPERATOR
+
 #if defined(SKEPU_OPENMP) && (defined(SKEPU_CUDA) || defined(SKEPU_OPENCL))
 # define SKEPU_HYBRID
 
@@ -49,6 +52,7 @@
 #include "skepu2/scan.hpp"
 #include "skepu2/mapoverlap.hpp"
 #include "skepu2/mapreduce.hpp"
+#include "skepu2/mappairs.hpp"
 #include "skepu2/call.hpp"
 
 #else
@@ -59,6 +63,7 @@
 #include "skepu2/backend/mapreduce.h"
 #include "skepu2/backend/scan.h"
 #include "skepu2/backend/mapoverlap.h"
+#include "skepu2/backend/mappairs.h"
 #include "skepu2/backend/call.h"
 
 

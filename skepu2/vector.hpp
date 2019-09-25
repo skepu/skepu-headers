@@ -28,6 +28,10 @@
 
 namespace skepu2
 {
+	enum class FlushMode {
+		Default, Dealloc
+	};
+	
 	template<typename T>
 	class Vector;
 	
@@ -96,6 +100,7 @@ namespace skepu2
 		
 		friend std::ostream& operator<< (std::ostream& output, Vector<T>& vec)
 		{
+			output << vec.size() << ".... ";
 			for (typename Vector<T>::size_type i = 0; i < vec.size(); ++i)
 			{
 				output<<vec.at(i) <<" ";
@@ -138,12 +143,14 @@ namespace skepu2
 		
 	public: //-- Operators --//
 		
+#ifdef SKEPU_ENABLE_DEPRECATED_OPERATOR
 		const T& operator[](const size_type index) const;
 #ifdef SKEPU_PRECOMPILED
 		proxy_elem operator[](const size_type index);
 #else
 		T& operator[](const size_type index);
 #endif // SKEPU_PRECOMPILED
+#endif // SKEPU_ENABLE_DEPRECATED_OPERATOR
 		
 		
 		Vec<T> hostProxy()
@@ -221,14 +228,14 @@ namespace skepu2
 #ifdef SKEPU_OPENCL
 		device_const_pointer_type_cl updateDevice_CL(const T* start, size_type numElements, backend::Device_CL* device, bool copy) const;
 		device_pointer_type_cl updateDevice_CL(T* start, size_type numElements, backend::Device_CL* device, bool copy);
-		void flush_CL();
+		void flush_CL(FlushMode mode);
 		bool isVectorOnDevice_CL(backend::Device_CL* device, bool multi=false) const;
 #endif
 		
 #ifdef SKEPU_CUDA
 		void copyDataToAnInvalidDeviceCopy(backend::DeviceMemPointer_CU<T> *copy, size_t deviceID, size_t streamID = 0) const;
 		device_pointer_type_cu updateDevice_CU(T* start, size_type numElements, size_t deviceID, AccessMode accessMode, bool markOnlyLocalCopiesInvalid = false, size_t streamID = 0) const;
-		void flush_CU();
+		void flush_CU(FlushMode mode);
 		bool isVectorOnDevice_CU(size_t deviceID) const;
 		bool isModified_CU(size_t deviceID) const;
 		
@@ -239,7 +246,7 @@ namespace skepu2
 		}
 #endif
 		
-		void flush();
+		void flush(FlushMode mode = FlushMode::Default);
 		
 		// Does not care about device data, use with care
 		T& operator()(const size_type index) { return m_data[index]; }
@@ -259,7 +266,7 @@ namespace skepu2
 			m_valid = val;
 		}
 		
-	private: //-- Data --//
+	protected: //-- Data --//
 		T *m_data;
 		mutable bool m_valid; /*! to keep track of whether the main copy is valid or not */
 		size_type m_capacity;

@@ -990,17 +990,19 @@ typename Matrix<T>::iterator Matrix<T>::erase( typename Matrix<T>::iterator star
 
 
 /*!
- *  Flushes the matrix, synchronizing it with the device then release all device allocations.
+ *  Flushes the matrix, synchronizing it with the device.
+ *
+ *  Then release all device allocations if deallocDevice is `true`.
  */
 template <typename T>
-void Matrix<T>::flush()
+void Matrix<T>::flush(FlushMode mode)
 {
 #ifdef SKEPU_OPENCL
-   flush_CL();
+   this->flush_CL(mode);
 #endif
 
 #ifdef SKEPU_CUDA
-   flush_CU();
+   this->flush_CU(mode);
 #endif
 }
 
@@ -1015,7 +1017,6 @@ void Matrix<T>::flush()
 template <typename T>
 const T& Matrix<T>::operator()(const size_type row, const size_type col) const
 {
-   updateHost();
    if(row >= this->total_rows() || col >= this->total_cols())
       SKEPU_ERROR("ERROR! Row or Column index is out of bound!");
    return m_data[row * m_cols + col];
@@ -1032,12 +1033,12 @@ const T& Matrix<T>::operator()(const size_type row, const size_type col) const
 template <typename T>
 T& Matrix<T>::operator()(const size_type row, const size_type col)
 {
-   updateHostAndInvalidateDevice();
    if(row >= this->total_rows() || col >= this->total_cols())
       SKEPU_ERROR("ERROR! Row or Column index is out of bound!");
    return m_data[row * m_cols + col];
 }
 
+#ifdef SKEPU_ENABLE_DEPRECATED_OPERATOR
 /*!
  *  Behaves like \p operator[] but does not care about synchronizing with device.
  *  Can be used when accessing many elements quickly so that no synchronization
@@ -1065,6 +1066,7 @@ T& Matrix<T>::operator()(const Index2D index)
 {
    return m_data[index.row * m_cols + index.col];
 }
+
 
 /*!
  *  A \p operator[] that care about synchronizing with device.
@@ -1095,6 +1097,8 @@ T& Matrix<T>::operator[](const size_type index)
       SKEPU_ERROR("ERROR! Index is out of bound!");
    return m_data[index];
 }
+
+#endif // SKEPU_ENABLE_DEPRECATED_OPERATOR
 
 ///////////////////////////////////////////////
 // Additions to interface END

@@ -94,7 +94,12 @@
 #endif
 
 #ifdef SKEPU_OPENCL
+#include <iostream>
+#ifdef __APPLE__
+#include <OpenCL/opencl.h>
+#else
 #include <CL/cl.h>
+#endif
 
 template<typename ERROR_T, typename... MESSAGE_T>
 auto inline

@@ -311,6 +311,8 @@ namespace skepu2
 // Operators START
 ///////////////////////////////////////////////
 
+#ifdef SKEPU_ENABLE_DEPRECATED_OPERATOR
+
 	/*!
 	 *  Please refer to the documentation of \p std::vector.
 	 */
@@ -346,6 +348,7 @@ namespace skepu2
 	}
 	
 #endif // SKEPU_PRECOMPILED
+#endif // SKEPU_ENABLE_DEPRECATED_OPERATOR
 	
 	
 	/*!
@@ -748,19 +751,22 @@ namespace skepu2
 ///////////////////////////////////////////////
 
 	/*!
-	 *  Flushes the vector, synchronizing it with the device then release all device allocations.
+	 *  Flushes the vector, synchronizing it with the device.
+	 * 
+	 *  Then release all device allocations if deallocDevice is `true`.
 	 */
 	template <typename T>
-	void Vector<T>::flush()
+	void Vector<T>::flush(FlushMode mode)
 	{
 #ifdef SKEPU_OPENCL
-		flush_CL();
+		this->flush_CL(mode);
 #endif
 
 #ifdef SKEPU_CUDA
-		flush_CU();
+		this->flush_CU(mode);
 #endif
 	}
+	
 
 ///////////////////////////////////////////////
 // Additions to interface END

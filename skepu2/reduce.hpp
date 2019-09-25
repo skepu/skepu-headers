@@ -105,9 +105,9 @@ namespace skepu2
 				
 				T res = this->m_start;
 				
-				res = arg[0];
+				res = *arg.begin();
 				for (size_t i = 1; i < size; i++)
-					res = this->redFunc(res, arg[i]);
+					res = this->redFunc(res, *(arg.begin() + i));
 				
 				return res;
 			}
@@ -127,7 +127,7 @@ namespace skepu2
 						T inner = arg(r, 0);
 						for (size_t c = 1; c < cols; c++)
 							inner = this->redFunc(inner, arg(r, c));
-						res[r] = inner;
+						res(r) = inner;
 					}
 				}
 				else if (this->m_mode == ReduceMode::ColWise)
@@ -140,7 +140,7 @@ namespace skepu2
 						T inner = arg(0, c);
 						for (size_t r = 1; r < rows; r++)
 							inner = this->redFunc(inner, arg(r, c));
-						res[c] = inner;
+						res(c) = inner;
 					}
 				}
 				

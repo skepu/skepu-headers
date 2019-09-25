@@ -122,7 +122,7 @@ namespace skepu2
 			os << "Matrix: (" << matrix.total_rows() << " X " << matrix.total_cols() << ")\n";
 			for(typename Matrix<T>::size_type i = 0; i < matrix.size(); i++)
 			{
-				os << matrix(i) << " ";
+				os << matrix(i / matrix.total_cols(), i % matrix.total_cols()) << " ";
 				if ((i+1) % matrix.total_cols() == 0)
 					os << "\n";
 			}
@@ -292,7 +292,7 @@ namespace skepu2
 		// Capacity
 		size_type capacity() const;
 		
-		void flush();
+		void flush(FlushMode mode = FlushMode::Default);
 		bool empty() const;
 		
 		// Element access
@@ -335,14 +335,14 @@ namespace skepu2
 		
 		device_const_pointer_type_cl updateDevice_CL(const T* start, size_type rows, size_type cols, backend::Device_CL* device, bool copy) const;
 		device_const_pointer_type_cl updateDevice_CL(const T* start, size_type cols, backend::Device_CL* device, bool copy) const;
-		void flush_CL();
+		void flush_CL(FlushMode mode);
 	#endif
 		
 	#ifdef SKEPU_CUDA
 		void copyDataToAnInvalidDeviceCopy(backend::DeviceMemPointer_CU<T> *copy, size_t deviceID, size_t streamID = 0) const;
 		device_pointer_type_cu updateDevice_CU(T* start, size_type rows, size_type cols, size_t deviceID, size_t streamID, AccessMode accessMode, bool usePitch, bool markOnlyLocalCopiesInvalid=false) const;
 		device_pointer_type_cu updateDevice_CU(T* start, size_type cols, size_t deviceID, AccessMode accessMode, bool markOnlyLocalCopiesInvalid=false, size_t streamID = 0) const;
-		void flush_CU();
+		void flush_CU(FlushMode mode);
 		
 		bool isMatrixOnDevice_CU(size_t deviceID) const;
 		bool isModified_CU(size_t deviceID) const;
@@ -358,12 +358,13 @@ namespace skepu2
 		}
 	#endif
 		
-		// Care about device data
+		// Don't Care about device data
 		const T& operator()(const size_type row, const size_type col) const;
 		
-		// Care about device data
+		// Don't Care about device data
 		T& operator()(const size_type row, const size_type col);
-		
+
+#ifdef SKEPU_ENABLE_DEPRECATED_OPERATOR
 		// Does not care about device data, use with care
 		T& operator()(const size_type index);
 		
@@ -375,7 +376,7 @@ namespace skepu2
 		
 		// Care about device data
 		T& operator[](const size_type index);
-		
+#endif // SKEPU_ENABLE_DEPRECATED_OPERATOR
 		
 		void transpose_CPU();
 		

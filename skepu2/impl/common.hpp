@@ -31,8 +31,17 @@ namespace skepu2
 
 	struct Index2D
 	{
-		size_t row;
-		size_t col;
+		size_t row, col;
+	};
+	
+	struct Index3D
+	{
+		size_t i, j, k;
+	};
+
+	struct Index4D
+	{
+		size_t i, j, k, l;
 	};
 	
 	
@@ -58,6 +67,7 @@ namespace skepu2
 	{
 		Map,
 		MapReduce,
+		MapPairs,
 		Reduce1D,
 		Reduce2D,
 		Scan,
@@ -109,6 +119,7 @@ namespace skepu2
 #include "meta_helpers.hpp"
 #include "skepu2/vector.hpp"
 #include "skepu2/matrix.hpp"
+#include "skepu2/tensor.hpp"
 #include "skepu2/sparse_matrix.hpp"
 
 namespace skepu2
@@ -199,6 +210,12 @@ namespace skepu2
 	template<>
 	struct is_skepu_index<Index2D>: std::true_type{};
 	
+	template<>
+	struct is_skepu_index<Index3D>: std::true_type{};
+	
+	template<>
+	struct is_skepu_index<Index4D>: std::true_type{};
+	
 	
 	template<typename... Args>
 	struct is_indexed
@@ -207,6 +224,27 @@ namespace skepu2
 	template<>
 	struct is_indexed<>
 	: std::false_type{};
+	
+	
+	// ----------------------------------------------------------------
+	// Smart Container Coherency Helpers
+	// ----------------------------------------------------------------
+	
+	/*
+	 * Base case for recursive variadic flush.
+	 */
+	template<FlushMode mode>
+	void flush() {}
+	
+	/*
+	 *  
+	 */
+	template<FlushMode mode = FlushMode::Default, typename First, typename... Args>
+	void flush(First&& first, Args&&... args)
+	{
+		first.flush(mode);
+		flush<mode>(std::forward<Args>(args)...);
+	}
 	
 	
 	// ----------------------------------------------------------------
@@ -230,6 +268,18 @@ namespace skepu2
 			return func(i, std::forward<CallArgs>(args)...);
 		}
 		
+		template<typename... CallArgs>
+		static Ret forward(Func func, Index3D i, CallArgs&&... args)
+		{
+			return func(i, std::forward<CallArgs>(args)...);
+		}
+		
+		template<typename... CallArgs>
+		static Ret forward(Func func, Index4D i, CallArgs&&... args)
+		{
+			return func(i, std::forward<CallArgs>(args)...);
+		}
+		
 		
 		template<typename... CallArgs>
 		static Ret forward_device(Func func, Index1D i, CallArgs&&... args)
@@ -239,6 +289,18 @@ namespace skepu2
 		
 		template<typename... CallArgs>
 		static Ret forward_device(Func func, Index2D i, CallArgs&&... args)
+		{
+			return func(i, std::forward<CallArgs>(args)...);
+		}
+		
+		template<typename... CallArgs>
+		static Ret forward_device(Func func, Index3D i, CallArgs&&... args)
+		{
+			return func(i, std::forward<CallArgs>(args)...);
+		}
+		
+		template<typename... CallArgs>
+		static Ret forward_device(Func func, Index4D i, CallArgs&&... args)
 		{
 			return func(i, std::forward<CallArgs>(args)...);
 		}

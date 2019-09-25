@@ -388,12 +388,12 @@ typename Matrix<T>::device_pointer_type_cu Matrix<T>::updateDevice_CU(T* start, 
 *  First it updates the matrix from all its device allocations, then it releases all allocations.
 */
 template <typename T>
-void Matrix<T>::flush_CU()
+void Matrix<T>::flush_CU(FlushMode mode)
 {
    DEBUG_TEXT_LEVEL3("Matrix flush CUDA\n")
-
-   updateHost_CU();
-   releaseDeviceAllocations_CU();
+   this->updateHost_CU();
+   if (mode == FlushMode::Dealloc)
+      this->releaseDeviceAllocations_CU();
 }
 
 /*!

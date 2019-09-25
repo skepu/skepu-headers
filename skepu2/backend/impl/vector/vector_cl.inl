@@ -91,10 +91,12 @@ namespace skepu2
 	 *  First it updates the vector from all its device allocations, then it releases all allocations.
 	 */
 	template <typename T>
-	void Vector<T>::flush_CL()
+	void Vector<T>::flush_CL(FlushMode mode)
 	{
-		updateHost_CL();
-		releaseDeviceAllocations_CL();
+		DEBUG_TEXT_LEVEL3("Vector flush OpenCL\n")
+		this->updateHost_CL();
+		if (mode == FlushMode::Dealloc)
+			this->releaseDeviceAllocations_CL();
 	}
 	
 	

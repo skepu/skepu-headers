@@ -356,10 +356,12 @@ bool Vector<T>::isVectorOnDevice_CU(size_t deviceID) const
  *  First it updates the vector from all its device allocations, then it deletes all allocations.
  */
 template <typename T>
-void Vector<T>::flush_CU()
+void Vector<T>::flush_CU(FlushMode mode)
 {
-   updateHost_CU();
-   releaseDeviceAllocations_CU();
+   DEBUG_TEXT_LEVEL3("Vector flush CUDA\n")
+   this->updateHost_CU();
+   if (mode == FlushMode::Dealloc)
+      this->releaseDeviceAllocations_CU();
 }
 
 /*!

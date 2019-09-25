@@ -109,12 +109,12 @@ namespace skepu2
 	 *  First it updates the matrix from all its device allocations, then it releases all allocations.
 	 */
 	template <typename T>
-	void Matrix<T>::flush_CL()
+	void Matrix<T>::flush_CL(FlushMode mode)
 	{
 		DEBUG_TEXT_LEVEL3("Matrix flush OpenCL\n")
-
-			updateHost_CL();
-		releaseDeviceAllocations_CL();
+		this->updateHost_CL();
+		if (mode == FlushMode::Dealloc)
+			this->releaseDeviceAllocations_CL();
 	}
 
 	/*!
