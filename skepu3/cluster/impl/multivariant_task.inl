@@ -1,6 +1,8 @@
 #ifndef MULTIVARIANT_TASK_INL
 #define MULTIVARIANT_TASK_INL
 
+#include <algorithm>
+
 #include <skepu3/cluster/multivariant_task.hpp>
 #include <skepu3/cluster/container_cut.hpp>
 #include <skepu3/cluster/handle_modes.hpp>

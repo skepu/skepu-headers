@@ -1,6 +1,8 @@
 #ifndef CONTAINER_CUT_INL
 #define CONTAINER_CUT_INL
 
+#include <algorithm>
+
 #include <skepu3/cluster/container_cut.hpp>
 #include <skepu3/cluster/helpers.hpp>
 #include <skepu3/impl/meta_helpers.hpp>

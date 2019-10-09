@@ -84,6 +84,13 @@ namespace skepu
 			this->element_aligned_sweep(size, m_mode, res, arg);
 		}
 
+		template<typename T, typename FN>
+		auto inline
+		reducer(T & a, T & b, FN fn)
+		-> T &
+		{
+			return fn(a,b);
+		}
 
 		template<typename ReduceFunc, typename CUDAKernel, typename CLKernel>
 		template<typename MatT,
@@ -107,16 +114,9 @@ namespace skepu
 			auto & res = std::get<0>(bufs);
 			auto & data = std::get<1>(bufs);
 
-
-
-			auto reducer = [](T & a, T & b) -> T& {
-				a = ReduceFunc::OMP(a, b);
-				return a;
-			};
-
 			omp_set_num_threads(starpu_combined_worker_get_size());
 
-#pragma omp declare reduction(UFOMPReducer:T:reducer(omp_in, omp_out))
+#pragma omp declare reduction(UFOMPReducer:T:omp_out=reducer(omp_out,omp_in,ReduceFunc::OMP))
 
 			if (mode == skepu::ReduceMode::RowWise) {
 				assert(res.cols >= size.row);
@@ -133,15 +133,10 @@ namespace skepu
 					auto row_res = res[row];
 #pragma omp parallel for reduction(UFOMPReducer: row_res)
 					for (size_t col = 0; col < size.col; ++col)
-					{
-						reducer(row_res, data(row, col));
-					}
+						row_res = ReduceFunc::OMP(row_res, data(row,col));
 					res[row] = row_res;
 				}
 			}
-
-
-
 
 			if (mode == skepu::ReduceMode::ColWise) {
 				assert(res.cols >= size.col);
@@ -157,9 +152,7 @@ namespace skepu
 				for (size_t row = 0; row < size.row; ++row) {
 #pragma omp parallel for
 					for (size_t col = 0; col < size.col; ++col)
-					{
-						reducer(res[col], data(row,col));
-					}
+						res[col] = ReduceFunc::OMP(res[col], data(row,col));
 				}
 			}
 
@@ -168,16 +161,12 @@ namespace skepu
 				auto r = data[0];
 #pragma omp parallel for reduction(UFOMPReducer: r)
 				for (size_t col = 1; col < size.col; ++col)
-				{
-					reducer(r, data(0, col));
-				}
+					r = ReduceFunc::OMP(r, data(0,col));
 
 				for (size_t row = 1; row < size.row; ++row) {
 #pragma omp parallel for reduction(UFOMPReducer: r)
 					for (size_t col = 0; col < size.col; ++col)
-					{
-						reducer(r, data(row, col));
-					}
+						r = ReduceFunc::OMP(r, data(row,col));
 				}
 				res[0] = r;
 			}

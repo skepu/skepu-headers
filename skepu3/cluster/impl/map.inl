@@ -1,6 +1,8 @@
 #ifndef MAP_INL
 #define MAP_INL
 
+#include <utility>
+
 #include <skepu3/cluster/map.hpp>
 #include <starpu.h>
 #include <omp.h>
