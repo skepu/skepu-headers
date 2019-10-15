@@ -201,8 +201,8 @@ namespace skepu
 				const size_t max_rows {
 					std::min<size_t>({
 							get<RI>(args...).block_height_from(i)...,
-								get<EI>(args...).block_height_from(i)...,
-								diff.row})
+							get<EI>(args...).block_height_from(i)...,
+							diff.row})
 						};
 
 				// Invalidate writable starpu_matrix_containers

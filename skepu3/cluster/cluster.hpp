@@ -16,7 +16,7 @@ namespace skepu {
 				int mpi_tag {1};
 				int mpi_provided_thread_support {};
 				internal_state() {
-					auto _ = starpu_init(NULL);
+					assert(!starpu_init(NULL));
 					starpu_mpi_init(NULL, NULL, 1);
 
 					starpu_mpi_comm_rank(MPI_COMM_WORLD, &mpi_rank);

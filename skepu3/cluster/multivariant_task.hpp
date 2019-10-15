@@ -159,6 +159,12 @@ namespace skepu
 			                           const skepu::SweepMode dir,
 			                           Args & ...args);
 
+			/* SkeletonBase compat fns. */
+			auto finishAll() -> void {}
+			template<typename T> auto setExecPlan(T) -> void {}
+			template<typename T> auto setBackend(T) -> void {}
+			auto resetBackend() -> void {}
+
 		public:
 			starpu_codelet* cl;
 			struct starpu_perfmodel* perf_model;

@@ -21,7 +21,6 @@ namespace skepu
 		 */
 		template<typename T>
 		class starpu_matrix_container {
-			//starpu_data_handle_t m_root;
 			bool m_unpartitioned_valid = false;
 			starpu_data_handle_t m_unpartitioned;
 			uintptr_t m_unpartitioned_data = 0;

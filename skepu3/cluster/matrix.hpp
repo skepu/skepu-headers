@@ -74,6 +74,7 @@ namespace skepu
 		void set(size_t index, const T & data = {});
 		void set(size_t row, size_t col, const T & data = {});
 
+		void flush();
 		void clear();
 
 

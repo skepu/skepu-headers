@@ -13,32 +13,37 @@ namespace skepu
 		::starpu_var(size_t owner)
 		{
 			int home_node = -1;
-			if (skepu::cluster::mpi_rank() == owner)
+			if(skepu::cluster::mpi_rank() == owner)
 			{
 				starpu_malloc((void**)&data, sizeof(T));
 				home_node = STARPU_MAIN_RAM;
 			}
-
 			starpu_matrix_data_register(&handle,
-			                            home_node,
-			                            data,
-			                            1,1,1, // 1x1 Matrix
-			                            sizeof(T));
-
+																	home_node,
+																	data,
+																	1,1,1, // 1x1 Matrix
+																	sizeof(T));
 			starpu_mpi_data_register(handle,
-			                         skepu::cluster::mpi_tag(),
-			                         owner);
+															 skepu::cluster::mpi_tag(),
+															 owner);
 		}
 
 		template<typename T>
 		starpu_var<T>
 		::~starpu_var()
 		{
-			if(! initialized) { return ; }
-			starpu_data_unregister(handle);
-			if(data != (uintptr_t)NULL) {
-				starpu_free((void*)data);
+			if(!initialized)
+				return;
+			if(data)
+			{
+				auto rank = skepu::cluster::mpi_rank();
+				auto data_loc = starpu_mpi_data_get_rank(handle);
+				starpu_data_unregister(handle);
+				if(data_loc == rank)
+					starpu_free((void*)data);
+				data = 0;
 			}
+			initialized = false;
 		}
 
 		template<typename T>

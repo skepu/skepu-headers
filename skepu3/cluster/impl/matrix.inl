@@ -252,6 +252,13 @@ namespace skepu
 	}
 
 	template<typename T>
+	void
+	Matrix<T>::flush()
+	{
+		m_data->allgather();
+	}
+
+	template<typename T>
 	void Matrix<T>
 	::clear()
 	{

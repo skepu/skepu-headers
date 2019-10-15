@@ -17,7 +17,8 @@ namespace skepu
 			starpu_var() : initialized { false } {};
 			starpu_var(const starpu_var&) = delete;
 			starpu_var<T>& operator=(const starpu_var&) = delete;
-			starpu_var(starpu_var<T>&& other) noexcept {
+			starpu_var(starpu_var<T>&& other) noexcept
+			{
 				// This is so ugly, please find a better way and destroy this
 				// code
 				data = other.data;
