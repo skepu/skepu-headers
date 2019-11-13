@@ -219,6 +219,7 @@ namespace skepu
 	} // end namespace backend
 
 #ifdef SKEPU_MERCURIUM
+
 template<typename Ret, typename ... Args>
 class MapReduceImpl: public SeqSkeletonBase
 {
@@ -252,10 +253,21 @@ public:
 	Ret operator()(CallArgs&&... args);
 };
 
-template<int arity, typename Ret, typename ... Args>
+template<int arity = 1, typename Ret, typename ... Args>
 auto inline
 MapReduce(Ret (*)(Args...), Ret (*)(Ret, Ret))
 -> MapReduceImpl<Ret,Args...>;
+
+template<int arity = 1, typename Ret, typename ... Args>
+auto inline
+MapReduce(std::function<Ret(Args...)>, std::function<Ret(Ret, Ret)>)
+-> MapReduceImpl<Ret,Args...>;
+
+template<int arity = 1, typename T, typename U>
+auto inline
+MapReduce(T map_op, U red_op)
+-> decltype(MapReduce<arity>(lambda_cast(map_op), lambda_cast(red_op)));
+
 #endif // SKEPU_MERCURIUM
 
 } // end namespace skepu

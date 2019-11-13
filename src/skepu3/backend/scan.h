@@ -225,6 +225,16 @@ auto inline
 Scan(T (*)(T, T))
 -> ScanImpl<T>;
 
+template<typename T>
+auto inline
+Scan(std::function<T(T,T)>)
+-> ScanImpl<T>;
+
+template<typename T>
+auto inline
+Scan(T op)
+-> decltype(Scan(lambda_cast(op)));
+
 #endif // SKEPU_MERCURIUM
 
 } // namespace skepu

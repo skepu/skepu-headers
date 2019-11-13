@@ -366,6 +366,7 @@ namespace skepu
 	} // end namespace backend
 
 #ifdef SKEPU_MERCURIUM
+
 template<typename T>
 class Reduce1D : public SeqSkeletonBase
 {
@@ -384,10 +385,6 @@ public:
 protected:
 	RedFunc redFunc;
 	Reduce1D(RedFunc red);
-
-/* TODO: Remove if possible.
-	ReduceMode m_mode = ReduceMode::RowWise;
-*/
 };
 
 template<typename T>
@@ -406,13 +403,37 @@ private:
 
 template<typename T>
 auto inline
-Reduce(T (* usr_fn)(T,T))
+Reduce(std::function<T(T,T)>)
 -> Reduce1D<T>;
 
 template<typename T>
 auto inline
-Reduce(T (* row_usr_Fn)(T,T), T (* col_usr_fn)(T,T))
+Reduce(T(*)(T,T))
+-> Reduce1D<T>;
+
+template<typename T>
+auto inline
+Reduce(T op)
+-> decltype(Reduce(&T::operator()))
+{
+	return Reduce(&T::operator());
+}
+
+template<typename T>
+auto inline
+Reduce(T(*)(T,T), T(*)(T,T))
 -> Reduce2D<T>;
+
+template<typename T>
+auto inline
+Reduce(std::function<T(T,T)>, std::function<T(T,T)>)
+-> Reduce2D<T>;
+
+template<typename T, typename U>
+auto inline
+Reduce(T row, U col)
+-> decltype(Reduce(lambda_cast(row), lambda_cast(col)));
+
 #endif // SKEPU_MERCURIUM
 
 } // end namespace skepu

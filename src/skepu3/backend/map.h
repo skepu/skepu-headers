@@ -237,6 +237,17 @@ template<int arity = 1, typename Ret, typename... Args>
 auto inline
 Map(Ret(*)(Args...))
 -> MapImpl<Ret, Args...>;
+
+template<int arity = 1, typename Ret, typename... Args>
+auto inline
+Map(std::function<Ret(Args...)>)
+-> MapImpl<Ret, Args...>;
+
+template<int arity = 1, typename T>
+auto inline
+Map(T op)
+-> decltype(Map(lambda_cast(op)));
+
 #endif // SKEPU_MERCURIUM
 
 } // namespace skepu

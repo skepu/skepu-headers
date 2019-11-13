@@ -161,6 +161,16 @@ auto inline
 Call(Ret (*)(Args...))
 -> CallImpl<Ret, Args...>;
 
+template<typename Ret, typename... Args>
+auto inline
+Call(std::function<Ret(Args...)>)
+-> CallImpl<Ret, Args...>;
+
+template<typename T>
+auto inline
+Call(T op)
+-> decltype(Call(lambda_cast(op)));
+
 #endif // SKEPU_MERCURIUM
 
 } // namespace skepu

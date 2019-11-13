@@ -667,8 +667,23 @@ MapOverlap(Ret (*)(int, size_t, Arg1, ArgRest...))
 
 template<typename Ret, typename Arg1, typename ... ArgRest>
 auto inline
+MapOverlap(std::function<Ret(int, size_t, Arg1, ArgRest...)>)
+-> MapOverlapImpl<Ret, Arg1, ArgRest...>;
+
+template<typename Ret, typename Arg1, typename ... ArgRest>
+auto inline
 MapOverlap(Ret (*)(int, int, size_t, Arg1, ArgRest...))
 -> MapOverlapImpl<Ret, Arg1, ArgRest...>;
+
+template<typename Ret, typename Arg1, typename ... ArgRest>
+auto inline
+MapOverlap(std::function<Ret(int, int, size_t, Arg1, ArgRest...)>)
+-> MapOverlapImpl<Ret, Arg1, ArgRest...>;
+
+template<typename T>
+auto inline
+MapOverlap(T op)
+-> decltype(MapOverlap(lambda_cast(op)));
 
 #endif // SKEPU_MERCURIUM
 
