@@ -17,7 +17,7 @@ namespace skepu
 			pack_expand((get<AI, CallArgs...>(args...).getParent().invalidateDeviceData(hasWriteAccess(MapOverlapFunc::anyAccessMode[AI])), 0)...);
 			res.invalidateDeviceData();
 			
-			const size_t overlap = this->m_overlap;
+			const int overlap = (int)this->m_overlap;
 			const size_t size = arg.size();
 			
 			T start[3*overlap], end[3*overlap];
@@ -47,13 +47,13 @@ namespace skepu
 				end[i] = arg(j + size - 2*overlap);
 			
 			for (size_t i = 0; i < overlap; ++i)
-				res(i) = MapOverlapFunc::CPU(overlap, 1, &start[i + overlap], get<AI, CallArgs...>(args...).hostProxy()..., get<CI, CallArgs...>(args...)...);
+				res(i) = MapOverlapFunc::CPU({overlap, 1, &start[i + overlap]}, get<AI, CallArgs...>(args...).hostProxy()..., get<CI, CallArgs...>(args...)...);
 				
 			for (size_t i = overlap; i < size - overlap; ++i)
-				res(i) = MapOverlapFunc::CPU(overlap, 1, arg.getAddress() + i, get<AI, CallArgs...>(args...).hostProxy()..., get<CI, CallArgs...>(args...)...);
+				res(i) = MapOverlapFunc::CPU({overlap, 1, arg.getAddress() + i}, get<AI, CallArgs...>(args...).hostProxy()..., get<CI, CallArgs...>(args...)...);
 				
 			for (size_t i = size - overlap; i < size; ++i)
-				res(i) = MapOverlapFunc::CPU(overlap, 1, &end[i + 2 * overlap - size], get<AI, CallArgs...>(args...).hostProxy()..., get<CI, CallArgs...>(args...)...);
+				res(i) = MapOverlapFunc::CPU({overlap, 1, &end[i + 2 * overlap - size]}, get<AI, CallArgs...>(args...).hostProxy()..., get<CI, CallArgs...>(args...)...);
 		}
 		
 		
@@ -68,7 +68,7 @@ namespace skepu
 			pack_expand((get<AI, CallArgs...>(args...).getParent().invalidateDeviceData(hasWriteAccess(MapOverlapFunc::anyAccessMode[AI])), 0)...);
 			res.invalidateDeviceData();
 			
-			const size_t overlap = this->m_overlap;
+			const int overlap = (int)this->m_overlap;
 			const size_t size = arg.size();
 			T start[3*overlap], end[3*overlap];
 			
@@ -109,15 +109,15 @@ namespace skepu
 					end[i] = inputEnd[(j - 2*overlap + 1)*stride];
 				
 				for (size_t i = 0; i < overlap; ++i)
-					res(i * stride + col) = MapOverlapFunc::CPU(overlap, 1, &start[i + overlap],
+					res(i * stride + col) = MapOverlapFunc::CPU({overlap, 1, &start[i + overlap]},
 						get<AI, CallArgs...>(args...).hostProxy()..., get<CI, CallArgs...>(args...)...);
 					
 				for (size_t i = overlap; i < colWidth - overlap; ++i)
-					res(i * stride + col) = MapOverlapFunc::CPU(overlap, stride, &inputBegin[i*stride],
+					res(i * stride + col) = MapOverlapFunc::CPU({overlap, stride, &inputBegin[i*stride]},
 						get<AI, CallArgs...>(args...).hostProxy()..., get<CI, CallArgs...>(args...)...);
 					
 				for (size_t i = colWidth - overlap; i < colWidth; ++i)
-					res(i * stride + col) = MapOverlapFunc::CPU(overlap, 1, &end[i + 2 * overlap - colWidth],
+					res(i * stride + col) = MapOverlapFunc::CPU({overlap, 1, &end[i + 2 * overlap - colWidth]},
 						get<AI, CallArgs...>(args...).hostProxy()..., get<CI, CallArgs...>(args...)...);
 				
 				inputBegin += 1;
@@ -136,7 +136,7 @@ namespace skepu
 			pack_expand((get<AI, CallArgs...>(args...).getParent().invalidateDeviceData(hasWriteAccess(MapOverlapFunc::anyAccessMode[AI])), 0)...);
 			res.invalidateDeviceData();
 			
-			size_t overlap = this->m_overlap;
+			int overlap = (int)this->m_overlap;
 			size_t size = arg.size();
 			T start[3*overlap], end[3*overlap];
 			
@@ -177,15 +177,15 @@ namespace skepu
 					end[i] = inputEnd[j - 2*overlap];
 				
 				for (size_t i = 0; i < overlap; ++i)
-					outputBegin[i] = MapOverlapFunc::CPU(overlap, stride, &start[i + overlap],
+					outputBegin[i] = MapOverlapFunc::CPU({overlap, stride, &start[i + overlap]},
 						get<AI, CallArgs...>(args...).hostProxy()..., get<CI, CallArgs...>(args...)...);
 					
 				for (size_t i = overlap; i < rowWidth - overlap; ++i)
-					outputBegin[i] = MapOverlapFunc::CPU(overlap, stride, &inputBegin[i],
+					outputBegin[i] = MapOverlapFunc::CPU({overlap, stride, &inputBegin[i]},
 						get<AI, CallArgs...>(args...).hostProxy()..., get<CI, CallArgs...>(args...)...);
 					
 				for (size_t i = rowWidth - overlap; i < rowWidth; ++i)
-					outputBegin[i] = MapOverlapFunc::CPU(overlap, stride, &end[i + 2 * overlap - rowWidth],
+					outputBegin[i] = MapOverlapFunc::CPU({overlap, stride, &end[i + 2 * overlap - rowWidth]},
 						get<AI, CallArgs...>(args...).hostProxy()..., get<CI, CallArgs...>(args...)...);
 				
 				inputBegin += rowWidth;
@@ -207,13 +207,60 @@ namespace skepu
 			pack_expand((get<AI, CallArgs...>(args...).getParent().invalidateDeviceData(hasWriteAccess(MapOverlapFunc::anyAccessMode[AI])), 0)...);
 			res.invalidateDeviceData();
 			
-			const size_t overlap_x = this->m_overlap_x;
-			const size_t overlap_y = this->m_overlap_y;
+			const int overlap_x = (int)this->m_overlap_x;
+			const int overlap_y = (int)this->m_overlap_y;
 			const size_t in_cols = arg.total_cols();
 			
 			for (size_t i = 0; i < res.total_rows(); i++)
 				for (size_t j = 0; j < res.total_cols(); j++)
-					res(i, j) = MapOverlapFunc::CPU(overlap_x, overlap_y, in_cols, &arg(i + overlap_y, j + overlap_x), get<AI, CallArgs...>(args...).hostProxy()..., get<CI, CallArgs...>(args...)...);
+					res(i, j) = MapOverlapFunc::CPU({overlap_x, overlap_y, in_cols, &arg(i + overlap_y, j + overlap_x)}, get<AI, CallArgs...>(args...).hostProxy()..., get<CI, CallArgs...>(args...)...);
+		}
+		
+		
+		
+		
+		template<typename MapOverlapFunc, typename CUDAKernel, typename CLKernel>
+		template<size_t... AI, size_t... CI, typename... CallArgs>
+		void MapOverlap3D<MapOverlapFunc, CUDAKernel, CLKernel>
+		::helper_CPU(skepu::Tensor3<Ret>& res, skepu::Tensor3<T>& arg, pack_indices<AI...>, pack_indices<CI...>,  CallArgs&&... args)
+		{
+			// Sync with device data
+			arg.updateHost();
+			pack_expand((get<AI, CallArgs...>(args...).getParent().updateHost(hasReadAccess(MapOverlapFunc::anyAccessMode[AI])), 0)...);
+			pack_expand((get<AI, CallArgs...>(args...).getParent().invalidateDeviceData(hasWriteAccess(MapOverlapFunc::anyAccessMode[AI])), 0)...);
+			res.invalidateDeviceData();
+			
+			for (size_t i = 0; i < res.size_i(); i++)
+				for (size_t j = 0; j < res.size_j(); j++)
+					for (size_t k = 0; k < res.size_k(); k++)
+						res(i, j, k) = MapOverlapFunc::CPU(Region3D<T>{this->m_overlap_i, this->m_overlap_j, this->m_overlap_k,
+							arg.size_i(), arg.size_j(), &arg(i+this->m_overlap_i, + j+this->m_overlap_j, + k+this->m_overlap_k)},
+							get<AI, CallArgs...>(args...).hostProxy()..., get<CI, CallArgs...>(args...)...);
+		}
+		
+		
+		
+		
+		template<typename MapOverlapFunc, typename CUDAKernel, typename CLKernel>
+		template<size_t... AI, size_t... CI, typename... CallArgs>
+		void MapOverlap4D<MapOverlapFunc, CUDAKernel, CLKernel>
+		::helper_CPU(skepu::Tensor4<Ret>& res, skepu::Tensor4<T>& arg, pack_indices<AI...>, pack_indices<CI...>,  CallArgs&&... args)
+		{
+			// Sync with device data
+			arg.updateHost();
+			pack_expand((get<AI, CallArgs...>(args...).getParent().updateHost(hasReadAccess(MapOverlapFunc::anyAccessMode[AI])), 0)...);
+			pack_expand((get<AI, CallArgs...>(args...).getParent().invalidateDeviceData(hasWriteAccess(MapOverlapFunc::anyAccessMode[AI])), 0)...);
+			res.invalidateDeviceData();
+			
+			for (size_t i = 0; i < res.size_i(); i++)
+				for (size_t j = 0; j < res.size_j(); j++)
+					for (size_t k = 0; k < res.size_k(); k++)
+						for (size_t l = 0; l < res.size_l(); l++)
+						{
+							res(i, j, k, l) = MapOverlapFunc::CPU(Region4D<T>{this->m_overlap_i, this->m_overlap_j, this->m_overlap_k, this->m_overlap_l,
+								arg.size_i(), arg.size_j(), arg.size_k(), &arg(i + this->m_overlap_i, j + this->m_overlap_j, k + this->m_overlap_k, l + this->m_overlap_l)},
+								get<AI, CallArgs...>(args...).hostProxy()..., get<CI, CallArgs...>(args...)...);
+						}
 		}
 		
 	} // namespace backend

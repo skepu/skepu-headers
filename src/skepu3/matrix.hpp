@@ -28,7 +28,6 @@ namespace skepu
 	template<typename T>
 	class Matrix;
 	
-	
 	// Proxy matrix for user functions
 	template<typename T>
 	struct Mat
@@ -47,7 +46,36 @@ namespace skepu
 		__host__ __device__
 #endif
 		T  operator[](size_t index) const { return this->data[index]; }
+	
+#ifdef SKEPU_CUDA
+		__host__ __device__
+#endif
+		T &operator()(size_t i, size_t j)       { return this->data[i * this->cols + j]; }
+#ifdef SKEPU_CUDA
+		__host__ __device__
+#endif
+		T  operator()(size_t i, size_t j) const { return this->data[i * this->cols + j]; }
 	};
+	
+	// Proxy matrix for user functions
+	template<typename T>
+	struct MatRow
+	{
+		using ContainerType = Matrix<T>;
+		
+		T *data;
+		size_t cols;
+		
+#ifdef SKEPU_CUDA
+		__host__ __device__
+#endif
+		T &operator[](size_t index)       { return this->data[index]; }
+#ifdef SKEPU_CUDA
+		__host__ __device__
+#endif
+		T  operator[](size_t index) const { return this->data[index]; }
+	};
+	
 	
 	template <typename T>
 	class MatrixIterator;
@@ -197,12 +225,26 @@ namespace skepu
 		{
 			return &m_data[0];
 		}
-			
-		Mat<T> hostProxy()
+		
+		template<typename Ignore>
+		Mat<T> hostProxy(ProxyTag::Default, Ignore)
 		{
 			Mat<T> proxy;
 			proxy.data = this->m_data.data();
 			proxy.rows = this->m_rows;
+			proxy.cols = this->m_cols;
+			return proxy;
+		}
+		
+		Mat<T> hostProxy()
+		{
+			return this->hostProxy(ProxyTag::Default{}, 0);
+		}
+		
+		MatRow<T> hostProxy(ProxyTag::MatRow, Index1D row)
+		{
+			MatRow<T> proxy;
+			proxy.data = this->m_data.data() + row.i * this->m_cols;
 			proxy.cols = this->m_cols;
 			return proxy;
 		}

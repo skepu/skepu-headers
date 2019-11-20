@@ -44,6 +44,95 @@ namespace skepu
 		size_t i, j, k, l;
 	};
 	
+	struct ProxyTag
+	{
+		struct Default {};
+		struct MatRow {};
+	};
+	
+	
+	// Container Regions (perhaps relocate)
+	
+	template<typename T>
+	struct Region1D
+	{
+		int oi;
+		size_t stride;
+		const T *data;
+		
+		T operator()(int i)
+		{
+			return data[i * this->stride];
+		}
+		
+		Region1D(int arg_oi, size_t arg_stride, const T *arg_data)
+		: oi(arg_oi), stride(arg_stride), data(arg_data) {}
+	};
+	
+	template<typename T>
+	struct Region2D
+	{
+		int oi, oj;
+		size_t stride;
+		const T *data;
+		
+		T operator()(int i, int j)
+		{
+			return data[i * this->stride + j];
+		}
+		
+		Region2D(int arg_oi, int arg_oj, size_t arg_stride, const T *arg_data)
+		: oi(arg_oi), oj(arg_oj), stride(arg_stride), data(arg_data) {}
+	};
+	
+	template<typename T>
+	struct Region3D
+	{
+		int oi, oj, ok;
+		size_t stride1, stride2;
+		const T *data;
+		
+		T operator()(int i, int j, int k)
+		{
+			return data[i * this->stride1 * this->stride2 + j * this->stride2 + k];
+		}
+		
+		Region3D(int arg_oi, int arg_oj, int arg_ok, size_t arg_stride1, size_t arg_stride2, const T *arg_data)
+		: oi(arg_oi), oj(arg_oj), ok(arg_ok), stride1(arg_stride1), stride2(arg_stride2), data(arg_data) {}
+	};
+	
+	template<typename T>
+	struct Region4D
+	{
+		int oi, oj, ok, ol;
+		size_t stride1, stride2, stride3;
+		const T *data;
+		
+		T operator()(int i, int j, int k, int l)
+		{
+			return data[i * this->stride1 * this->stride2 * this->stride3 + j * this->stride2 * this->stride3 + k * this->stride3 + l];
+		}
+		
+		Region4D(int arg_oi, int arg_oj, int arg_ok, int arg_ol, size_t arg_stride1, size_t arg_stride2, size_t arg_stride3, const T *arg_data)
+		: oi(arg_oi), oj(arg_oj), ok(arg_ok), ol(arg_ol), stride1(arg_stride1), stride2(arg_stride2), stride3(arg_stride3), data(arg_data) {}
+	};
+	
+	
+	template<typename T>
+	struct region_type {};
+	
+	template<typename T>
+	struct region_type<Region1D<T>> { using type = T; };
+	
+	template<typename T>
+	struct region_type<Region2D<T>> { using type = T; };
+	
+	template<typename T>
+	struct region_type<Region3D<T>> { using type = T; };
+	
+	template<typename T>
+	struct region_type<Region4D<T>> { using type = T; };
+	
 	
 	enum class AccessMode
 	{
@@ -73,6 +162,8 @@ namespace skepu
 		Scan,
 		MapOverlap1D,
 		MapOverlap2D,
+		MapOverlap3D,
+		MapOverlap4D,
 		Call,
 	};
 	
@@ -140,6 +231,13 @@ namespace skepu
 	// ----------------------------------------------------------------
 	
 	template<typename T>
+	struct is_skepu_vector: std::false_type {};
+	
+	template<typename T>
+	struct is_skepu_vector<skepu::Vector<T>>: std::true_type {};
+	
+	
+	template<typename T>
 	struct is_skepu_matrix: std::false_type {};
 	
 	template<typename T>
@@ -148,17 +246,28 @@ namespace skepu
 	template<typename T>
 	struct is_skepu_matrix<skepu::SparseMatrix<T>>: std::true_type {};
 	
-	template<typename T>
-	struct is_skepu_vector: std::false_type {};
 	
 	template<typename T>
-	struct is_skepu_vector<skepu::Vector<T>>: std::true_type {};
+	struct is_skepu_tensor3: std::false_type {};
+	
+	template<typename T>
+	struct is_skepu_tensor3<skepu::Tensor3<T>>: std::true_type {};
+	
+	
+	template<typename T>
+	struct is_skepu_tensor4: std::false_type {};
+	
+	template<typename T>
+	struct is_skepu_tensor4<skepu::Tensor4<T>>: std::true_type {};
+	
 	
 	template<typename T>
 	struct is_skepu_container:
 		std::integral_constant<bool,
 			is_skepu_vector<typename std::remove_cv<typename std::remove_reference<T>::type>::type>::value ||
-			is_skepu_matrix<typename std::remove_cv<typename std::remove_reference<T>::type>::type>::value> {};
+			is_skepu_matrix<typename std::remove_cv<typename std::remove_reference<T>::type>::type>::value ||
+			is_skepu_tensor3<typename std::remove_cv<typename std::remove_reference<T>::type>::type>::value ||
+			is_skepu_tensor4<typename std::remove_cv<typename std::remove_reference<T>::type>::type>::value> {};
 		
 		
 		
@@ -175,13 +284,30 @@ namespace skepu
 	struct is_skepu_matrix_proxy<skepu::Mat<T>>: std::true_type {};
 	
 	template<typename T>
+	struct is_skepu_matrix_proxy<skepu::MatRow<T>>: std::true_type {};
+	
+	template<typename T>
 	struct is_skepu_matrix_proxy<skepu::SparseMat<T>>: std::true_type {};
+	
+	template<typename T>
+	struct is_skepu_tensor3_proxy: std::false_type {};
+	
+	template<typename T>
+	struct is_skepu_tensor3_proxy<skepu::Ten3<T>>: std::true_type {};
+	
+	template<typename T>
+	struct is_skepu_tensor4_proxy: std::false_type {};
+	
+	template<typename T>
+	struct is_skepu_tensor4_proxy<skepu::Ten4<T>>: std::true_type {};
 	
 	template<typename T>
 	struct is_skepu_container_proxy:
 		std::integral_constant<bool,
 			is_skepu_vector_proxy<typename std::remove_cv<typename std::remove_reference<T>::type>::type>::value ||
-			is_skepu_matrix_proxy<typename std::remove_cv<typename std::remove_reference<T>::type>::type>::value> {};
+			is_skepu_matrix_proxy<typename std::remove_cv<typename std::remove_reference<T>::type>::type>::value ||
+			is_skepu_tensor3_proxy<typename std::remove_cv<typename std::remove_reference<T>::type>::type>::value ||
+			is_skepu_tensor4_proxy<typename std::remove_cv<typename std::remove_reference<T>::type>::type>::value>  {};
 	
 	
 	
@@ -224,6 +350,20 @@ namespace skepu
 	template<>
 	struct is_indexed<>
 	: std::false_type{};
+	
+	// ----------------------------------------------------------------
+	// matrix row proxy trait class
+	// ----------------------------------------------------------------
+	
+	template<typename T>
+	struct proxy_tag {
+		using type = ProxyTag::Default;
+	};
+	
+	template<typename T>
+	struct proxy_tag<MatRow<T>> {
+		using type = ProxyTag::MatRow;
+	};
 	
 	
 	// ----------------------------------------------------------------

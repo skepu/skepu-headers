@@ -25,6 +25,12 @@ namespace skepu
 	template<typename T>
 	class SparseMatrix;
 	
+	template<typename T>
+	class Tensor3;
+	
+	template<typename T>
+	class Tensor4;
+	
 	namespace backend
 	{
 		template<typename T>
@@ -98,7 +104,6 @@ namespace skepu
 			randomAccessArg(Vector<T> &c, Device_CL *device, bool read)
 			{
 				auto memP = c.updateDevice_CL(c.getAddress(), c.size(), device, read);
-				
 				return std::make_tuple(&c, memP);
 			}
 			
@@ -107,7 +112,22 @@ namespace skepu
 			randomAccessArg(Matrix<T> &c, Device_CL *device, bool read)
 			{
 				auto memP = c.updateDevice_CL(c.getAddress(), c.size(), device, read);
-				
+				return std::make_tuple(&c, memP);
+			}
+			
+			template<typename T>
+			inline std::tuple<Tensor3<T> *, DeviceMemPointer_CL<T> *>
+			randomAccessArg(Tensor3<T> &c, Device_CL *device, bool read)
+			{
+				auto memP = c.updateDevice_CL(c.getAddress(), c.size(), device, read);
+				return std::make_tuple(&c, memP);
+			}
+			
+			template<typename T>
+			inline std::tuple<Tensor4<T> *, DeviceMemPointer_CL<T> *>
+			randomAccessArg(Tensor4<T> &c, Device_CL *device, bool read)
+			{
+				auto memP = c.updateDevice_CL(c.getAddress(), c.size(), device, read);
 				return std::make_tuple(&c, memP);
 			}
 			

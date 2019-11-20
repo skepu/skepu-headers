@@ -101,18 +101,9 @@ namespace skepu
 			{
 				static_assert(sizeof...(CallArgs) == numArgs, "Number of arguments not matching Map function");
 				
-			/*	if (this->default_size_y != 0)
-				{
-					Container<Ret> res(this->default_size_x, this->default_size_y);
-					this->apply(elwise_indices, any_indices, const_indices, res, std::forward<CallArgs>(args)...);
-					return std::move(res);
-				}
-				else
-				{*/
-					Container<T> res(this->default_size_x);
-					this->backendDispatch(elwise_indices, any_indices, const_indices, res.size(), res.begin(), std::forward<CallArgs>(args)...);
-					return std::move(res);
-			//	}
+				Container<T> res(this->default_size_x);
+				this->backendDispatch(elwise_indices, any_indices, const_indices, res.size(), res.begin(), std::forward<CallArgs>(args)...);
+				return std::move(res);
 			}
 			
 		private:

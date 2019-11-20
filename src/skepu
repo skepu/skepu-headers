@@ -55,6 +55,8 @@
 #include "skepu3/mappairs.hpp"
 #include "skepu3/call.hpp"
 
+#include "skepu3/maptuple.hpp"
+
 #else
 
 #include "skepu3/backend/skeleton_base.h"

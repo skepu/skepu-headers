@@ -153,10 +153,13 @@ namespace skepu
 #endif // SKEPU_ENABLE_DEPRECATED_OPERATOR
 		
 		
-		Vec<T> hostProxy()
+		template<typename Ignore>
+		Vec<T> hostProxy(ProxyTag::Default, Ignore)
 		{
 			return {this->m_data, this->m_size};
 		}
+		
+		Vec<T> hostProxy() { return this->hostProxy(ProxyTag::Default{}, 0); }
 		
 		Vector<T>& operator=(const Vector<T>&);
 		
@@ -350,7 +353,11 @@ namespace skepu
 		
 		T* getAddress() const;
 		
-		Vec<T> hostProxy() { return {this->m_std_iterator, this->size()}; }
+		template<typename Ignore>
+		Vec<T> hostProxy(ProxyTag::Default, Ignore)
+		{ return {this->m_std_iterator, this->size()}; }
+		
+		Vec<T> hostProxy() { return this->hostProxy(ProxyTag::Default{}); }
 		
 		// Does not care about device data, use with care...sometimes pass negative indices...
 		T& operator()(const ssize_t index = 0);

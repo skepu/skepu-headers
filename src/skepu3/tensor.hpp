@@ -45,6 +45,9 @@ namespace skepu
 		T &operator[](size_t index)       { return this->data[index]; }
 		T  operator[](size_t index) const { return this->data[index]; }
 		
+		T &operator()(size_t i, size_t j, size_t k)       { return this->data[i * this->size_j * this->size_k + j * this->size_k + k]; }
+		T  operator()(size_t i, size_t j, size_t k) const { return this->data[i * this->size_j * this->size_k + j * this->size_k + k]; }
+		
 		T *data;
 		size_t size_i, size_j, size_k;
 	};
@@ -108,6 +111,9 @@ namespace skepu
 		{
 			return Vector<T>::m_data[i * this->m_size_j * this->m_size_k + j * this->m_size_k + k];
 		}
+		
+		const Tensor3<T>& getParent() const { return *this; }
+		Tensor3<T>& getParent() { return *this; }
 		
 	private:
 		
@@ -217,6 +223,11 @@ namespace skepu
 		T &operator[](size_t index)       { return this->data[index]; }
 		T  operator[](size_t index) const { return this->data[index]; }
 		
+		T &operator()(size_t i, size_t j, size_t k, size_t l)       
+			{ return this->data[i * this->size_j * this->size_k * this->size_l + j * this->size_k * this->size_l + k * this->size_l + l]; }
+		T  operator()(size_t i, size_t j, size_t k, size_t l) const
+			{ return this->data[i * this->size_j * this->size_k * this->size_l + j * this->size_k * this->size_l + k * this->size_l + l]; }
+		
 		T *data;
 		size_t size_i, size_j, size_k, size_l;
 	};
@@ -286,6 +297,9 @@ namespace skepu
 		{
 			return Vector<T>::m_data[i * this->m_size_j * this->m_size_k * this->m_size_l + j * this->m_size_k * this->m_size_l + k * this->m_size_l + l];
 		}
+		
+		const Tensor4<T>& getParent() const { return *this; }
+		Tensor4<T>& getParent() { return *this; }
 		
 	private:
 		

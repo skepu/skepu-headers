@@ -40,7 +40,7 @@ namespace skepu
 		class MapOverlap1D: public SkeletonBase
 		{
 			using Ret = typename MapOverlapFunc::Ret;
-			using T = typename std::remove_cv<typename std::remove_pointer<typename parameter_type<2, decltype(&MapOverlapFunc::CPU)>::type>::type>::type;
+			using T = typename region_type<typename parameter_type<0, decltype(&MapOverlapFunc::CPU)>::type>::type;
 			
 		public:
 			
@@ -429,7 +429,7 @@ namespace skepu
 		class MapOverlap2D: public SkeletonBase
 		{
 			using Ret = typename MapOverlapFunc::Ret;
-			using T = typename std::remove_cv<typename std::remove_pointer<typename parameter_type<3, decltype(&MapOverlapFunc::CPU)>::type>::type>::type;
+			using T = typename region_type<typename parameter_type<0, decltype(&MapOverlapFunc::CPU)>::type>::type;
 			
 		public:
 			
@@ -585,6 +585,343 @@ namespace skepu
 				return res;
 			}
 		};
+		
+		
+		
+		
+		
+		
+		
+		
+		template<typename MapOverlapFunc, typename CUDAKernel, typename CLKernel>
+		class MapOverlap3D: public SkeletonBase
+		{
+			using Ret = typename MapOverlapFunc::Ret;
+			using T = typename region_type<typename parameter_type<0, decltype(&MapOverlapFunc::CPU)>::type>::type;
+			
+		public:
+			
+			static constexpr auto skeletonType = SkeletonType::MapOverlap3D;
+			using ResultArg = std::tuple<T>;
+			using ElwiseArgs = std::tuple<T>;
+			using ContainerArgs = typename MapOverlapFunc::ContainerArgs;
+			using UniformArgs = typename MapOverlapFunc::UniformArgs;
+			static constexpr bool prefers_matrix = false;
+			
+			MapOverlap3D(CUDAKernel kernel) : m_cuda_kernel(kernel)
+			{
+#ifdef SKEPU_OPENCL
+				CLKernel::initialize();
+#endif
+			}
+			
+			void setEdgeMode(Edge mode)
+			{
+				this->m_edge = mode;
+			}
+			
+			void setPad(T pad)
+			{
+				this->m_pad = pad;
+			}
+			
+			void setOverlap(int o)
+			{
+				this->m_overlap_i = o;
+				this->m_overlap_j = o;
+				this->m_overlap_j = o;
+			}
+			
+			void setOverlap(int oi, int oj, int ok)
+			{
+				this->m_overlap_i = oi;
+				this->m_overlap_j = oj;
+				this->m_overlap_k = ok;
+			}
+			
+			std::tuple<int, int, int> getOverlap() const
+			{
+				return std::make_tuple(this->m_overlap_i, this->m_overlap_j, this->m_overlap_k);
+			}
+			
+			template<typename... Args>
+			void tune(Args&&... args)
+			{
+				tuner::tune(*this, std::forward<Args>(args)...);
+			}
+			
+		private:
+			CUDAKernel m_cuda_kernel;
+			
+			Edge m_edge = Edge::Duplicate;
+			T m_pad {};
+			
+			int m_overlap_i, m_overlap_j, m_overlap_k;
+			
+			
+		private:
+			template<size_t... AnyIndx, size_t... ConstIndx, typename... CallArgs>
+			void helper_CPU(Tensor3<Ret>& res, Tensor3<T>& arg, pack_indices<AnyIndx...>, pack_indices<ConstIndx...>,  CallArgs&&... args);
+			
+#ifdef SKEPU_OPENMP
+			
+			template<size_t... AnyIndx, size_t... ConstIndx, typename... CallArgs>
+			void helper_OpenMP(Tensor3<Ret>& res, Tensor3<T>& arg, pack_indices<AnyIndx...>, pack_indices<ConstIndx...>,  CallArgs&&... args);
+			
+#endif
+		
+#ifdef SKEPU_OPENCL
+			
+			template<size_t... AI, size_t... CI, typename... CallArgs>
+			void helper_OpenCL(skepu::Tensor3<Ret>& res, skepu::Tensor3<T>& arg, pack_indices<AI...>, pack_indices<CI...>,  CallArgs&&... args);
+			
+			template<size_t... AI, size_t... CI, typename... CallArgs>
+			void mapOverlapSingleThread_CL(size_t deviceID, skepu::Tensor3<Ret>& res, skepu::Tensor3<T>& arg, pack_indices<AI...>, pack_indices<CI...>,  CallArgs&&... args);
+			
+			template<size_t... AI, size_t... CI, typename... CallArgs>
+			void mapOverlapMultipleThread_CL(size_t numDevices, skepu::Tensor3<Ret>& res, skepu::Tensor3<T>& arg, pack_indices<AI...>, pack_indices<CI...>,  CallArgs&&... args);
+			
+#endif
+		
+#ifdef SKEPU_CUDA
+			
+			template<size_t... AI, size_t... CI, typename... CallArgs>
+			void mapOverlapSingleThread_CU(size_t deviceID, Tensor3<Ret>& res, Tensor3<T>& arg, pack_indices<AI...>, pack_indices<CI...>,  CallArgs&&... args);
+			
+			template<size_t... AI, size_t... CI, typename... CallArgs>
+			void mapOverlapMultipleThread_CU(size_t numDevices, Tensor3<Ret>& res, Tensor3<T>& arg, pack_indices<AI...>, pack_indices<CI...>,  CallArgs&&... args);
+			
+			template<size_t... AI, size_t... CI, typename... CallArgs>
+			void helper_CUDA(skepu::Tensor3<Ret>& res, skepu::Tensor3<T>& arg, pack_indices<AI...> ai, pack_indices<CI...> ci,  CallArgs&&... args);
+			
+#endif
+			
+#ifdef SKEPU_HYBRID
+			
+			template<size_t... AnyIndx, size_t... ConstIndx, typename... CallArgs>
+			void helper_Hybrid(Tensor3<Ret>& res, Tensor3<T>& arg, pack_indices<AnyIndx...>, pack_indices<ConstIndx...>,  CallArgs&&... args);
+			
+#endif
+			
+		public:
+			template<typename... CallArgs>
+			Tensor3<Ret> &operator()(Tensor3<Ret> &res, Tensor3<T> &arg, CallArgs&&... args)
+			{
+				static constexpr size_t anyCont = std::tuple_size<typename MapOverlapFunc::ContainerArgs>::value;
+				typename make_pack_indices<anyCont, 0>::type any_indices;
+				typename make_pack_indices<sizeof...(CallArgs), anyCont>::type const_indices;
+				
+				if (  (arg.size_i() - this->m_overlap_i*2 != res.size_i())
+					&& (arg.size_j() - this->m_overlap_j*2 != res.size_j())
+					&& (arg.size_k() - this->m_overlap_k*2 != res.size_k()))
+					SKEPU_ERROR("MapOverlap3D: Non-matching container sizes");
+				
+				this->m_selected_spec = (this->m_user_spec != nullptr)
+					? this->m_user_spec
+					: &this->m_execPlan->find(arg.size());
+				
+				switch (this->m_selected_spec->backend())
+				{
+				case Backend::Type::Hybrid:
+#ifdef SKEPU_HYBRID
+					this->helper_OpenMP(res, arg, any_indices, const_indices, std::forward<CallArgs>(args)...);
+					break;
+#endif
+				case Backend::Type::CUDA:
+#ifdef SKEPU_CUDA
+					this->helper_CUDA(res, arg, any_indices, const_indices, std::forward<CallArgs>(args)...);
+					break;
+#endif
+				case Backend::Type::OpenCL:
+#ifdef SKEPU_OPENCL
+					this->helper_OpenCL(res, arg, any_indices, const_indices, std::forward<CallArgs>(args)...);
+					break;
+#endif
+				case Backend::Type::OpenMP:
+#ifdef SKEPU_OPENMP
+					this->helper_OpenMP(res, arg, any_indices, const_indices, std::forward<CallArgs>(args)...);
+					break;
+#endif
+				default:
+					this->helper_CPU(res, arg, any_indices, const_indices, std::forward<CallArgs>(args)...);
+					break;
+				}
+				
+				return res;
+			}
+		};
+		
+		
+		
+		
+		
+		
+		
+		
+		template<typename MapOverlapFunc, typename CUDAKernel, typename CLKernel>
+		class MapOverlap4D: public SkeletonBase
+		{
+			using Ret = typename MapOverlapFunc::Ret;
+			using T = typename region_type<typename parameter_type<0, decltype(&MapOverlapFunc::CPU)>::type>::type;
+			
+		public:
+			
+			static constexpr auto skeletonType = SkeletonType::MapOverlap4D;
+			using ResultArg = std::tuple<T>;
+			using ElwiseArgs = std::tuple<T>;
+			using ContainerArgs = typename MapOverlapFunc::ContainerArgs;
+			using UniformArgs = typename MapOverlapFunc::UniformArgs;
+			static constexpr bool prefers_matrix = false;
+			
+			MapOverlap4D(CUDAKernel kernel) : m_cuda_kernel(kernel)
+			{
+#ifdef SKEPU_OPENCL
+				CLKernel::initialize();
+#endif
+			}
+			
+			void setEdgeMode(Edge mode)
+			{
+				this->m_edge = mode;
+			}
+			
+			void setPad(T pad)
+			{
+				this->m_pad = pad;
+			}
+			
+			void setOverlap(int o)
+			{
+				this->m_overlap_i = o;
+				this->m_overlap_j = o;
+				this->m_overlap_j = o;
+				this->m_overlap_l = o;
+			}
+			
+			void setOverlap(int oi, int oj, int ok, int ol)
+			{
+				this->m_overlap_i = oi;
+				this->m_overlap_j = oj;
+				this->m_overlap_k = ok;
+				this->m_overlap_l = ol;
+			}
+			
+			std::tuple<int, int, int, int> getOverlap() const
+			{
+				return std::make_tuple(this->m_overlap_i, this->m_overlap_j, this->m_overlap_k, this->m_overlap_l);
+			}
+			
+			template<typename... Args>
+			void tune(Args&&... args)
+			{
+				tuner::tune(*this, std::forward<Args>(args)...);
+			}
+			
+		private:
+			CUDAKernel m_cuda_kernel;
+			
+			Edge m_edge = Edge::Duplicate;
+			T m_pad {};
+			
+			int m_overlap_i, m_overlap_j, m_overlap_k, m_overlap_l;
+			
+			
+		private:
+			template<size_t... AnyIndx, size_t... ConstIndx, typename... CallArgs>
+			void helper_CPU(Tensor4<Ret>& res, Tensor4<T>& arg, pack_indices<AnyIndx...>, pack_indices<ConstIndx...>,  CallArgs&&... args);
+			
+#ifdef SKEPU_OPENMP
+			
+			template<size_t... AnyIndx, size_t... ConstIndx, typename... CallArgs>
+			void helper_OpenMP(Tensor4<Ret>& res, Tensor4<T>& arg, pack_indices<AnyIndx...>, pack_indices<ConstIndx...>,  CallArgs&&... args);
+			
+#endif
+		
+#ifdef SKEPU_OPENCL
+			
+			template<size_t... AI, size_t... CI, typename... CallArgs>
+			void helper_OpenCL(skepu::Tensor4<Ret>& res, skepu::Tensor4<T>& arg, pack_indices<AI...>, pack_indices<CI...>,  CallArgs&&... args);
+			
+			template<size_t... AI, size_t... CI, typename... CallArgs>
+			void mapOverlapSingleThread_CL(size_t deviceID, skepu::Tensor4<Ret>& res, skepu::Tensor4<T>& arg, pack_indices<AI...>, pack_indices<CI...>,  CallArgs&&... args);
+			
+			template<size_t... AI, size_t... CI, typename... CallArgs>
+			void mapOverlapMultipleThread_CL(size_t numDevices, skepu::Tensor4<Ret>& res, skepu::Tensor4<T>& arg, pack_indices<AI...>, pack_indices<CI...>,  CallArgs&&... args);
+			
+#endif
+		
+#ifdef SKEPU_CUDA
+			
+			template<size_t... AI, size_t... CI, typename... CallArgs>
+			void mapOverlapSingleThread_CU(size_t deviceID, Tensor4<Ret>& res, Tensor4<T>& arg, pack_indices<AI...>, pack_indices<CI...>,  CallArgs&&... args);
+			
+			template<size_t... AI, size_t... CI, typename... CallArgs>
+			void mapOverlapMultipleThread_CU(size_t numDevices, Tensor4<Ret>& res, Tensor4<T>& arg, pack_indices<AI...>, pack_indices<CI...>,  CallArgs&&... args);
+			
+			template<size_t... AI, size_t... CI, typename... CallArgs>
+			void helper_CUDA(skepu::Tensor4<Ret>& res, skepu::Tensor4<T>& arg, pack_indices<AI...> ai, pack_indices<CI...> ci,  CallArgs&&... args);
+			
+#endif
+			
+#ifdef SKEPU_HYBRID
+			
+			template<size_t... AnyIndx, size_t... ConstIndx, typename... CallArgs>
+			void helper_Hybrid(Tensor4<Ret>& res, Tensor4<T>& arg, pack_indices<AnyIndx...>, pack_indices<ConstIndx...>,  CallArgs&&... args);
+			
+#endif
+			
+		public:
+			template<typename... CallArgs>
+			Tensor4<Ret> &operator()(Tensor4<Ret> &res, Tensor4<T> &arg, CallArgs&&... args)
+			{
+				static constexpr size_t anyCont = std::tuple_size<typename MapOverlapFunc::ContainerArgs>::value;
+				typename make_pack_indices<anyCont, 0>::type any_indices;
+				typename make_pack_indices<sizeof...(CallArgs), anyCont>::type const_indices;
+				
+				if (  (arg.size_i() - this->m_overlap_i*2 != res.size_i())
+					&& (arg.size_j() - this->m_overlap_j*2 != res.size_j())
+					&& (arg.size_k() - this->m_overlap_k*2 != res.size_k())
+					&& (arg.size_l() - this->m_overlap_l*2 != res.size_l()))
+					SKEPU_ERROR("MapOverlap4D: Non-matching container sizes");
+				
+				this->m_selected_spec = (this->m_user_spec != nullptr)
+					? this->m_user_spec
+					: &this->m_execPlan->find(arg.size());
+				
+				switch (this->m_selected_spec->backend())
+				{
+				case Backend::Type::Hybrid:
+#ifdef SKEPU_HYBRID
+					this->helper_OpenMP(res, arg, any_indices, const_indices, std::forward<CallArgs>(args)...);
+					break;
+#endif
+				case Backend::Type::CUDA:
+#ifdef SKEPU_CUDA
+					this->helper_CUDA(res, arg, any_indices, const_indices, std::forward<CallArgs>(args)...);
+					break;
+#endif
+				case Backend::Type::OpenCL:
+#ifdef SKEPU_OPENCL
+					this->helper_OpenCL(res, arg, any_indices, const_indices, std::forward<CallArgs>(args)...);
+					break;
+#endif
+				case Backend::Type::OpenMP:
+#ifdef SKEPU_OPENMP
+					this->helper_OpenMP(res, arg, any_indices, const_indices, std::forward<CallArgs>(args)...);
+					break;
+#endif
+				default:
+					this->helper_CPU(res, arg, any_indices, const_indices, std::forward<CallArgs>(args)...);
+					break;
+				}
+				
+				return res;
+			}
+		};
+		
+		
+		
+		
 		
 	} // namespace backend
 
