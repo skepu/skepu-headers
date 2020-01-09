@@ -12,6 +12,16 @@ namespace skepu
 		size_t col;
 		size_t i;
 		inline bool transpose(); // bool, so it can be used in pack_expand
+
+		Index2D() noexcept = default;
+
+		Index2D(size_t _row, size_t _col, size_t _i = 0) noexcept
+		: row{_row}, col{_col}, i{_i}
+		{}
+
+		Index2D(Index2D const & other) noexcept
+		: row{other.row}, col{other.col}, i{other.i}
+		{}
 	};
 	inline Index2D operator+(const Index2D & lhs, const Index2D & rhs);
 

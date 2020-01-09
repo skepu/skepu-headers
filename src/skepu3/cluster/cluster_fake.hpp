@@ -11,14 +11,28 @@ namespace skepu
 		static size_t
 		mpi_rank() {
 			return 0;
-		};
+		}
+
 		static size_t
 		mpi_size() {
 			return 1;
-		};
+		}
+
 		static size_t
 		mpi_tag() {
 			return 0;
-		};
+		}
+
+		static auto
+		starpu_ncpus()
+		-> int
+		{
+			return 0;
+		}
+
+		static auto
+		barrier()
+		-> void
+		{}
 	}
 }

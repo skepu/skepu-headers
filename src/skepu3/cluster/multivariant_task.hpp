@@ -165,9 +165,9 @@ namespace skepu
 			template<typename T> auto setBackend(T) -> void {}
 			auto resetBackend() -> void {}
 
-		public:
-			starpu_codelet* cl;
-			struct starpu_perfmodel* perf_model;
+		private:
+			starpu_codelet cl;
+			starpu_perfmodel perf_model;
 		};
 	} // cluster
 } // skepu

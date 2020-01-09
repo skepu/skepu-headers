@@ -22,8 +22,8 @@ namespace skepu
 		template<typename T>
 		class starpu_matrix_container {
 			bool m_unpartitioned_valid = false;
-			starpu_data_handle_t m_unpartitioned;
-			uintptr_t m_unpartitioned_data = 0;
+			T * local_data_ptr;
+			starpu_data_handle_t local_data_handle;
 			std::vector<starpu_data_handle_t> m_children;
 			std::vector<uintptr_t> m_child_data;
 			size_t m_n_owned_children = 0;
@@ -32,6 +32,7 @@ namespace skepu
 			helpers::cut_structure m_col_struct;
 
 			void partition();
+			void partition(starpu_matrix_container const &);
 			size_t block_row_col_to_idx(const size_t & block_row,
 			                            const size_t & block_col) const;
 			size_t local_elem_idx(starpu_data_handle_t & handle,
@@ -45,8 +46,10 @@ namespace skepu
 			size_t elem_owner(const size_t & row, const size_t & col) const;
 			T operator()(const size_t & row, const size_t & col);
 			T operator[](const size_t & col);
-			starpu_data_handle_t& get_block(const size_t & block_row,
+			starpu_data_handle_t & get_block(const size_t & block_row,
 			                                const size_t & block_col);
+			starpu_data_handle_t const & get_block(const size_t & block_row,
+			                                const size_t & block_col) const;
 			starpu_data_handle_t& get_block_by_elem(const size_t & row,
 			                                        const size_t & col);
 			void set(const size_t & row, const size_t & col, const T & value);

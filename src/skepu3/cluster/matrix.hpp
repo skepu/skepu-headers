@@ -36,15 +36,16 @@ namespace skepu
 
 		Matrix();
 		Matrix(const size_t size);
-		Matrix(const size_t size, const T& val);
+		//Matrix(const size_t size, const T& val);
 		Matrix(const size_t size, const std::vector<T>& vals);
 		Matrix(const size_t size, std::vector<T>&& vals);
 		Matrix(const Size2D & size);
-		Matrix(const Size2D & size, const T& val);
+		Matrix(size_t const rows, size_t const cols);
+		//Matrix(const Size2D & size, const T& val);
 		Matrix(const Size2D & size, const std::vector<T>& vals);
 		Matrix(const Size2D & size, std::vector<T>&& vals);
-		Matrix(Matrix<T>& copy);
-		~Matrix();
+		Matrix(Matrix<T> const & copy);
+		~Matrix() = default;
 
 		const Matrix<T>& getParent() const;
 		Matrix<T>& getParent();
@@ -65,22 +66,21 @@ namespace skepu
 
 		size_t capacity() const;
 		bool empty() const;
-		T at(size_t index);
-		T at(size_t row, size_t col);
+		T at(size_t index) const;
+		T at(size_t row, size_t col) const;
 		T operator[](const size_t index);
 		T operator()(const Index2D index);
 		T operator()(const size_t index);
 		T operator()(const size_t & row, const size_t & col);
+		Matrix & operator=(Matrix const & other);
 		void set(size_t index, const T & data = {});
 		void set(size_t row, size_t col, const T & data = {});
 
 		void flush();
 		void clear();
 
-
 		void swap(Matrix<T>& from);
 		Matrix<T>& operator~(); // transpose
-
 
 		cluster::starpu_matrix_container<T> & data();
 		const Offset2D & offset() const;

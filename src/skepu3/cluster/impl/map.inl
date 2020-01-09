@@ -56,7 +56,7 @@ namespace skepu
 		}
 
 
-
+static int iteration = 0;
 		template<size_t arity,
 		         typename MapFunc,
 		         typename CUDAKernel,
@@ -67,7 +67,7 @@ namespace skepu
 		         size_t... CI,
 		         typename... Uniform>
 		void Map<arity,MapFunc,CUDAKernel,CLKernel>
-		::cpu(const void* self,
+		::cpu(const void* /* self */,
 		      Size2D size,
 		      Offset2D global_offset,
 		      MatT && bufs, // skepu::Mat<T>...
@@ -76,13 +76,11 @@ namespace skepu
 		      pack_indices<CI...>,
 		      Uniform... args)
 		{
-			omp_set_num_threads(starpu_combined_worker_get_size());
-
 			auto & res = std::get<0>(bufs);
 
-			for (size_t row = 0; row < size.row; ++row) {
-#pragma omp parallel for
-				for (size_t col = 0; col < size.col; ++col) {
+			for(size_t row = 0; row < size.row; ++row) {
+				#pragma omp parallel for num_threads(starpu_combined_worker_get_size())
+				for(size_t col = 0; col < size.col; ++col) {
 					Index2D i {};
 					i.col = col;
 					i.row = row;

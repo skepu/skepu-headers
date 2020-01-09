@@ -26,29 +26,30 @@ namespace skepu
 		                  Self>
 		::multivariant_task()
 		{
-			if (perf_model == NULL)
-			{
-				perf_model = new struct starpu_perfmodel;
-				// Initialize performance model
-				memset(perf_model, 0, sizeof(struct starpu_perfmodel));
-				perf_model->type = STARPU_HISTORY_BASED;
-				perf_model->symbol = __PRETTY_FUNCTION__;
-			}
-			if (cl == NULL)
-			{
-				cl = new starpu_codelet();
-				starpu_codelet_init(cl);
-				cl->nbuffers = n_handles;
-				cl->max_parallelism = INT_MAX;
-				cl->type = STARPU_FORKJOIN; // For OpenMP
-				cl->where = STARPU_CPU;
-				cl->cpu_funcs[0] = cpu_starpu_func;
+			// Initialize performance model
+			memset(&perf_model, 0, sizeof(starpu_perfmodel));
+			starpu_perfmodel_init(&perf_model);
+			perf_model.type = STARPU_HISTORY_BASED;
+			// Not really used for now.
+			perf_model.symbol = __PRETTY_FUNCTION__;
 
-				helpers::set_codelet_read_only_modes(handle_indices, *cl);
-				for(size_t i {}; i < n_result; ++i)
-				{
-					cl->modes[i] = STARPU_RW;
-				}
+			starpu_codelet_init(&cl);
+			cl.nbuffers = n_handles;
+			cl.max_parallelism = INT_MAX;
+			cl.type = STARPU_FORKJOIN; // For OpenMP
+			cl.where = STARPU_CPU;
+			cl.cpu_funcs[0] = cpu_starpu_func;
+			cl.cpu_funcs_name[0] = __PRETTY_FUNCTION__;
+			cl.modes[0] = STARPU_RW;
+			/* Performance model not neede?
+			 * Creates a problem with starpu_shutdown if used with MPI.
+			 */
+			//cl.model = &perf_model;
+
+			helpers::set_codelet_read_only_modes(handle_indices, cl);
+			for(size_t i {}; i < n_result; ++i)
+			{
+				cl.modes[i] = STARPU_RW;
 			}
 		}
 
@@ -184,7 +185,7 @@ namespace skepu
 		                       Size2D total_size,
 		                       Args & ...args)
 		{
-			auto modes = helpers::modes_from_codelet(*cl);
+			auto modes = helpers::modes_from_codelet(cl);
 
 			Index2D i {};
 			while (i.row < total_size.row)
@@ -233,7 +234,7 @@ namespace skepu
 					auto handles = std::tuple_cat(tc.task_handles, container_handles);
 
 					auto uniform_args = std::make_tuple(td, get<UI>(args...)...);
-					helpers::schedule_task(cl,
+					helpers::schedule_task(&cl,
 					                       modes,
 					                       handles,
 					                       uniform_args);
@@ -289,7 +290,7 @@ namespace skepu
 		                                     Args & ...args)
 		{
 			// Note that RI points to empty std::vector<starpu_var<T>>.
-			auto modes = helpers::modes_from_codelet(*cl);
+			auto modes = helpers::modes_from_codelet(cl);
 			auto & partials = get<0>(args...);
 
 			Index2D i {};
@@ -343,7 +344,7 @@ namespace skepu
 					auto handles = std::tuple_cat(tc.task_handles, container_handles);
 
 					auto uniform_args = std::make_tuple(td, get<UI>(args...)...);
-					helpers::schedule_task(cl,
+					helpers::schedule_task(&cl,
 					                       modes,
 					                       handles,
 					                       uniform_args);
@@ -403,7 +404,7 @@ namespace skepu
 		                             const skepu::SweepMode dir,
 		                             Args & ...args)
 		{
-			auto modes = helpers::modes_from_codelet(*cl);
+			auto modes = helpers::modes_from_codelet(cl);
 
 			Index2D i {};
 			while (i.row < total_size.row)
@@ -485,7 +486,7 @@ namespace skepu
 					auto handles = std::tuple_cat(tc.task_handles, container_handles);
 
 					auto uniform_args = std::make_tuple(td, get<UI>(args...)...);
-					helpers::schedule_task(cl,
+					helpers::schedule_task(&cl,
 					                       modes,
 					                       handles,
 					                       uniform_args);

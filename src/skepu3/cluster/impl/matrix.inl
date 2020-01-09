@@ -20,27 +20,7 @@ namespace skepu
 		  m_data {
 			  std::make_shared<cluster::starpu_matrix_container<T>>(size.row,
 			                                                        size.col)}
-	{
-		// TODO: Make this non-stupid
-		for (size_t row {}; row < size.row; ++row) {
-			for (size_t col {}; col < size.col; ++col) {
-				m_data->set(row, col, (T){});
-			}
-		}
-	}
-
-	template<typename T>
-	Matrix<T>
-	::Matrix(const Size2D & size, const T& val)
-		: Matrix(size)
-	{
-		// TODO: Make this non-stupid
-		for (size_t row {}; row < size.row; ++row) {
-			for (size_t col {}; col < size.col; ++col) {
-				m_data->set(row, col, val);
-			}
-		}
-	}
+	{}
 
 	template<typename T>
 	Matrix<T>
@@ -68,14 +48,7 @@ namespace skepu
 	template<typename T>
 	Matrix<T>
 	::Matrix(const size_t size)
-		: Matrix({1, size}) {}
-
-
-	template<typename T>
-	Matrix<T>
-	::Matrix(const size_t size, const T& val)
-		: Matrix({1, size}, val) {}
-
+		: Matrix(Size2D{1, size}) {}
 
 	template<typename T>
 	Matrix<T>
@@ -88,30 +61,32 @@ namespace skepu
 	::Matrix(const size_t size, std::vector<T>&& vals)
 		: Matrix({1, size}, std::forward<std::vector<T>>(vals)) {}
 
+template<typename T>
+Matrix<T>
+::Matrix(size_t const rows, size_t const cols)
+: Matrix{Size2D{rows, cols}}
+{}
+
 
 	template<typename T>
 	Matrix<T>
-	::Matrix(Matrix<T>& copy)
-		: m_size { copy.m_size },
-		  m_offset { },
-		  m_data {
-			  std::make_shared<cluster::starpu_matrix_container<T>>(m_size.col,
-			                                                        m_size.row)
-				  }
+	::Matrix(Matrix<T> const & copy)
+		: m_size{copy.m_size},
+		  m_offset{},
+			m_data{
+				std::make_shared<cluster::starpu_matrix_container<T>>(
+					copy.total_rows(),
+					copy.total_cols())}
 	{
 		// TODO: Make this non-stupid
+		// Is it possible to only update the local copy on every node?
+		// That would make the copy O(N/p) in time, if there is one block per p.
 		for (size_t row {}; row < m_size.row; ++row) {
 			for (size_t col {}; col < m_size.col; ++col) {
-				(*m_data).set(row, col, copy.at(row,col));
+				m_data->set(row, col, copy.at(row,col));
 			}
 		}
 	}
-
-
-	template<typename T>
-	Matrix<T>
-	::~Matrix() {}
-
 
 	template<typename T>
 	size_t Matrix<T>
@@ -189,7 +164,7 @@ namespace skepu
 
 	template<typename T>
 	T Matrix<T>
-	::at(size_t index)
+	::at(size_t index) const
 	{
 		return at(index/total_cols(),index%total_cols());
 	}
@@ -197,7 +172,7 @@ namespace skepu
 
 	template<typename T>
 	T Matrix<T>
-	::at(size_t row, size_t col)
+	::at(size_t row, size_t col) const
 	{
 		assert(row < m_size.row && "Index out of bounds");
 		assert(col < m_size.col && "Index out of bounds");
@@ -233,6 +208,27 @@ namespace skepu
 	::operator()(const size_t & row, const size_t & col)
 	{
 		return at(row, col);
+	}
+
+	template<typename T>
+	Matrix<T> &
+	Matrix<T>::
+	operator=(Matrix<T> const & other)
+	{
+		m_size = other.m_size;
+		m_offset = other.m_offset;
+		m_data =
+			std::make_shared<cluster::starpu_matrix_container<T>>(
+				m_size.row,
+				m_size.col);
+
+		for (size_t row {}; row < m_size.row; ++row) {
+			for (size_t col {}; col < m_size.col; ++col) {
+				(*m_data).set(row, col, other.at(row,col));
+			}
+		}
+
+		return *this;
 	}
 
 	template<typename T>

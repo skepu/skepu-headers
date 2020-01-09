@@ -87,7 +87,7 @@ namespace skepu
 		template<typename T, typename FN>
 		auto inline
 		reducer(T & a, T & b, FN fn)
-		-> T &
+		-> T
 		{
 			return fn(a,b);
 		}

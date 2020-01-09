@@ -24,38 +24,43 @@ namespace skepu
 			m_col_struct { width,
 					std::min<size_t>(skepu::cluster::mpi_size(), width) }
 		{
-			mpi_size();
 			partition();
 			m_unpartitioned_valid = false;
-		}
+			auto rows = m_row_struct.size();
+			auto columns = m_col_struct.size();
+			auto size = rows * columns;
+			auto tag = skepu::cluster::mpi_tag();
 
+			local_data_ptr = new T[size];
+			starpu_matrix_data_register(
+				&local_data_handle,
+				STARPU_MAIN_RAM,
+				(uintptr_t)local_data_ptr,
+				columns,
+				columns,
+				rows,
+				sizeof(T));
+			starpu_mpi_data_register(
+				local_data_handle,
+				tag,
+				STARPU_MAIN_RAM);
+		}
 
 		template<typename T>
 		starpu_matrix_container<T>
 		::~starpu_matrix_container()
 		{
-			starpu_task_wait_for_all();
+			starpu_data_unregister_no_coherency(local_data_handle);
+			delete[] local_data_ptr;
 
-			invalidate_unpartition();
-			if(m_unpartitioned_data)
+			for (size_t i {}; i < m_children.size(); ++i)
 			{
-				starpu_data_unregister(m_unpartitioned);
-				starpu_free((void*)m_unpartitioned_data);
-				m_unpartitioned_data = 0;
-			}
-
-			for (size_t i {}; i < m_children.size(); ++i) {
 				auto & handle = m_children[i];
-				auto & data = m_child_data[i];
 
-				starpu_data_unregister(handle);
-
-				if(data) {
-						starpu_free((void*)data);
-				}
+				starpu_data_unregister_no_coherency(handle);
+				if(m_child_data[i])
+					starpu_free((void *)m_child_data[i]);
 			}
-
-			m_children.clear();
 		}
 
 
@@ -122,7 +127,7 @@ namespace skepu
 		::operator()(const size_t & row, const size_t & col)
 		{
 			if(m_unpartitioned_valid)
-				return ((T *)m_unpartitioned_data)[row*width() + col];
+				return local_data_ptr[row*width() + col];
 
 			assert (row < m_row_struct.size() && col < m_col_struct.size());
 			starpu_data_handle_t & handle = get_block_by_elem(row, col);
@@ -143,11 +148,9 @@ namespace skepu
 			invalidate_unpartition();
 			starpu_data_handle_t & handle = get_block_by_elem(row, col);
 
-			// TODO: Is this correct?
-			//starpu_mpi_cache_flush(MPI_COMM_WORLD, handle);
-			if (elem_owner(row, col) == skepu::cluster::mpi_rank())
+			if(elem_owner(row, col) == skepu::cluster::mpi_rank())
 			{
-				starpu_data_acquire(handle, STARPU_RW);
+				starpu_data_acquire(handle, STARPU_W);
 				T* local = (T*)starpu_matrix_get_local_ptr(handle);
 				local[local_elem_idx(handle, row, col)] = value;
 				starpu_data_release(handle);
@@ -175,7 +178,6 @@ namespace skepu
 			return (*this)(col/width(), col%width());
 		}
 
-
 		/**
 		 * @brief Get a handle for the block containing the element at (row, col)
 		 *
@@ -193,6 +195,19 @@ namespace skepu
 		}
 
 
+		/**
+		 * @brief Get a handle for a block
+		 *
+		 * @param block_row
+		 * @param block_col
+		 * @return starpu_data_handle_t &
+		 */
+		template <typename T>
+		starpu_data_handle_t & starpu_matrix_container<T>
+		::get_block(const size_t & block_row, const size_t & block_col)
+		{
+			return m_children[block_row_col_to_idx(block_row, block_col)];
+		}
 
 		/**
 		 * @brief Get a handle for a block
@@ -202,8 +217,8 @@ namespace skepu
 		 * @return starpu_data_handle_t &
 		 */
 		template <typename T>
-		starpu_data_handle_t& starpu_matrix_container<T>
-		::get_block(const size_t & block_row, const size_t & block_col)
+		starpu_data_handle_t const & starpu_matrix_container<T>
+		::get_block(const size_t & block_row, const size_t & block_col) const
 		{
 			return m_children[block_row_col_to_idx(block_row, block_col)];
 		}
@@ -263,9 +278,9 @@ namespace skepu
 				     ++col_block) {
 					uintptr_t data = (uintptr_t)NULL;
 					const size_t owner = block_owner(row_block, col_block);
+					auto const block_index = block_row_col_to_idx(row_block, col_block);
 					int home_node = -1;
-					auto & handle =
-						m_children[block_row_col_to_idx(row_block, col_block)];
+					auto & handle = m_children[block_index];
 
 					// Only allocate data if we are the owner.
 					if (owner == skepu::cluster::mpi_rank()) {
@@ -276,7 +291,7 @@ namespace skepu
 						home_node = STARPU_MAIN_RAM;
 						m_n_owned_children++;
 					}
-					m_child_data[block_row_col_to_idx(row_block, col_block)] = data;
+					m_child_data[block_index] = data;
 
 					starpu_matrix_data_register(&handle,
 					                            home_node,
@@ -302,7 +317,74 @@ namespace skepu
 			}
 		}
 
+		/** Allocate and copy data from other container.
+		 *
+		 * \param other The source of the data.
+		 */
+	/*
+		template <typename T>
+		void
+		starpu_matrix_container<T>
+		::partition(starpu_matrix_container<T> const & other)
+		{
+			m_children.resize(m_row_struct.block_count()*m_col_struct.block_count());
+			m_child_data.resize(m_children.size());
 
+			for (size_t row_block {};
+			     row_block < m_row_struct.block_count();
+			     ++row_block) {
+				for (size_t col_block {};
+				     col_block < m_col_struct.block_count();
+				     ++col_block) {
+					uintptr_t data = (uintptr_t)NULL;
+					const size_t owner = block_owner(row_block, col_block);
+					auto block_index = block_row_col_to_idx(row_block, col_block);
+					int home_node = -1;
+					auto & handle = m_children[block_index];
+
+					// Only allocate data if we are the owner.
+					auto other_handle = other.get_block(row_block, col_block);
+					starpu_data_acquire(other_handle, STARPU_R);
+					if (owner == skepu::cluster::mpi_rank())
+					{
+						size_t block_size(
+							sizeof(T)
+							* m_row_struct.block_size(row_block)
+							* m_col_struct.block_size(col_block));
+						starpu_malloc((void**)&data, block_size);
+						home_node = STARPU_MAIN_RAM;
+						m_n_owned_children++;
+						T * src = (T *)starpu_matrix_get_local_ptr(other_handle);
+						for(size_t i(0); i < block_size; ++i)
+							((T *)data)[i] = src[i];
+					}
+					starpu_data_release(other_handle);
+					m_child_data[block_index] = data;
+
+					starpu_matrix_data_register(&handle,
+					                            home_node,
+					                            data,
+					                            // stride
+					                            m_col_struct.block_size(col_block),
+					                            // width
+					                            m_col_struct.block_size(col_block),
+					                            // height
+					                            m_row_struct.block_size(row_block),
+					                            sizeof(T));
+
+					assert(starpu_matrix_get_nx(handle)
+					       == m_col_struct.block_size(col_block));
+
+					assert(starpu_matrix_get_ny(handle)
+					       == m_row_struct.block_size(row_block));
+
+					starpu_mpi_data_register(handle,
+					                         skepu::cluster::mpi_tag(),
+					                         owner);
+				}
+			}
+		}
+	*/
 
 		/**
 		 * @brief The height of the matrix
@@ -350,37 +432,21 @@ namespace skepu
 		starpu_data_handle_t starpu_matrix_container<T>
 		::allgather()
 		{
+			starpu_mpi_wait_for_all(MPI_COMM_WORLD);
+
 			if(m_unpartitioned_valid)
-				return m_unpartitioned;
+				return local_data_handle;
 
-			assert(m_col_struct.size() > 0);
-			assert(m_row_struct.size() > 0);
+			assert(starpu_matrix_get_nx(local_data_handle) == m_col_struct.size());
+			assert(starpu_matrix_get_ny(local_data_handle) == m_row_struct.size());
 
-			// Allocate and register the full matrix on each node
-			if (m_unpartitioned_data == 0)
-			{
-				starpu_malloc((void**)&m_unpartitioned_data,
-				              sizeof(T)*m_row_struct.size()*m_col_struct.size());
-				starpu_matrix_data_register(&m_unpartitioned,
-																		STARPU_MAIN_RAM,
-																		m_unpartitioned_data,
-																		m_col_struct.size(), // stride
-																		m_col_struct.size(), // width
-																		m_row_struct.size(), // height
-																		sizeof(T));
-				/* The cause of the problems with unexpected messages. */
-				starpu_mpi_data_register(m_unpartitioned,
-																 skepu::cluster::mpi_tag(),
-																 skepu::cluster::mpi_rank());
-			}
-			T* data_ptr = (T*)m_unpartitioned_data;
-
-			assert(starpu_matrix_get_nx(m_unpartitioned) == m_col_struct.size());
-			assert(starpu_matrix_get_ny(m_unpartitioned) == m_row_struct.size());
-
-			starpu_data_acquire(m_unpartitioned, STARPU_W);
+			starpu_data_acquire(local_data_handle, STARPU_W);
 
 			for (auto & child : m_children) {
+				/*
+				 * Is this blocking? It sure should be...
+				 * If it is blocking, remove the barrier at the top of allgather.
+				 */
 				starpu_mpi_get_data_on_all_nodes_detached(MPI_COMM_WORLD, child);
 			}
 
@@ -405,7 +471,7 @@ namespace skepu
 
 					for (size_t row {}; row < local_rows; ++row) {
 						for (size_t col {}; col < local_cols; ++col) {
-							data_ptr[width()*(row + row_offset) + (col + col_offset)] =
+							local_data_ptr[width()*(row + row_offset) + (col + col_offset)] =
 								local_data[row*local_ld + col];
 						}
 					}
@@ -414,9 +480,9 @@ namespace skepu
 				}
 			}
 
-			starpu_data_release(m_unpartitioned);
+			starpu_data_release(local_data_handle);
 			m_unpartitioned_valid = true;
-			return m_unpartitioned;
+			return local_data_handle;
 		}
 
 		/**
