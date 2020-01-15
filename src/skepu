@@ -22,17 +22,11 @@
 #ifdef SKEPU_MPI_STARPU
 
 #include "skepu3/cluster/cluster.hpp"
-#include "skepu3/cluster/starpu_matrix_container.hpp"
-#include "skepu3/cluster/task_creator.hpp"
-#include "skepu3/cluster/matrix.hpp"
-#include "skepu3/cluster/vec.hpp"
-#include "skepu3/cluster/vector.hpp"
-#include "skepu3/cluster/matrix_iterator.hpp"
-#include "skepu3/cluster/vector_iterator.hpp"
-#include "skepu3/cluster/access_mode.hpp"
-#include "skepu3/cluster/map.hpp"
-#include "skepu3/cluster/reduce1d.hpp"
-#include "skepu3/backend/debug.h"
+#include "skepu3/cluster/containers/matrix/matrix.hpp"
+#include "skepu3/cluster/containers/vector/vector.hpp"
+#include "skepu3/cluster/containers/tensor3/tensor3.hpp"
+#include "skepu3/cluster/skeletons/map.hpp"
+#include "skepu3/cluster/skeletons/reduce/reduce.hpp"
 
 #else
 

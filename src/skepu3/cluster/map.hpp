@@ -118,7 +118,7 @@ namespace skepu
 
 			template<template<class> class Container,
 			         typename... CallArgs,
-			         REQUIRES(is_skepu_matrix<Container<T>>::value)>
+			         REQUIRES(is_skepu_container<Container<T>>::value)>
 			Container<T> &operator()(Container<T> &res, CallArgs&&... args)
 				{
 					this->backendDispatch(elwise_indices,

@@ -25,6 +25,8 @@ namespace skepu
 		void Map<arity, MapFunc, CUDAKernel, CLKernel>
 		::Hybrid(size_t size, pack_indices<OI...> oi, pack_indices<EI...> ei, pack_indices<AI...> ai, pack_indices<CI...> ci, CallArgs&&... args)
 		{
+			static constexpr auto proxy_tags = typename MapFunc::ProxyTags{};
+
 			const float cpuPartitionSize = this->m_selected_spec->CPUPartitionRatio();
 			const size_t cpuSize = cpuPartitionSize*size;
 			const size_t gpuSize = size-cpuSize;
@@ -88,7 +90,7 @@ namespace skepu
 						auto index = (std::get<0>(std::make_tuple(get<OI, CallArgs...>(args...).begin()...)) + i).getIndex();
 						auto res = F::forward(MapFunc::OMP, index,
 							get<EI, CallArgs...>(args...)(i)..., 
-							get<AI, CallArgs...>(args...).hostProxy(std::get<AI-arity-outArity>(MapFunc::ProxyTags), index)...,
+							get<AI, CallArgs...>(args...).hostProxy(std::get<AI-arity-outArity>(proxy_tags), index)...,
 							get<CI, CallArgs...>(args...)...
 						);
 						std::tie(get<OI, CallArgs...>(args...)(i)...) = res;

@@ -86,14 +86,11 @@ namespace skepu
 		const Offset2D & offset() const;
 		const Size2D & size2D() const;
 	};
+
+template<typename T>
+struct is_skepu_container<skepu::Matrix<T>> : std::true_type {};
+
 }
-
-template<typename T>
-struct is_skepu_matrix: std::false_type {};
-
-template<typename T>
-struct is_skepu_matrix<skepu::Matrix<T>>: std::true_type {};
-
 
 #include <skepu3/cluster/impl/matrix.inl>
 

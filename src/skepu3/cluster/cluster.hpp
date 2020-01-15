@@ -1,19 +1,10 @@
 #ifndef CLUSTER_HPP
 #define CLUSTER_HPP
 
-#include <stdio.h>
 #include <starpu.h>
-#include <iostream>
 #include <starpu_mpi.h>
-#include <mpi.h>
 
 namespace skepu {
-	// TODO: Remove.
-	struct ProxyTag {
-		struct Default {};
-		struct MatRow {};
-	};
-
 	namespace cluster {
 		namespace state {
 			struct internal_state {
@@ -22,11 +13,14 @@ namespace skepu {
 				int mpi_size;
 				int mpi_tag {1};
 
+				// Figure out howto enable all cores when not using STARPU_NCPU
 				internal_state() {
 					starpu_conf_init(&conf);
 					conf.single_combined_worker = 1;
 					if(conf.ncpus > 1)
 						conf.sched_policy_name = "peager";
+					if(conf.ncpus == -1)
+						conf.reserve_ncpus = 1;
 					// Not using starpu_mpi_init_conf because that makes
 					// starpu_mpi_shutdown segfault.
 					assert(!starpu_init(&conf));
@@ -38,6 +32,7 @@ namespace skepu {
 
 				~internal_state() {
 					starpu_mpi_wait_for_all(MPI_COMM_WORLD);
+					starpu_mpi_barrier(MPI_COMM_WORLD);
 					starpu_mpi_shutdown();
 					// StarPU shutdown is apparently not MPI safe when using performance
 					// models.. However, starpu_mpi_shutdown should suffice.
