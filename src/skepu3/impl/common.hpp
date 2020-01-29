@@ -168,6 +168,17 @@ namespace skepu
 	};
 	
 	
+	// For multiple return Map variants
+	
+	template<typename... args>
+	using multiple = std::tuple<args...>;
+	
+	template <typename... Args>
+	auto ret(Args&&... args) -> decltype(std::make_tuple(std::forward<Args>(args)...)) {
+		return std::make_tuple(std::forward<Args>(args)...);
+	}
+	
+	
 #ifdef SKEPU_OPENCL
 	
 	/*!

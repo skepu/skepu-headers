@@ -11,6 +11,16 @@ struct bool_constant : std::integral_constant<bool, B> { };
 template<size_t I>
 struct index_constant : std::integral_constant<size_t, I> { };
 
+
+// FOR MAPTUPLE
+
+template<typename T>
+struct out_size: std::integral_constant<size_t, 1> {};
+
+template<typename... Args>
+struct out_size<std::tuple<Args...>>: std::integral_constant<size_t, sizeof... (Args)> {};
+
+
 /////////////////////////////
 // true_for_n
 //

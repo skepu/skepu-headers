@@ -220,6 +220,11 @@ namespace skepu
 			return m_cols;
 		}
 		
+		size_type size_i() const { return this->m_rows; }
+		size_type size_j() const { return this->m_cols; }
+		size_type size_k() const { return 0; }
+		size_type size_l() const { return 0; }
+		
 		// highly dangerous, use with care.
 		T *getAddress()
 		{

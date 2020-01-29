@@ -77,10 +77,13 @@ namespace skepu
 			return iterator(*this, &Vector<T>::m_data[0]);
 		}
 		
-		Ten3<T> hostProxy()
+		template<typename Ignore>
+		Ten3<T> hostProxy(ProxyTag::Default, Ignore)
 		{
 			return { this->m_data, this->m_size_i, this->m_size_j, this->m_size_k };
 		}
+		
+		Ten3<T> hostProxy() { return this->hostProxy(ProxyTag::Default{}, 0); }
 		
 		size_type size() const 
 		{
@@ -100,6 +103,11 @@ namespace skepu
 		size_type size_k() const 
 		{
 			return m_size_k;
+		}
+		
+		size_type size_l() const 
+		{
+			return 0;
 		}
 		
 		T& operator()(size_type i, size_type j, size_type k)
@@ -157,7 +165,11 @@ namespace skepu
 		
 		T* getAddress() const;
 		
-		Ten3<T> hostProxy() { return {this->m_std_iterator, this->size()}; }
+		template<typename Ignore>
+		Ten3<T> hostProxy(ProxyTag::Default, Ignore)
+		{ return {this->m_std_iterator, this->size()}; }
+		
+		Ten3<T> hostProxy() { return this->hostProxy(ProxyTag::Default{}, 0); }
 		
 		// Does not care about device data, use with care...sometimes pass negative indices...
 		T& operator()(const ssize_t index = 0);
@@ -258,10 +270,13 @@ namespace skepu
 			return iterator(*this, &Vector<T>::m_data[0]);
 		}
 		
-		Ten4<T> hostProxy()
+		template<typename Ignore>
+		Ten4<T> hostProxy(ProxyTag::Default, Ignore)
 		{
 			return { this->m_data, this->m_size_i, this->m_size_j, this->m_size_k, this->m_size_l };
 		}
+		
+		Ten4<T> hostProxy() { return this->hostProxy(ProxyTag::Default{}, 0); }
 		
 		size_type size() const 
 		{
@@ -344,7 +359,11 @@ namespace skepu
 		
 		T* getAddress() const;
 		
-		Ten4<T> hostProxy() { return {this->m_std_iterator, this->size()}; }
+		template<typename Ignore>
+		Ten4<T> hostProxy(ProxyTag::Default, Ignore)
+		{ return {this->m_std_iterator, this->size()}; }
+		
+		Ten4<T> hostProxy() { return this->hostProxy(ProxyTag::Default{}, 0); }
 		
 		// Does not care about device data, use with care...sometimes pass negative indices...
 		T& operator()(const ssize_t index = 0);

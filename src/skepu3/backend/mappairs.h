@@ -81,26 +81,8 @@ namespace skepu
 			template<template<class> class Container, typename... CallArgs, REQUIRES(is_skepu_container<Container<T>>::value)>
 			Container<T> &operator()(Container<T> &res, CallArgs&&... args)
 			{
-				this->backendDispatch(Velwise_indices, Helwise_indices, any_indices, const_indices, res.size(), res.begin(), args...);
+				this->backendDispatch(Velwise_indices, Helwise_indices, any_indices, const_indices, res.total_cols(), res.total_rows(), res.begin(), args...);
 				return res;
-			}
-			
-			
-			template<typename Iterator, typename... CallArgs, REQUIRES(is_skepu_iterator<Iterator, T>::value)>
-			Iterator operator()(Iterator res, Iterator res_end, CallArgs&&... args)
-			{
-				this->backendDispatch(Velwise_indices, Helwise_indices, any_indices, const_indices, res_end - res, res, args...);
-				return res;
-			}
-			
-			template<template<class> class Container = Vector, typename... CallArgs>
-			Container<T> operator()(CallArgs&&... args)
-			{
-				static_assert(sizeof...(CallArgs) == numArgs, "Number of arguments not matching Map function");
-				
-				Container<T> res(this->default_size_x);
-				this->backendDispatch(Velwise_indices, Helwise_indices, any_indices, const_indices, res.size(), res.begin(), std::forward<CallArgs>(args)...);
-				return std::move(res);
 			}
 			
 		private:
@@ -108,13 +90,13 @@ namespace skepu
 			// ==========================    Implementation     ==========================
 			
 			template<size_t... VEI, size_t... HEI,  size_t... AI, size_t... CI, typename Iterator, typename... CallArgs> 
-			void CPU(size_t Hsize, size_t Vsize,  pack_indices<VEI...>, pack_indices<HEI...>, pack_indices<AI...>, pack_indices<CI...>, Iterator res, CallArgs&&... args);
+			void CPU(size_t Vsize, size_t Hsize,  pack_indices<VEI...>, pack_indices<HEI...>, pack_indices<AI...>, pack_indices<CI...>, Iterator res, CallArgs&&... args);
 			
 			
 #ifdef SKEPU_OPENMP
 			
 			template<size_t... VEI, size_t... HEI, size_t... AI, size_t... CI, typename Iterator, typename ...CallArgs> 
-			void OMP(size_t Hsize, size_t Vsize,  pack_indices<VEI...>, pack_indices<HEI...>, pack_indices<AI...>, pack_indices<CI...>, Iterator res, CallArgs&&... args);
+			void OMP(size_t Vsize, size_t Hsize,  pack_indices<VEI...>, pack_indices<HEI...>, pack_indices<AI...>, pack_indices<CI...>, Iterator res, CallArgs&&... args);
 			
 #endif // SKEPU_OPENMP
 			
@@ -122,7 +104,7 @@ namespace skepu
 #ifdef SKEPU_CUDA
 			
 			template<size_t... VEI, size_t... HEI, size_t... AI, size_t... CI, typename Iterator, typename... CallArgs> 
-			void CUDA(size_t startIdx, size_t Hsize, size_t Vsize, pack_indices<VEI...>, pack_indices<HEI...>, pack_indices<AI...>, pack_indices<CI...>, Iterator res, CallArgs&&... args);
+			void CUDA(size_t startIdx, size_t Vsize, size_t Hsize, pack_indices<VEI...>, pack_indices<HEI...>, pack_indices<AI...>, pack_indices<CI...>, Iterator res, CallArgs&&... args);
 			
 #endif // SKEPU_CUDA
 			
@@ -130,14 +112,17 @@ namespace skepu
 #ifdef SKEPU_OPENCL
 			
 			template<size_t... VEI, size_t... HEI, size_t... AI, size_t... CI, typename Iterator, typename... CallArgs> 
-			void CL(size_t startIdx, size_t Hsize, size_t Vsize, pack_indices<VEI...>, pack_indices<HEI...>, pack_indices<AI...>, pack_indices<CI...>, Iterator res, CallArgs&&... args);
+			void CL(size_t startIdx, size_t Vsize, size_t Hsize, pack_indices<VEI...>, pack_indices<HEI...>, pack_indices<AI...>, pack_indices<CI...>, Iterator res, CallArgs&&... args);
+			
+			template<size_t... VEI, size_t... HEI, size_t... AI, size_t... CI, typename Iterator, typename... CallArgs> 
+			void mapNumDevices_CL(size_t startIdx, size_t numDevices, size_t Vsize, size_t Hsize, pack_indices<VEI...>, pack_indices<HEI...>, pack_indices<AI...>, pack_indices<CI...>, Iterator res, CallArgs&&... args);
 			
 #endif // SKEPU_OPENCL
   
 #ifdef SKEPU_HYBRID
 			
 			template<size_t... VEI, size_t... HEI, size_t... AI, size_t... CI, typename Iterator, typename... CallArgs> 
-			void Hybrid(size_t Hsize, size_t Vsize, pack_indices<VEI...>, pack_indices<HEI...>, pack_indices<AI...>, pack_indices<CI...>, Iterator res, CallArgs&&... args);
+			void Hybrid(size_t Vsize, size_t Hsize, pack_indices<VEI...>, pack_indices<HEI...>, pack_indices<AI...>, pack_indices<CI...>, Iterator res, CallArgs&&... args);
 			
 #endif // SKEPU_HYBRID
 			
@@ -175,17 +160,16 @@ namespace skepu
 #endif
 				case Backend::Type::OpenCL:
 #ifdef SKEPU_OPENCL
-					std::cerr << "MapPairs OpenCL: Not implemented" << std::endl;
-				//	this->CL(0, size, vei, hei, ai, ci, res, get<EI, CallArgs...>(args...).begin()..., get<AI, CallArgs...>(args...)..., get<CI, CallArgs...>(args...)...);
+					this->CL(0, Vsize, Hsize, vei, hei, ai, ci, res, get<VEI, CallArgs...>(args...).begin()..., get<HEI, CallArgs...>(args...).begin()..., get<AI, CallArgs...>(args...)..., get<CI, CallArgs...>(args...)...);
 					break;
 #endif
 				case Backend::Type::OpenMP:
 #ifdef SKEPU_OPENMP
-					this->OMP(Hsize, Vsize, vei, hei, ai, ci, res, get<VEI, CallArgs...>(args...).begin()..., get<HEI, CallArgs...>(args...).begin()..., get<AI, CallArgs...>(args...)..., get<CI, CallArgs...>(args...)...);
+					this->OMP(Vsize, Hsize, vei, hei, ai, ci, res, get<VEI, CallArgs...>(args...).begin()..., get<HEI, CallArgs...>(args...).begin()..., get<AI, CallArgs...>(args...)..., get<CI, CallArgs...>(args...)...);
 					break;
 #endif
 				default:
-					this->CPU(Hsize, Vsize, vei, hei, ai, ci, res, get<VEI, CallArgs...>(args...).begin()..., get<HEI, CallArgs...>(args...).begin()...,get<AI, CallArgs...>(args...)..., get<CI, CallArgs...>(args...)...);
+					this->CPU(Vsize, Hsize, vei, hei, ai, ci, res, get<VEI, CallArgs...>(args...).begin()..., get<HEI, CallArgs...>(args...).begin()...,get<AI, CallArgs...>(args...)..., get<CI, CallArgs...>(args...)...);
 					break;
 				}
 			}
@@ -226,7 +210,7 @@ MapPairs(Ret(*)(Args...))
 
 #include "impl/mappairs/mappairs_cpu.inl"
 #include "impl/mappairs/mappairs_omp.inl"
-//#include "impl/mappairs/mappairs_cl.inl"
+#include "impl/mappairs/mappairs_cl.inl"
 //#include "impl/mappairs/mappairs_cu.inl"
 //#include "impl/mappairs/mappairs_hy.inl"
 

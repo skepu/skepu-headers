@@ -184,6 +184,11 @@ namespace skepu
 		size_type size() const       { return this->m_size; }
 		size_type total_cols() const { return this->m_size; }
 		size_type max_size() const   { return 1073741823; }
+		
+		size_type size_i() const { return this->m_size; }
+		size_type size_j() const { return 0; }
+		size_type size_k() const { return 0; }
+		size_type size_l() const { return 0; }
 
 		void resize(size_type num, T val = T());
 		bool empty() const;

@@ -45,12 +45,8 @@ namespace skepu
 		
 		// For iterators
 		template<size_t... VEI, size_t... HEI, size_t... AI, size_t... CI, typename Iterator, typename... CallArgs> 
-		void apply(pack_indices<VEI...>, pack_indices<HEI...>, pack_indices<AI...>, pack_indices<CI...>, size_t Hsize, size_t Vsize, Iterator res, CallArgs&&... args)
+		void apply(pack_indices<VEI...>, pack_indices<HEI...>, pack_indices<AI...>, pack_indices<CI...>, size_t Vsize, size_t Hsize, Iterator res, CallArgs&&... args)
 		{
-		
-		//	std:: cout << "Varity: " << Varity << " Harity: " << Harity << "\n";
-		//	std:: cout << "Vsize: " << Vsize << " Hsize: " << Hsize << "\n";
-			
 			if (disjunction((get<VEI>(args...).size() < Vsize)...))
 				SKEPU_ERROR("Non-matching container sizes");
 			

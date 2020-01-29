@@ -21,9 +21,9 @@ namespace skepu
 	{
 	
 		template<size_t arity, typename MapFunc, typename CUDAKernel, typename CLKernel>
-		template<size_t... EI, size_t... AI, size_t... CI, typename Iterator, typename... CallArgs> 
+		template<size_t... OI, size_t... EI, size_t... AI, size_t... CI, typename... CallArgs> 
 		void Map<arity, MapFunc, CUDAKernel, CLKernel>
-		::Hybrid(size_t size, pack_indices<EI...> ei, pack_indices<AI...> ai, pack_indices<CI...> ci, Iterator res, CallArgs&&... args)
+		::Hybrid(size_t size, pack_indices<OI...> oi, pack_indices<EI...> ei, pack_indices<AI...> ai, pack_indices<CI...> ci, CallArgs&&... args)
 		{
 			const float cpuPartitionSize = this->m_selected_spec->CPUPartitionRatio();
 			const size_t cpuSize = cpuPartitionSize*size;
@@ -35,15 +35,15 @@ namespace skepu
 			// If one partition is considered too small, fall back to GPU-only or CPU-only
 			if(gpuSize < 32) { // Not smaller than a warp (=32 threads)
 				DEBUG_TEXT_LEVEL1("Hybrid Map: Too small GPU size, fall back to CPU-only.");
-				this->OMP(size, ei, ai, ci, res, args...);
+				this->OMP(size, oi, ei, ai, ci, args...);
 				return;
 			}
 			else if(cpuSize < nthr) {
 				DEBUG_TEXT_LEVEL1("Hybrid Map: Too small CPU size, fall back to GPU-only.");
 #ifdef SKEPU_HYBRID_USE_CUDA
-				this->CUDA(0, size, ei, ai, ci, res, args...);
+				this->CUDA(0, size, oi, ei, ai, ci, args...);
 #else
-				this->CL(0, size, ei, ai, ci, res, args...);
+				this->CL(0, size, oi, ei, ai, ci, args...);
 #endif
 				return;
 			}
@@ -66,9 +66,9 @@ namespace skepu
 				if(myId == 0) {
 					// Let first thread take care of GPU
 #ifdef SKEPU_HYBRID_USE_CUDA
-					this->CUDA(cpuSize, gpuSize, ei, ai, ci, res, args...);
+					this->CUDA(cpuSize, gpuSize, oi, ei, ai, ci, args...);
 #else
-					this->CL(cpuSize, gpuSize, ei, ai, ci, res, args...);
+					this->CL(cpuSize, gpuSize, oi, ei, ai, ci, args...);
 #endif
 				}
 				else {
@@ -84,7 +84,14 @@ namespace skepu
 					
 					for (size_t i = first; i < last; ++i)
 					{
-						res(i) = F::forward(MapFunc::OMP, (res + i).getIndex(), get<EI, CallArgs...>(args...)(i)..., get<AI, CallArgs...>(args...).hostProxy()..., get<CI, CallArgs...>(args...)...);
+					//	res(i) = F::forward(MapFunc::OMP, (res + i).getIndex(), get<EI, CallArgs...>(args...)(i)..., get<AI, CallArgs...>(args...).hostProxy()..., get<CI, CallArgs...>(args...)...);
+						auto index = (std::get<0>(std::make_tuple(get<OI, CallArgs...>(args...).begin()...)) + i).getIndex();
+						auto res = F::forward(MapFunc::OMP, index,
+							get<EI, CallArgs...>(args...)(i)..., 
+							get<AI, CallArgs...>(args...).hostProxy(std::get<AI-arity-outArity>(MapFunc::ProxyTags), index)...,
+							get<CI, CallArgs...>(args...)...
+						);
+						std::tie(get<OI, CallArgs...>(args...)(i)...) = res;
 					}
 				}
 			}
