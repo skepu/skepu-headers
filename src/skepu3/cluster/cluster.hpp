@@ -8,6 +8,12 @@
 #include <mpi.h>
 
 namespace skepu {
+	// TODO: Remove.
+	struct ProxyTag {
+		struct Default {};
+		struct MatRow {};
+	};
+
 	namespace cluster {
 		namespace state {
 			struct internal_state {
