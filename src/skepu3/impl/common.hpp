@@ -407,82 +407,30 @@ namespace skepu
 	{
 		using Ret = typename return_type<Func>::type;
 		
-		template<typename... CallArgs>
-		static Ret forward(Func func, Index1D i, CallArgs&&... args)
+		// Forward index
+		
+		template<typename Index, typename... CallArgs, REQUIRES(is_skepu_index<Index>::value && indexed)>
+		static Ret forward(Func func, Index i, CallArgs&&... args)
 		{
 			return func(i, std::forward<CallArgs>(args)...);
 		}
 		
-		template<typename... CallArgs>
-		static Ret forward(Func func, Index2D i, CallArgs&&... args)
+		template<typename Index, typename... CallArgs, REQUIRES(is_skepu_index<Index>::value && indexed)>
+		static Ret forward_device(Func func, Index i, CallArgs&&... args)
 		{
 			return func(i, std::forward<CallArgs>(args)...);
 		}
 		
-		template<typename... CallArgs>
-		static Ret forward(Func func, Index3D i, CallArgs&&... args)
-		{
-			return func(i, std::forward<CallArgs>(args)...);
-		}
+		// Do not forward index
 		
-		template<typename... CallArgs>
-		static Ret forward(Func func, Index4D i, CallArgs&&... args)
-		{
-			return func(i, std::forward<CallArgs>(args)...);
-		}
-		
-		
-		template<typename... CallArgs>
-		static Ret forward_device(Func func, Index1D i, CallArgs&&... args)
-		{
-			return func(i, std::forward<CallArgs>(args)...);
-		}
-		
-		template<typename... CallArgs>
-		static Ret forward_device(Func func, Index2D i, CallArgs&&... args)
-		{
-			return func(i, std::forward<CallArgs>(args)...);
-		}
-		
-		template<typename... CallArgs>
-		static Ret forward_device(Func func, Index3D i, CallArgs&&... args)
-		{
-			return func(i, std::forward<CallArgs>(args)...);
-		}
-		
-		template<typename... CallArgs>
-		static Ret forward_device(Func func, Index4D i, CallArgs&&... args)
-		{
-			return func(i, std::forward<CallArgs>(args)...);
-		}
-	};
-	
-	template<typename Func>
-	struct ConditionalIndexForwarder<false, Func>
-	{
-		using Ret = typename return_type<Func>::type;
-		
-		template<typename... CallArgs>
-		static Ret forward(Func func, Index1D, CallArgs&&... args)
+		template<typename Index, typename... CallArgs, REQUIRES(is_skepu_index<Index>::value && !indexed)>
+		static Ret forward(Func func, Index, CallArgs&&... args)
 		{
 			return func(std::forward<CallArgs>(args)...);
 		}
 		
-		template<typename... CallArgs>
-		static Ret forward(Func func, Index2D, CallArgs&&... args)
-		{
-			return func(std::forward<CallArgs>(args)...);
-		}
-		
-		
-		template<typename... CallArgs>
-		static Ret forward_device(Func func, Index1D, CallArgs&&... args)
-		{
-			return func(std::forward<CallArgs>(args)...);
-		}
-		
-		template<typename... CallArgs>
-		static Ret forward_device(Func func, Index2D, CallArgs&&... args)
+		template<typename Index, typename... CallArgs, REQUIRES(is_skepu_index<Index>::value && !indexed)>
+		static Ret forward_device(Func func, Index, CallArgs&&... args)
 		{
 			return func(std::forward<CallArgs>(args)...);
 		}
