@@ -112,10 +112,10 @@ namespace skepu
 			std::map<Key, TimeSpan> data;
 		};
 		
-		using BenchmarkFunc = std::function<void(size_t size)>;
+		using BenchmarkFunc = std::function<void(size_t size, BackendSpec &spec)>;
 		
-		template<typename... Args>
-		inline std::chrono::microseconds measureExecTime(BenchmarkFunc f, Args&&... args)
+		template<typename BF, typename... Args>
+		inline std::chrono::microseconds measureExecTime(BF f, Args&&... args)
 		{
 			auto t1 = std::chrono::high_resolution_clock::now();
 			f(std::forward<Args>(args)...);
@@ -133,9 +133,33 @@ namespace skepu
 		
 		using Callback = std::function<void(TimeSpan duration)>;
 		
+		void nullCallbackFn(TimeSpan duration) {}
+		
+		template<typename BF>
+		inline std::vector<TimeSpan> measureForEachBackend(size_t repeats, size_t size, std::vector<BackendSpec> backends, BF f, Callback callback = nullCallbackFn)
+		{
+			std::vector<TimeSpan> medianTimes;
+			for (auto &spec : backends)
+			{
+				std::vector<TimeSpan> durations(repeats);
+				
+				// Run multiple tests to smooth out fluctuations
+				for (auto &duration : durations)
+				{
+					duration = measureExecTime(f, size, spec);
+					callback(duration);
+				}
+				
+				// Find median execution time
+				medianTimes.push_back(median(durations));
+			}
+			return medianTimes;
+		}
+		
 		// Runs a skeleton instance with the currently set ExecPlan and BackendSpec ´repeats´ times
 		// and returns the median execution time
-		inline TimeSpan basicBenchmark(size_t repeats, size_t size, BenchmarkFunc f, Callback callback)
+		template<typename BF>
+		inline TimeSpan basicBenchmark(size_t repeats, size_t size, BF f, Callback callback)
 		{
 			std::vector<TimeSpan> durations(repeats);
 			
