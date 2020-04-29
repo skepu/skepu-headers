@@ -359,12 +359,31 @@ namespace skepu
 		bool isMatrixOnDevice_CU(size_t deviceID) const;
 		bool isModified_CU(size_t deviceID) const;
 		
-		std::pair<device_pointer_type_cu, Mat<T>> cudaProxy(size_t deviceID, AccessMode accessMode)
+		template<typename Ignore>
+		std::pair<device_pointer_type_cu, Mat<T>>
+		cudaProxy(size_t deviceID, AccessMode accessMode, ProxyTag::Default, Ignore)
 		{
-			device_pointer_type_cu devptr = this->updateDevice_CU(this->m_data.data(), this->m_cols, deviceID, accessMode);
+			device_pointer_type_cu devptr = this->updateDevice_CU(this->m_data.data(), this->m_rows * this->m_cols, deviceID, accessMode);
 			Mat<T> proxy;
-			proxy.data = this->m_data.data();
+			proxy.data = devptr->getDeviceDataPointer();
 			proxy.rows = this->m_rows;
+			proxy.cols = this->m_cols;
+			return {devptr, proxy};
+		}
+		
+		std::pair<device_pointer_type_cu, Mat<T>>
+		cudaProxy(size_t deviceID, AccessMode accessMode)
+		{
+			return this->cudaProxy(deviceID, accessMode, ProxyTag::Default{}, 0);
+		}
+		
+		std::pair<device_pointer_type_cu, MatRow<T>>
+		cudaProxy(size_t deviceID, AccessMode accessMode, ProxyTag::MatRow, Index1D row)
+		{
+			// TODO: Optimize
+			device_pointer_type_cu devptr = this->updateDevice_CU(this->m_data.data(), this->m_rows * this->m_cols, deviceID, accessMode);
+			MatRow<T> proxy;
+			proxy.data = devptr->getDeviceDataPointer() + row.i * this->m_cols;
 			proxy.cols = this->m_cols;
 			return {devptr, proxy};
 		}

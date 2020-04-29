@@ -59,14 +59,19 @@ namespace skepu
 	template<typename T>
 	class Tensor3 : public Vector<T>
 	{
+	public:
 		using size_type = typename Vector<T>::size_type;
+		using proxy_type = Ten3<T>;
+		
+#ifdef SKEPU_CUDA
+		using device_pointer_type_cu = typename Vector<T>::device_pointer_type_cu;
+#endif
 		
 		typedef Tensor3Iterator<T> iterator;
 		typedef Tensor3Iterator<const T> const_iterator;
 		
 		friend class Tensor3Iterator<T>;
 		
-	public:
 		explicit Tensor3(size_type si, size_type sj, size_type sk, const T& val = T())
 		: m_size_i(si), m_size_j(sj), m_size_k(sk),
 		Vector<T>(si * sj * sk, val)
@@ -83,12 +88,12 @@ namespace skepu
 		}
 		
 		template<typename Ignore>
-		Ten3<T> hostProxy(ProxyTag::Default, Ignore)
+		proxy_type hostProxy(ProxyTag::Default, Ignore)
 		{
 			return { this->m_data, this->m_size_i, this->m_size_j, this->m_size_k };
 		}
 		
-		Ten3<T> hostProxy() { return this->hostProxy(ProxyTag::Default{}, 0); }
+		proxy_type hostProxy() { return this->hostProxy(ProxyTag::Default{}, 0); }
 		
 		size_type size() const
 		{
@@ -128,6 +133,27 @@ namespace skepu
 		const Tensor3<T>& getParent() const { return *this; }
 		Tensor3<T>& getParent() { return *this; }
 		
+#ifdef SKEPU_CUDA
+		template<typename Ignore>
+		std::pair<device_pointer_type_cu, proxy_type>
+		cudaProxy(size_t deviceID, AccessMode accessMode, ProxyTag::Default, Ignore)
+		{
+			device_pointer_type_cu devptr = this->updateDevice_CU(this->m_data, this->size(), deviceID, accessMode);
+			proxy_type proxy;
+			proxy.data = devptr->getDeviceDataPointer();
+			proxy.size_i = this->m_size_i;
+			proxy.size_j = this->m_size_j;
+			proxy.size_k = this->m_size_k;
+			return {devptr, proxy};
+		}
+		
+		std::pair<device_pointer_type_cu, proxy_type>
+		cudaProxy(size_t deviceID, AccessMode accessMode)
+		{
+			return this->cudaProxy(deviceID, accessMode, ProxyTag::Default{}, 0);
+		}
+#endif // SKEPU_CUDA
+		
 	private:
 		
 		size_type m_size_i, m_size_j, m_size_k;
@@ -144,7 +170,7 @@ namespace skepu
 	   typedef typename std::conditional<std::is_const<T>::value,
 						const Tensor3<typename std::remove_const<T>::type>, Tensor3<T>>::type parent_type;
 		
-		typedef Vec<T> proxy_type;
+		using proxy_type = typename parent_type::proxy_type;
 	
 	public: //-- Constructors & Destructor --//
 		
@@ -171,10 +197,10 @@ namespace skepu
 		T* getAddress() const;
 		
 		template<typename Ignore>
-		Ten3<T> hostProxy(ProxyTag::Default, Ignore)
+		proxy_type hostProxy(ProxyTag::Default, Ignore)
 		{ return {this->m_std_iterator, this->size()}; }
 		
-		Ten3<T> hostProxy() { return this->hostProxy(ProxyTag::Default{}, 0); }
+		proxy_type hostProxy() { return this->hostProxy(ProxyTag::Default{}, 0); }
 		
 		// Does not care about device data, use with care...sometimes pass negative indices...
 		T& operator()(const ssize_t index = 0);
@@ -256,14 +282,19 @@ namespace skepu
 	template<typename T>
 	class Tensor4 : public Vector<T>
 	{
+	public:
 		using size_type = typename Vector<T>::size_type;
+		using proxy_type = Ten4<T>;
+		
+#ifdef SKEPU_CUDA
+		using device_pointer_type_cu = typename Vector<T>::device_pointer_type_cu;
+#endif
 		
 		typedef Tensor4Iterator<T> iterator;
 		typedef Tensor4Iterator<const T> const_iterator;
 		
 		friend class Tensor4Iterator<T>;
 		
-	public:
 		explicit Tensor4(size_type si, size_type sj, size_type sk, size_type sl, const T& val = T())
 		: m_size_i(si), m_size_j(sj), m_size_k(sk), m_size_l(sl),
 		Vector<T>(si * sj * sk * sl, val)
@@ -281,12 +312,12 @@ namespace skepu
 		}
 		
 		template<typename Ignore>
-		Ten4<T> hostProxy(ProxyTag::Default, Ignore)
+		proxy_type hostProxy(ProxyTag::Default, Ignore)
 		{
 			return { this->m_data, this->m_size_i, this->m_size_j, this->m_size_k, this->m_size_l };
 		}
 		
-		Ten4<T> hostProxy() { return this->hostProxy(ProxyTag::Default{}, 0); }
+		proxy_type hostProxy() { return this->hostProxy(ProxyTag::Default{}, 0); }
 		
 		size_type size() const
 		{
@@ -326,6 +357,28 @@ namespace skepu
 		const Tensor4<T>& getParent() const { return *this; }
 		Tensor4<T>& getParent() { return *this; }
 		
+#ifdef SKEPU_CUDA
+		template<typename Ignore>
+		std::pair<device_pointer_type_cu, proxy_type>
+		cudaProxy(size_t deviceID, AccessMode accessMode, ProxyTag::Default, Ignore)
+		{
+			device_pointer_type_cu devptr = this->updateDevice_CU(this->m_data, this->size(), deviceID, accessMode);
+			proxy_type proxy;
+			proxy.data = devptr->getDeviceDataPointer();
+			proxy.size_i = this->m_size_i;
+			proxy.size_j = this->m_size_j;
+			proxy.size_k = this->m_size_k;
+			proxy.size_l = this->m_size_l;
+			return {devptr, proxy};
+		}
+		
+		std::pair<device_pointer_type_cu, proxy_type>
+		cudaProxy(size_t deviceID, AccessMode accessMode)
+		{
+			return this->cudaProxy(deviceID, accessMode, ProxyTag::Default{}, 0);
+		}
+#endif // SKEPU_CUDA
+		
 	private:
 		
 		size_type m_size_i, m_size_j, m_size_k, m_size_l;
@@ -343,7 +396,7 @@ namespace skepu
 	   typedef typename std::conditional<std::is_const<T>::value,
 						const Tensor4<typename std::remove_const<T>::type>, Tensor4<T>>::type parent_type;
 		
-		typedef Vec<T> proxy_type;
+		using proxy_type = typename parent_type::proxy_type;
 	
 	public: //-- Constructors & Destructor --//
 		
@@ -370,10 +423,10 @@ namespace skepu
 		T* getAddress() const;
 		
 		template<typename Ignore>
-		Ten4<T> hostProxy(ProxyTag::Default, Ignore)
+		proxy_type hostProxy(ProxyTag::Default, Ignore)
 		{ return {this->m_std_iterator, this->size()}; }
 		
-		Ten4<T> hostProxy() { return this->hostProxy(ProxyTag::Default{}, 0); }
+		proxy_type hostProxy() { return this->hostProxy(ProxyTag::Default{}, 0); }
 		
 		// Does not care about device data, use with care...sometimes pass negative indices...
 		T& operator()(const ssize_t index = 0);

@@ -98,7 +98,7 @@ namespace skepu
 			
 			Ret result[numKernels];
 			typename to_device_pointer_cu<decltype(eArgs)>::type elwiseMemP[numKernels];
-			typename to_proxy_cu<decltype(aArgs)>::type anyMemP[numKernels];
+			typename to_proxy_cu<decltype(MapFunc::ProxyTags), decltype(aArgs)>::type             anyMemP[numKernels];
 			DeviceMemPointer_CU<Ret>* outMemP[numKernels];
 			
 			size_t numBlocks[numKernels];
@@ -316,7 +316,7 @@ namespace skepu
 			auto scArgs = std::make_tuple(get<CI, CallArgs...>(args...)...);
 			
 			typename to_device_pointer_cu<decltype(eArgs)>::type elwiseMemP[MAX_GPU_DEVICES];
-			typename to_proxy_cu<decltype(aArgs)>::type anyMemP[MAX_GPU_DEVICES];
+			typename to_proxy_cu<decltype(MapFunc::ProxyTags), decltype(aArgs)>::type anyMemP[MAX_GPU_DEVICES];
 			
 			Ret result[MAX_GPU_DEVICES];
 			DeviceMemPointer_CU<Ret>* outMemP[MAX_GPU_DEVICES];

@@ -16,6 +16,9 @@
 
 namespace skepu
 {
+	
+		template<typename T>
+		struct MatRow;
 	namespace backend
 	{
 
@@ -832,18 +835,29 @@ namespace skepu
 		
 		
 		/* Type trait helper */ 
-		template<typename T>
+		template<typename R, typename T>
 		struct to_proxy_cu
+		{
+		};
+		
+		template<typename T>
+		struct to_proxy_cu<ProxyTag::Default, T>
 		{
 			using type = std::pair<typename T::device_pointer_type_cu, typename T::proxy_type>;
 		};
 		
-		template<typename...Ts>
-		struct to_proxy_cu<std::tuple<Ts...>>
+		template<typename T>
+		struct to_proxy_cu<ProxyTag::MatRow, T>
 		{
-			using type = std::tuple<std::pair<typename Ts::device_pointer_type_cu, typename Ts::proxy_type>...>;
+			using type = std::pair<typename T::device_pointer_type_cu, MatRow<typename T::value_type>>;
 		};
-
+		
+		template<typename... Rs, typename...Ts>
+		struct to_proxy_cu<const std::tuple<Rs...>, std::tuple<Ts...>>
+		{
+			using type = std::tuple<typename to_proxy_cu<Rs, Ts>::type...>;
+		};
+		
 	}
 }
 

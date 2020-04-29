@@ -38,8 +38,8 @@ namespace skepu
 				return *this;
 			}
 			
-			void copyHostToDevice(size_t numElements = -1, bool copyLast=false) const;
-			void copyDeviceToHost(size_t numElements = -1, bool copyLast=false) const;
+			void copyHostToDevice(size_t numElements = std::numeric_limits<size_t>::max(), bool copyLast=false) const;
+			void copyDeviceToHost(size_t numElements = std::numeric_limits<size_t>::max(), bool copyLast=false) const;
 			void copyDeviceToDevice(cl_mem copyToPointer, size_t numElements, size_t dstOffset = 0, size_t srcOffset = 0) const;
 			
 			cl_mem getDeviceDataPointer() const;
@@ -153,7 +153,7 @@ namespace skepu
 				copyUpTimer.start();
 #endif
 				
-				size_t sizeVec = ((numElements != -1) ? numElements : m_numElements) * sizeof(T);
+				size_t sizeVec = ((numElements != std::numeric_limits<size_t>::max()) ? numElements : m_numElements) * sizeof(T);
 				cl_int err = clEnqueueCopyBuffer(m_device->getQueue(),m_deviceDataPointer, copyToPointer, srcOffset*sizeof(T), dstOffset*sizeof(T), sizeVec, 0, NULL, NULL);
 				CL_CHECK_ERROR(err, "Error copying data to OpenCL device, size: ", sizeVec);
 				
@@ -218,7 +218,7 @@ template <typename T>
 		{
 			cl_int err;
 			size_t sizeVec;
-			if (numElements == -1)
+			if (numElements == std::numeric_limits<size_t>::max())
 				sizeVec = (copyLast ? m_numElements : m_effectiveNumElements) * sizeof(T);
 			else
 				sizeVec = numElements*sizeof(T);
@@ -263,7 +263,7 @@ template <typename T>
 			{
 				cl_int err;
 				size_t sizeVec;
-				if (numElements == -1)
+				if (numElements == std::numeric_limits<size_t>::max())
 					sizeVec = (copyLast ? m_numElements : m_effectiveNumElements) * sizeof(T);
 				else
 					sizeVec = numElements*sizeof(T);
