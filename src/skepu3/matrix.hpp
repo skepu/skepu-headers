@@ -176,7 +176,6 @@ namespace skepu
 				delete m_transpose_matrix;
 		}
 		
-		Matrix();
 		Matrix(size_type _rows, size_type _cols);
 		Matrix(size_type _rows, size_type _cols, const T& val);
 		Matrix(size_type _rows, size_type _cols, const std::vector<T>& vals);
@@ -308,20 +307,12 @@ namespace skepu
 		
 	public: //-- Operators --//
 		
-		void resize(size_type _rows, size_type _cols, T val = T());
-		
 		Matrix<T>& operator=(const Matrix<T>& other);
 		Matrix<T>& operator=(const T& elem);
 		void set(const size_t & row, const size_t & col, const T & value);
 		
 		bool operator==(const Matrix<T>& c1);
 		bool operator!=(const Matrix<T>& c1);
-		bool operator<(const Matrix<T>& c1);
-		bool operator>(const Matrix<T>& c1);
-		bool operator<=(const Matrix<T>& c1);
-		bool operator>=(const Matrix<T>& c1);
-		
-		Matrix<T>& subsection(size_type row, size_type col, size_type rowWidth, size_type colWidth);  
 		
 	public: //-- STL vector regular interface --//
 		
@@ -336,11 +327,7 @@ namespace skepu
 		iterator end(size_t row);
 		const_iterator end(size_t row) const;
 		
-		// Capacity
-		size_type capacity() const;
-		
 		void flush(FlushMode mode = FlushMode::Default);
-		bool empty() const;
 		
 		// Element access
 #ifdef SKEPU_PRECOMPILED
@@ -349,28 +336,6 @@ namespace skepu
 #else
 		T& at(size_type row, size_type col);
 #endif // SKEPU_PRECOMPILED
-		
-		size_type row_back(size_type row);
-		const T& row_back(size_type row) const;
-		
-		size_type row_front(size_type row);
-		const T& row_front(size_type row) const;
-		
-#ifdef SKEPU_PRECOMPILED
-		proxy_elem col_back(size_type col);
-		const T& col_back(size_type col) const;
-		
-		proxy_elem col_front(size_type col);
-		const T& col_front(size_type col) const;
-#else
-		T& col_back(size_type col);
-		T& col_front(size_type col);
-#endif // SKEPU_PRECOMPILED
-			
-		void clear();
-		
-		iterator erase( iterator loc );
-		iterator erase( iterator start, iterator end );
 		
 		void swap(Matrix<T>& from);
 		

@@ -41,7 +41,7 @@ namespace skepu
 	{
 		using ContainerType = Vector<T>;
 		
-		Vec(T *dataptr, size_t sizearg): data{dataptr}, size{sizearg} {} 
+		Vec(T *dataptr, size_t sizearg): data{dataptr}, size{sizearg} {}
 		Vec(): data{nullptr}, size{0} {} // empty proxy constructor
 		
 #ifdef SKEPU_CUDA
@@ -127,8 +127,6 @@ namespace skepu
 
 	public: //-- Constructors & Destructor --//
 		
-		Vector();
-		
 		Vector(const Vector& vec);
 		Vector(Vector&& vec);
 		Vector(std::initializer_list<T> l);
@@ -165,10 +163,6 @@ namespace skepu
 		
 		bool operator==(const Vector<T>&);
 		bool operator!=(const Vector<T>&);
-		bool operator< (const Vector<T>&);
-		bool operator> (const Vector<T>&);
-		bool operator<=(const Vector<T>&);
-		bool operator>=(const Vector<T>&);
 		
 	public: //-- STL vector regular interface --//
 		
@@ -180,52 +174,25 @@ namespace skepu
 		const_iterator end() const;
 		
 		// Capacity
-		size_type capacity() const   { return this->m_capacity; }
 		size_type size() const       { return this->m_size; }
 		size_type total_cols() const { return this->m_size; }
-		size_type max_size() const   { return 1073741823; }
 		
 		size_type size_i() const { return this->m_size; }
 		size_type size_j() const { return 0; }
 		size_type size_k() const { return 0; }
 		size_type size_l() const { return 0; }
-
-		void resize(size_type num, T val = T());
-		bool empty() const;
-		void reserve(size_type size);
 		
 		const Vector<T>& getParent() const { return *this; }
 		Vector<T>& getParent() { return *this; }
 		
 		// Element access
 		const T& at(size_type loc) const;
-		const T& back() const;
-		const T& front() const;
 		
 #ifdef SKEPU_PRECOMPILED
 		proxy_elem at(size_type loc);
-		proxy_elem back();
-		proxy_elem front();
 #else
 		T& at(size_type loc);
-		T& back();
-		T& front();
 #endif // SKEPU_PRECOMPILED
-		
-		// Modifiers
-		void assign( size_type num, const T& val );
-		
-		template <typename input_iterator>
-		void assign( input_iterator start, input_iterator end );
-		void clear();
-		
-		iterator erase( iterator loc );
-		iterator erase( iterator start, iterator end );
-		iterator insert( iterator loc, const T& val );
-		
-		void insert( iterator loc, size_type num, const T& val );
-		void pop_back();
-		void push_back(const T& val);
 		
 		void swap(Vector<T>& from);
 		
@@ -277,7 +244,6 @@ namespace skepu
 	protected: //-- Data --//
 		T *m_data;
 		mutable bool m_valid; /*! to keep track of whether the main copy is valid or not */
-		size_type m_capacity;
 		size_type m_size;
 		bool m_deallocEnabled;
 		mutable bool m_noValidDeviceCopy;

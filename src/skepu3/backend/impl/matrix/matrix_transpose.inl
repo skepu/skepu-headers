@@ -18,15 +18,13 @@ namespace skepu
 	{
 		DEBUG_TEXT_LEVEL1("TRANSPOSE CPU\n")
 		
-		if (m_transpose_matrix && m_transpose_matrix->m_rows == m_cols && m_transpose_matrix->m_cols == m_rows && !this->m_dataChanged)
+		if (this->m_transpose_matrix && !this->m_dataChanged)
 			return;
 		
 		updateHost();
 		
 		if (!this->m_transpose_matrix) // if not created alreay, create transpose matrix
 			this->m_transpose_matrix = new Matrix<T>(this->m_cols, this->m_rows);
-		else if (this->m_transpose_matrix->m_rows != m_cols || this->m_transpose_matrix->m_cols != m_rows)
-			this->m_transpose_matrix->resize(this->m_cols, this->m_rows); // resize it
 		else
 			this->m_transpose_matrix->invalidateDeviceData(); // invalidate any device copies
 		
@@ -46,15 +44,13 @@ namespace skepu
 	{
 		DEBUG_TEXT_LEVEL1("TRANSPOSE OPENMP\n")
 		
-		if (this->m_transpose_matrix && this->m_transpose_matrix->m_rows == this->m_cols && this->m_transpose_matrix->m_cols == this->m_rows && !this->m_dataChanged)
+		if (this->m_transpose_matrix && !this->m_dataChanged)
 			return;
 		
 		updateHost();
 		
 		if (!this->m_transpose_matrix) // if not created alreay, create transpose matrix
 			this->m_transpose_matrix = new Matrix<T>(this->m_cols, this->m_rows);
-		else if (this->m_transpose_matrix->m_rows != this->m_cols || this->m_transpose_matrix->m_cols != this->m_rows)
-			this->m_transpose_matrix->resize(this->m_cols, this->m_rows); // resize it
 		else
 			this->m_transpose_matrix->invalidateDeviceData(); // invalidate any device copies
 		
@@ -144,13 +140,11 @@ namespace skepu
 		
 		size_t deviceID = device->getDeviceID();
 		
-		if (this->m_transpose_matrix && this->m_transpose_matrix->m_rows == this->m_cols && this->m_transpose_matrix->m_cols == this->m_rows && !this->m_dataChanged)
+		if (this->m_transpose_matrix && !this->m_dataChanged)
 			return;
 		
-		if (!m_transpose_matrix) // if not created alreay, create transpose matrix
+		if (!this->m_transpose_matrix) // if not created alreay, create transpose matrix
 			this->m_transpose_matrix = new Matrix<T>(this->m_cols, this->m_rows);
-		else if (this->m_transpose_matrix->m_rows != this->m_cols || this->m_transpose_matrix->m_cols != this->m_rows)
-			this->m_transpose_matrix->resize(m_cols, m_rows); // resize it
 		else
 			this->m_transpose_matrix->invalidateDeviceData(); // invalidate any device copies, could optimize it for CUDA as ask for validating copies except this one.
 		
@@ -185,13 +179,11 @@ namespace skepu
 	{
 		DEBUG_TEXT_LEVEL1("TRANSPOSE OpenCL\n")
 		
-		if (this->m_transpose_matrix && this->m_transpose_matrix->m_rows == this->m_cols && this->m_transpose_matrix->m_cols == this->m_rows && !this->m_dataChanged)
+		if (this->m_transpose_matrix && !this->m_dataChanged)
 			return;
 		
-		if (!m_transpose_matrix) // if not created alreay, create transpose matrix
+		if (!this->m_transpose_matrix) // if not created alreay, create transpose matrix
 			this->m_transpose_matrix = new Matrix<T>(this->m_cols, this->m_rows);
-		else if (this->m_transpose_matrix->m_rows != this->m_cols || m_transpose_matrix->m_cols != this->m_rows)
-			this->m_transpose_matrix->resize(this->m_cols, this->m_rows);
 		else
 			this->m_transpose_matrix->invalidateDeviceData(); // invalidate any device copies, could optimize it for CUDA as ask for validating copies except this one.
 		
@@ -241,4 +233,3 @@ namespace skepu
 
 
 }
-

@@ -94,7 +94,6 @@ void Matrix<T>::load(const std::string& filename, size_type rowWidth, size_type 
       getline (file,line);
       std::istringstream ss(line);
       T num;
-      clear();
 
       //Load all elements
       if(numRows == 0)
@@ -168,20 +167,20 @@ Matrix<T>::Matrix(typename Matrix<T>::size_type _rows, typename Matrix<T>::size_
 }
 
 /*!
- *  Constructor, used to allocate memory ($_rows * _cols$) with a vector to initialize all elements. 
+ *  Constructor, used to allocate memory ($_rows * _cols$) with a vector to initialize all elements.
  *  The size of the vector must be the same as _rows * _cols.
  * \param _rows Number of rows in the matrix.
  * \param _cols Number of columns in the matrix.
  * \param val A value to initialize all elements.
  */
 template<typename T>
-Matrix<T>::Matrix(typename Matrix<T>::size_type _rows, typename Matrix<T>::size_type _cols, const std::vector<T>& vals): 
-	m_rows(_rows), 
+Matrix<T>::Matrix(typename Matrix<T>::size_type _rows, typename Matrix<T>::size_type _cols, const std::vector<T>& vals):
+	m_rows(_rows),
 	m_cols(_cols),
-	m_data(vals), 
-	m_dataChanged(false), 
-	m_transpose_matrix(0), 
-	m_noValidDeviceCopy(true), 
+	m_data(vals),
+	m_dataChanged(false),
+	m_transpose_matrix(0),
+	m_noValidDeviceCopy(true),
 	m_valid(true)
 {
 	assert(m_data.size() == _rows * _cols);
@@ -192,20 +191,20 @@ Matrix<T>::Matrix(typename Matrix<T>::size_type _rows, typename Matrix<T>::size_
 }
 
 /*!
- *  Constructor, initializes elements with data moved from argument vector. 
+ *  Constructor, initializes elements with data moved from argument vector.
  *  The size of the vector must be the same as _rows * _cols.
  * \param _rows Number of rows in the matrix.
  * \param _cols Number of columns in the matrix.
  * \param val A value to initialize all elements.
  */
 template<typename T>
-Matrix<T>::Matrix(typename Matrix<T>::size_type _rows, typename Matrix<T>::size_type _cols, std::vector<T>&& vals): 
-	m_rows(_rows), 
+Matrix<T>::Matrix(typename Matrix<T>::size_type _rows, typename Matrix<T>::size_type _cols, std::vector<T>&& vals):
+	m_rows(_rows),
 	m_cols(_cols),
-	m_data(std::move(vals)), 
-	m_dataChanged(false), 
-	m_transpose_matrix(0), 
-	m_noValidDeviceCopy(true), 
+	m_data(std::move(vals)),
+	m_dataChanged(false),
+	m_transpose_matrix(0),
+	m_noValidDeviceCopy(true),
 	m_valid(true)
 {
 	assert(m_data.size() == _rows * _cols);
@@ -237,18 +236,6 @@ Matrix<T>::Matrix(const Matrix<T>& copy): m_noValidDeviceCopy(true), m_valid(tru
 #endif
 }
 
-template<typename T>
-Matrix<T>::Matrix()
-: m_rows(0), m_cols(0),m_data(), m_dataChanged(false), m_transpose_matrix(0), m_noValidDeviceCopy(true), m_valid(true)
-{}
-
-
-///////////////////////////////////////////////
-// Operators START
-///////////////////////////////////////////////
-
-
-
 
 /*!
  *  copy matrix,,, copy row and column count as well along with data
@@ -268,237 +255,6 @@ Matrix<T>& Matrix<T>::operator=(const Matrix<T>& other)
    return *this;
 }
 
-
-/*!
- *  resize matrix,,, invalidates all copies before resizing.
- */
-template <typename T>
-void Matrix<T>::resize(size_type _rows, size_type _cols, T val)
-{
-   if (_rows == m_rows && _cols == m_cols)
-   {
-      return;
-   }
-
-   updateHostAndInvalidateDevice();
-
-   typename Matrix<T>::container_type m( _rows*_cols, val);
-   typename Matrix<T>::size_type colSize = std::min(m_cols,_cols) * sizeof(T);
-   typename Matrix<T>::size_type minRow = std::min(m_rows,_rows);
-
-   for (size_type r=0; r < _rows; r++)
-   {
-      for(size_type c=0; c < _cols; c++)
-      {
-         if(r < m_rows && c < m_cols)
-            m[(r * _cols + c)]= m_data[(r * m_cols + c)];
-         else
-            m[(r * _cols + c)]= val;
-      }
-   }
-
-   m_data=m;
-   m_rows = _rows;
-   m_cols = _cols;
-
-}
-
-/*!
- *  Add \p rhs matrix operation element wise to current matrix. Two matrices must be of same size.
- * \param rhs The matrix which is used in addition to current matrix.
- */
-template <typename T>
-const Matrix<T>& Matrix<T>::operator+=(const Matrix<T>& rhs)
-{
-   if(m_rows != rhs.m_rows || m_cols != rhs.m_cols)
-      SKEPU_ERROR("ERROR: Matrix should be of same size for this operation!");
-
-   rhs.updateHost();
-   updateHostAndInvalidateDevice();
-
-   for(size_type r=0; r<m_rows; r++)
-      for(size_type c=0; c<m_cols; c++)
-      {
-         m_data[r*m_cols+c] += rhs.m_data[r*m_cols+c];
-      }
-   return *this;
-}
-
-
-/*!
- *  Adds a scalar value to all elements in the current matrix.
- * \param rhs The value which is used in addition to current matrix.
- */
-template <typename T>
-const Matrix<T>& Matrix<T>::operator+=(const T& rhs)
-{
-   updateHostAndInvalidateDevice();
-
-   for(size_type r=0; r<m_rows; r++)
-      for(size_type c=0; c<m_cols; c++)
-      {
-         m_data[r*m_cols+c] += rhs;
-      }
-   return *this;
-}
-
-/*!
- *  Subtract \p rhs matrix operation element wise to current matrix. Two matrices must be of same size.
- * \param rhs The matrix which is used in subtraction to current matrix.
- */
-template <typename T>
-const Matrix<T>& Matrix<T>::operator-=(const Matrix<T>& rhs)
-{
-   rhs.updateHost();
-   updateHostAndInvalidateDevice();
-
-   if(m_rows != rhs.m_rows || m_cols != rhs.m_cols)
-      SKEPU_ERROR("ERROR: Matrix should be of same size for this operation!");
-
-   for(size_type r=0; r<m_rows; r++)
-      for(size_type c=0; c<m_cols; c++)
-      {
-         m_data[r*m_cols+c] -= rhs.m_data[r*m_cols+c];
-      }
-   return *this;
-}
-
-/*!
- *  Subtracts a scalar value to all elements in the current matrix.
- * \param rhs The value which is used in subtraction to current matrix.
- */
-template <typename T>
-const Matrix<T>& Matrix<T>::operator-=(const T& rhs)
-{
-   updateHostAndInvalidateDevice();
-
-   for(size_type r=0; r<m_rows; r++)
-      for(size_type c=0; c<m_cols; c++)
-      {
-         m_data[r*m_cols+c] -= rhs;
-      }
-   return *this;
-}
-
-
-/*!
- *  Multiplies \p rhs matrix operation element wise to current matrix. Two matrices must be of same size. NB it is not matrix multiplication
- * \param rhs The matrix which is used in multiplication to current matrix.
- */
-template <typename T>
-const Matrix<T>& Matrix<T>::operator*=(const Matrix<T>& rhs)
-{
-   rhs.updateHost();
-   updateHostAndInvalidateDevice();
-
-   if(m_rows != rhs.m_rows || m_cols != rhs.m_cols)
-      SKEPU_ERROR("ERROR: Matrix should be of same size for this operation!");
-
-   for(size_type r=0; r<m_rows; r++)
-      for(size_type c=0; c<m_cols; c++)
-      {
-         m_data[r*m_cols+c] *= rhs.m_data[r*m_cols+c];
-      }
-   return *this;
-}
-
-/*!
- *  Multiplies a scalar value to all elements in the current matrix.
- * \param rhs The value which is used in multiplication to current matrix.
- */
-template <typename T>
-const Matrix<T>& Matrix<T>::operator*=(const T& rhs)
-{
-   updateHostAndInvalidateDevice();
-
-   for(size_type r=0; r<m_rows; r++)
-      for(size_type c=0; c<m_cols; c++)
-      {
-         m_data[r*m_cols+c] *= rhs;
-      }
-   return *this;
-}
-
-/*!
- *  Divides \p rhs matrix operation element wise to current matrix. Two matrices must be of same size. NB it is not matrix multiplication
- * \param rhs The matrix which is used in division to current matrix.
- */
-template <typename T>
-const Matrix<T>& Matrix<T>::operator/=(const Matrix<T>& rhs)
-{
-   rhs.updateHost();
-   updateHostAndInvalidateDevice();
-
-   if(m_rows != rhs.m_rows || m_cols != rhs.m_cols)
-      SKEPU_ERROR("ERROR: Matrix should be of same size for this operation!");
-
-   for(size_type r=0; r<m_rows; r++)
-      for(size_type c=0; c<m_cols; c++)
-      {
-         m_data[r*m_cols+c] /= rhs.m_data[r*m_cols+c];
-      }
-   return *this;
-}
-
-/*!
- *  Divides a scalar value to all elements in the current matrix.
- * \param rhs The value which is used in division to current matrix.
- */
-template <typename T>
-const Matrix<T>& Matrix<T>::operator/=(const T& rhs)
-{
-   updateHostAndInvalidateDevice();
-
-   for(size_type r=0; r<m_rows; r++)
-      for(size_type c=0; c<m_cols; c++)
-      {
-         m_data[r*m_cols+c] /= rhs;
-      }
-   return *this;
-}
-
-
-/*!
- *  Taking Mod with \p rhs matrix, element wise to current matrix. Two matrices must be of same size.
- * \param rhs The value which is used in taking mod to current matrix.
- */
-template <typename T>
-const Matrix<T>& Matrix<T>::operator%=(const Matrix<T>& rhs)
-{
-   rhs.updateHost();
-   updateHostAndInvalidateDevice();
-   if(m_rows != rhs.m_rows || m_cols != rhs.m_cols)
-      SKEPU_ERROR("ERROR: Matrix should be of same size for this operation!");
-
-   for(size_type r=0; r<m_rows; r++)
-      for(size_type c=0; c<m_cols; c++)
-      {
-         m_data[r*m_cols+c] %= rhs.m_data[r*m_cols+c];
-      }
-   return *this;
-}
-
-/*!
- *  Taking Mod with a scalar value to all elements in the current matrix.
- * \param rhs The value which is used in taking mod to current matrix.
- */
-template <typename T>
-const Matrix<T>& Matrix<T>::operator%=(const T& rhs)
-{
-   updateHostAndInvalidateDevice();
-
-   for(size_type r=0; r<m_rows; r++)
-      for(size_type c=0; c<m_cols; c++)
-      {
-         m_data[r*m_cols+c] %= rhs;
-      }
-   return *this;
-}
-
-
-///////////////////////////////////////////////
-// Operators END
-///////////////////////////////////////////////
 
 ///////////////////////////////////////////////
 // Public Helpers START
@@ -537,10 +293,10 @@ inline void Matrix<T>::invalidateDeviceData(bool enable) const
 	if (!enable)
 		return;
 	
-   /// this flag is used to track whether contents in main matrix are changed so that the contents of the 
+   /// this flag is used to track whether contents in main matrix are changed so that the contents of the
    /// transpose matrix that was taken earlier need to be updated again...
    /// normally invalidation occurs when contents are changed so good place to update this flag (?)
-   m_dataChanged = true; 
+   m_dataChanged = true;
    
 #ifdef SKEPU_OPENCL
    invalidateDeviceData_CL();
@@ -698,28 +454,6 @@ typename Matrix<T>::const_iterator Matrix<T>::end(size_t row) const
 }
 
 
-/*!
- *  Please refer to the documentation of \p std::vector.
- */
-template <typename T>
-typename Matrix<T>::size_type Matrix<T>::capacity() const
-{
-   return m_data.capacity();
-}
-
-
-
-/*!
- *  Please refer to the documentation of \p std::vector.
- */
-template <typename T>
-bool Matrix<T>::empty() const
-{
-   return m_data.empty();
-}
-
-
-
 
 /*!
  *  Please refer to the documentation of \p std::vector.
@@ -766,178 +500,6 @@ const T& Matrix<T>::at(size_type row, size_type col ) const
 }
 
 /*!
- *  To get a subsection of matrix. This will creat a separate copy.
- *  \param row Index of row to get.
- * \param rowWidth Width of the row of new Matrix.
- *  \param col Index of column to get.
- * \param colWidth Width of column of new Matrix.
- */
-template <typename T>
-Matrix<T>& Matrix<T>::subsection(size_type row, size_type col, size_type rowWidth, size_type colWidth)
-{
-   updateHost();
-
-   if(row+rowWidth > total_rows())
-      SKEPU_ERROR("ERROR! row index and width is larger than total rows!");
-
-   if(col+colWidth > total_cols())
-      SKEPU_ERROR("ERROR! column index and column width is larger than total columns!");
-
-
-   Matrix<T> *submat=new Matrix<T>(rowWidth, colWidth);
-   DEBUG_TEXT_LEVEL2("Creating Matrix subsection, rows: " << submat->total_rows() << "   columns:" << submat->total_cols());
-   for(typename Matrix<T>::size_type r=row, rsub=0; rsub<rowWidth; r++, rsub++)
-   {
-      for(typename Matrix<T>::size_type c=col, csub=0; csub<colWidth; c++, csub++)
-      {
-         submat->at(rsub,csub)= this->at(r,c);
-      }
-   }
-   return *submat;
-}
-
-/*!
- *  Return index of last element of \p row.
- *
- * \param row Index of the row.
- */
-template <typename T>
-typename Matrix<T>::size_type Matrix<T>::row_back(size_type row)
-{
-   if(row>=m_rows)
-      SKEPU_ERROR("Row index out of bound exception");
-
-   updateHost();
-   typename Matrix<T>::size_type index= ((row+1) * m_cols)-1;
-   return index;
-}
-
-
-
-/*!
- *  Return last element of \p row.
- *
- * \param row Index of the row.
- */
-template <typename T>
-const T& Matrix<T>::row_back(size_type row) const
-{
-   if(row>=m_rows)
-      SKEPU_ERROR("Row index out of bound exception");
-   updateHost();
-   typename Matrix<T>::size_type index= ((row+1) * m_cols)-1;
-   return m_data[index];
-}
-
-/*!
- *  Return index of first element of \p row in 1D container.
- *
- * \param row Index of the row.
- */
-template <typename T>
-typename Matrix<T>::size_type Matrix<T>::row_front(size_type row)
-{
-   if(row>=m_rows)
-      SKEPU_ERROR("Row index out of bound exception");
-   updateHost();
-   return (row * m_cols);
-}
-
-/*!
- *  Return first element of \p row.
- *
- * \param row Index of the row.
- */
-template <typename T>
-const T& Matrix<T>::row_front(size_type row) const
-{
-   if(row>=m_rows)
-      SKEPU_ERROR("Row index out of bound exception");
-
-   updateHost();
-   return m_data[(row * m_cols)];
-}
-
-
-/*!
- *  Returns proxy of last element in \p column.
- *
- *  Returns a \p proxy_elem instead of an ordinary element. The \p proxy_elem usually
- *  behaves like an ordinary, but there might be exceptions.
- * \p col Index of the column.
- */
-template <typename T>
-typename Matrix<T>::proxy_elem Matrix<T>::col_back(size_type col)
-{
-   if(col>=m_cols)
-      SKEPU_ERROR("Column index out of bound exception");
-
-   typename Matrix<T>::size_type index= ((m_rows-1)*m_cols)+col;
-   return proxy_elem(*this, index);
-}
-
-/*!
- *  Returns last element in \p column.
- *
- * \p col Index of the column.
- */
-template <typename T>
-const T& Matrix<T>::col_back(size_type col) const
-{
-
-   if(col>=m_cols)
-      SKEPU_ERROR("Column index out of bound exception");
-
-   updateHost();
-   typename Matrix<T>::size_type index= ((m_rows-1)*m_cols)+col;
-   return m_data[index];
-}
-
-
-/*!
- *  Returns proxy of first element in \p column.
- *
- *  Returns a \p proxy_elem instead of an ordinary element. The \p proxy_elem usually
- *  behaves like an ordinary, but there might be exceptions.
- * \p col Index of the column.
- */
-template <typename T>
-typename Matrix<T>::proxy_elem Matrix<T>::col_front(size_type col)
-{
-   if(col>=m_cols)
-      SKEPU_ERROR("Column index out of bound exception");
-   return proxy_elem(*this, col);
-}
-
-/*!
- *  Returns last element in \p column.
- *
- * \p col Index of the column.
- */
-template <typename T>
-const T& Matrix<T>::col_front(size_type col) const
-{
-
-   if(col>=m_cols)
-      SKEPU_ERROR("Column index out of bound exception");
-   updateHost();
-   return m_data[col];
-}
-
-
-/*!
- *  Please refer to the documentation of \p std::vector.
- * Invalidates all copies before clear.
- */
-template <typename T>
-void Matrix<T>::clear()
-{
-   invalidateDeviceData();
-
-   m_data.clear();
-}
-
-/*!
  *  Please refer to the documentation of \p std::vector.
  * Updates and invalidate both Matrices before swapping.
  */
@@ -951,33 +513,6 @@ void Matrix<T>::swap(Matrix<T>& from)
    item_swap<typename Matrix<T>::size_type>(m_cols, from.m_cols);
    item_swap<typename Matrix::container_type>(m_data, from.m_data);
 }
-
-
-/*!
- *  Please refer to the documentation of \p std::vector.
- * Updates and invalidate the Matrix.
- */
-template <typename T>
-typename Matrix<T>::iterator Matrix<T>::erase( typename Matrix<T>::iterator loc )
-{
-   updateHostAndInvalidateDevice();
-
-   return iterator(m_data.erase(loc), *this);
-}
-
-/*!
- *  Please refer to the documentation of \p std::vector.
- * Erases a certain number of elements pointed by \p start and \p end. Updates and Invalidates all copies before.
- */
-template <typename T>
-typename Matrix<T>::iterator Matrix<T>::erase( typename Matrix<T>::iterator start, typename Matrix<T>::iterator end )
-{
-   updateHostAndInvalidateDevice();
-
-   return iterator(m_data.erase(start, end), *this);
-}
-
-
 
 ///////////////////////////////////////////////
 // Regular interface functions END
@@ -1136,60 +671,4 @@ bool Matrix<T>::operator!=(const Matrix<T>& c1)
    return (c1.m_data != m_data);
 }
 
-
-/*!
- *  Please refer to the documentation of \p std::vector.
- *
- */
-template <typename T>
-bool Matrix<T>::operator<(const Matrix<T>& c1)
-{
-   c1.updateHost();
-   updateHost();
-
-   return (c1.m_data < m_data);
-}
-
-/*!
- *  Please refer to the documentation of \p std::vector.
- *
- */
-template <typename T>
-bool Matrix<T>::operator>(const Matrix<T>& c1)
-{
-   c1.updateHost();
-   updateHost();
-
-   return (c1.m_data > m_data);
-}
-
-/*!
- *  Please refer to the documentation of \p std::vector.
- *
- */
-template <typename T>
-bool Matrix<T>::operator<=(const Matrix<T>& c1)
-{
-   c1.updateHost();
-   updateHost();
-
-   return (c1.m_data <= m_data);
-}
-
-
-/*!
- *  Please refer to the documentation of \p std::vector.
- *
- */
-template <typename T>
-bool Matrix<T>::operator>=(const Matrix<T>& c1)
-{
-   c1.updateHost();
-   updateHost();
-
-   return (c1.m_data >= m_data);
-}
-
-
 } // end namespace skepu
-

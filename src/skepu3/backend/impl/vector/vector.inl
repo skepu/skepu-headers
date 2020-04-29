@@ -69,7 +69,6 @@ namespace skepu
 			getline (file,line);
 			std::istringstream ss(line);
 			T num;
-			clear();
 			
 			// Load all elements
 			if (numElements == 0)
@@ -100,28 +99,18 @@ namespace skepu
 ///////////////////////////////////////////////
 	
 	/*!
-	 *  Please refer to the documentation of \p std::vector.
-	 */
-	template <typename T>
-	inline Vector<T>::Vector(): m_capacity(10), m_size(0), m_deallocEnabled(true), m_valid(true), m_noValidDeviceCopy(true)
-	{
-		backend::allocateHostMemory<T>(m_data, m_capacity);
-	}
-	
-	
-	/*!
 	 *  Please refer to the documentation of \p std::vector. The copy occurs w.r.t. elements.
 	 *  As copy constructor creates a new storage.
 	 *
 	 *  Updates vector \p c before copying.
 	 */
 	template <typename T>
-	inline Vector<T>::Vector(const Vector& c): m_capacity(c.m_capacity), m_size(c.m_size), m_deallocEnabled(true), m_valid(true), m_noValidDeviceCopy(true)
+	inline Vector<T>::Vector(const Vector& c): m_size(c.m_size), m_deallocEnabled(true), m_valid(true), m_noValidDeviceCopy(true)
 	{
 		if (m_size < 1)
 			SKEPU_ERROR("The vector size should be positive.");
 		
-		backend::allocateHostMemory<T>(m_data, m_capacity);
+		backend::allocateHostMemory<T>(m_data, m_size);
 		c.updateHost();
 		std::copy(c.m_data, c.m_data + m_size, m_data);
 	}
@@ -130,7 +119,6 @@ namespace skepu
 	template <typename T>
 	inline Vector<T>::Vector(Vector&& c):
 		m_data(nullptr),
-		m_capacity(0),
 		m_size(0),
 		m_deallocEnabled(false),
 		m_valid(false),
@@ -141,9 +129,9 @@ namespace skepu
 	
 	
 	template <typename T>
-	inline Vector<T>::Vector(std::initializer_list<T> l): m_capacity(l.size()), m_size(l.size()), m_deallocEnabled(true), m_valid(true), m_noValidDeviceCopy(true)
+	inline Vector<T>::Vector(std::initializer_list<T> l): m_size(l.size()), m_deallocEnabled(true), m_valid(true), m_noValidDeviceCopy(true)
 	{
-		backend::allocateHostMemory<T>(m_data, m_capacity);
+		backend::allocateHostMemory<T>(m_data, m_size);
 		
 		int i = 0;
 		for (const T& elem : l)
@@ -156,7 +144,7 @@ namespace skepu
 	 * Useful when creating the vector object with existing raw data pointer.
 	 */
 	template <typename T>
-	inline Vector<T>::Vector(T * const ptr, size_type size, bool deallocEnabled): m_capacity(size), m_size (size), m_deallocEnabled(deallocEnabled), m_valid(true), m_noValidDeviceCopy(true)
+	inline Vector<T>::Vector(T * const ptr, size_type size, bool deallocEnabled): m_size (size), m_deallocEnabled(deallocEnabled), m_valid(true), m_noValidDeviceCopy(true)
 	{
 		if (m_size < 1)
 			SKEPU_ERROR("The vector size should be positive.");
@@ -175,12 +163,12 @@ namespace skepu
 	 *  Please refer to the documentation of \p std::vector.
 	 */
 	template <typename T>
-	inline Vector<T>::Vector(size_type num, const T& val): m_capacity(num), m_size(num), m_deallocEnabled(true), m_valid(true), m_noValidDeviceCopy(true)
+	inline Vector<T>::Vector(size_type num, const T& val): m_size(num), m_deallocEnabled(true), m_valid(true), m_noValidDeviceCopy(true)
 	{
 	//	if (m_size < 1)
 		//	SKEPU_ERROR("The vector size should be positive.");
 		
-		backend::allocateHostMemory<T>(m_data, m_capacity);
+		backend::allocateHostMemory<T>(m_data, m_size);
 		
 		std::fill(m_data, m_data + m_size, val);
 	}
@@ -363,14 +351,14 @@ namespace skepu
 		updateHostAndReleaseDeviceAllocations();
 		other.updateHost();
 		
-		if (m_capacity < other.m_size)
+		if (m_size < other.m_size)
 		{
 			if (m_data)
 				backend::deallocateHostMemory<T>(m_data);
 			
-			m_capacity = m_size = other.m_size;
+			m_size = m_size = other.m_size;
 			
-			backend::allocateHostMemory<T>(m_data, m_capacity);
+			backend::allocateHostMemory<T>(m_data, m_size);
 		}
 		else
 		{
@@ -435,59 +423,6 @@ namespace skepu
 	 *  Please refer to the documentation of \p std::vector.
 	 */
 	template <typename T>
-	void Vector<T>::resize(size_type num, T val)
-	{
-		updateHostAndReleaseDeviceAllocations();
-		
-		if (num <= m_size) // dont shrink the size, maybe good in some cases?
-		{
-			this->m_size = num;
-			return;
-		}
-		
-		reserve(num);
-		std::fill(this->m_data + this->m_size, this->m_data + num, val);
-		
-		this->m_size = num;
-	}
-	
-	
-	/*!
-	 *  Please refer to the documentation of \p std::vector.
-	 */
-	template <typename T>
-	bool Vector<T>::empty() const
-	{
-		return m_size == 0;
-	}
-	
-	
-	/*!
-	 *  Please refer to the documentation of \p std::vector.
-	 */
-	template <typename T>
-	void Vector<T>::reserve(size_type size)
-	{
-		if (size <= this->m_capacity)
-			return;
-		
-		updateHostAndReleaseDeviceAllocations();
-		
-		T* temp;
-		
-		backend::allocateHostMemory<T>(temp, size);
-		std::copy(this->m_data, this->m_data + this->m_size, temp);
-		backend::deallocateHostMemory<T>(m_data);
-		
-		this->m_data = temp;
-		this->m_capacity = size;
-		temp = 0;
-	}
-	
-	/*!
-	 *  Please refer to the documentation of \p std::vector.
-	 */
-	template <typename T>
 	const T& Vector<T>::at(size_type loc) const
 	{
 		updateHost();
@@ -523,214 +458,6 @@ namespace skepu
 	 *  Please refer to the documentation of \p std::vector.
 	 */
 	template <typename T>
-	const T& Vector<T>::back() const
-	{
-		updateHost();
-		return this->m_data[m_size-1];
-	}
-	
-#ifdef SKEPU_PRECOMPILED
-	
-	/*!
-	 *  Please refer to the documentation of \p std::vector.
-	 *
-	 *  Returns a \p proxy_elem instead of an ordinary element. The \p proxy_elem usually
-	 *  behaves like an ordinary, but there might be exceptions.
-	 */
-	template <typename T>
-	typename Vector<T>::proxy_elem Vector<T>::back()
-	{
-		return proxy_elem(*this, m_size-1);
-	}
-	
-#else
-	
-	template <typename T>
-	T& Vector<T>::back()
-	{
-		return this->m_data[this->m_size-1];
-	}
-	
-#endif // SKEPU_PRECOMPILED
-	
-	
-	/*!
-	 *  Please refer to the documentation of \p std::vector.
-	 */
-	template <typename T>
-	const T& Vector<T>::front() const
-	{
-		updateHost();
-		return m_data[0];
-	}
-	
-#ifdef SKEPU_PRECOMPILED
-	
-	/*!
-	 *  Please refer to the documentation of \p std::vector.
-	 *
-	 *  Returns a \p proxy_elem instead of an ordinary element. The \p proxy_elem usually
-	 *  behaves like an ordinary, but there might be exceptions.
-	 */
-	template <typename T>
-	typename Vector<T>::proxy_elem Vector<T>::front()
-	{
-		return proxy_elem(*this, 0);
-	}
-	
-#else
-	
-	template <typename T>
-	T& Vector<T>::front()
-	{
-		return m_data[0];
-	}
-	
-#endif // SKEPU_PRECOMPILED
-	
-	
-	/*!
-	 *  Please refer to the documentation of \p std::vector.
-	 */
-	template <typename T>
-	void Vector<T>::assign(size_type num, const T& val)
-	{
-		releaseDeviceAllocations();
-		
-		reserve(num); // check if need some reallocation
-		std::fill(m_data, m_data + num, val);
-		m_size = num;
-	}
-	
-	
-	/*!
-	 *  Please refer to the documentation of \p std::vector.
-	 */
-	template <typename T>
-	template<typename input_iterator>
-	void Vector<T>::assign( input_iterator start, input_iterator end )
-	{
-		updateHostAndReleaseDeviceAllocations();
-		
-		size_type num = end-start;
-		reserve(num); // check if need some reallocation
-		
-		for (size_type i = 0; i < num; i++, start++)
-		{
-			m_data[i]=*start;
-		}
-		
-		m_size = num;
-	}
-	
-	
-	/*!
-	 *  Please refer to the documentation of \p std::vector.
-	 */
-	template <typename T>
-	void Vector<T>::clear()
-	{
-		releaseDeviceAllocations();
-		
-		m_size=0;
-	}
-	
-	
-	/*!
-	 *  Please refer to the documentation of \p std::vector.
-	 */
-	template <typename T>
-	typename Vector<T>::iterator Vector<T>::erase( typename Vector<T>::iterator loc )
-	{
-		updateHostAndReleaseDeviceAllocations();
-		
-		std::copy(loc+1, end(), loc);
-		--m_size;
-		return loc;
-	}
-	
-	
-	/*!
-	 *  Please refer to the documentation of \p std::vector.
-	 */
-	template <typename T>
-	typename Vector<T>::iterator Vector<T>::erase( typename Vector<T>::iterator start, typename Vector<T>::iterator end )
-	{
-		updateHostAndReleaseDeviceAllocations();
-		
-		std::copy(end, iterator(*this, &m_data[m_size]), start);
-		m_size -= (end-start);
-		return start;
-	}
-	
-	
-	/*!
-	 *  Please refer to the documentation of \p std::vector.
-	 */
-	template <typename T>
-	typename Vector<T>::iterator Vector<T>::insert( typename Vector<T>::iterator loc, const T& val )
-	{
-		updateHostAndReleaseDeviceAllocations();
-		
-		reserve(m_size+1);
-		copy(loc, end(), loc+1);
-		++m_size;
-		*loc = val;
-		
-		return loc;
-	}
-	
-	
-	/*!
-	 *  Please refer to the documentation of \p std::vector.
-	 */
-	template <typename T>
-	void Vector<T>::insert( typename Vector<T>::iterator loc, size_type num, const T& val )
-	{
-		updateHostAndReleaseDeviceAllocations();
-		
-		reserve(m_size+num);
-		
-		copy(loc, end(), loc+num);
-		m_size += num;
-		
-		for(size_type i=0; i<num; i++)
-		{
-			*loc = val;
-			++loc;
-		}
-	}
-	
-	
-	/*!
-	 *  Please refer to the documentation of \p std::vector.
-	 */
-	template <typename T>
-	void Vector<T>::pop_back()
-	{
-		updateHostAndReleaseDeviceAllocations();
-		--m_size;
-	}
-
-	/*!
-	 *  Please refer to the documentation of \p std::vector.
-	 */
-	template <typename T>
-	void Vector<T>::push_back(const T& val)
-	{
-		updateHostAndReleaseDeviceAllocations();
-		
-		if (m_size >= m_capacity)
-			reserve(m_capacity + 5);
-		
-		m_data[m_size++] = val;
-	}
-	
-	
-	/*!
-	 *  Please refer to the documentation of \p std::vector.
-	 */
-	template <typename T>
 	void Vector<T>::swap(Vector<T>& from)
 	{
 		updateHostAndReleaseDeviceAllocations();
@@ -738,7 +465,6 @@ namespace skepu
 		
 		std::swap(m_data, from.m_data);
 		std::swap(m_size, from.m_size);
-		std::swap(m_capacity, from.m_capacity);
 	}
 
 ///////////////////////////////////////////////
@@ -752,7 +478,7 @@ namespace skepu
 
 	/*!
 	 *  Flushes the vector, synchronizing it with the device.
-	 * 
+	 *
 	 *  Then release all device allocations if deallocDevice is `true`.
 	 */
 	template <typename T>
@@ -824,85 +550,6 @@ namespace skepu
 		return false;
 	}
 	
-	
-	/*!
-	 *  Please refer to the documentation of \p std::vector.
-	 */
-	template <typename T>
-	bool Vector<T>::operator<(const Vector<T>& c1)
-	{
-		c1.updateHost();
-		updateHost();
-		
-		size_type t_size = (c1.size() < size()) ? c1.size() : size();
-		
-		for (size_type i = 0; i < t_size; ++i)
-		{
-			if (m_data[i] >= c1.m_data[i])
-				return false;
-		}
-		return true;
-	}
-	
-	
-	/*!
-	 *  Please refer to the documentation of \p std::vector.
-	 */
-	template <typename T>
-	bool Vector<T>::operator>(const Vector<T>& c1)
-	{
-		c1.updateHost();
-		updateHost();
-		
-		size_type t_size = (c1.size() < size()) ? c1.size() : size();
-		
-		for (size_type i = 0; i < t_size; ++i)
-		{
-			if (m_data[i] <= c1.m_data[i])
-				return false;
-		}
-		return true;
-	}
-	
-	
-	/*!
-	 *  Please refer to the documentation of \p std::vector.
-	 */
-	template <typename T>
-	bool Vector<T>::operator<=(const Vector<T>& c1)
-	{
-		c1.updateHost();
-		updateHost();
-		
-		size_type t_size = (c1.size() < size()) ? c1.size() : size();
-		
-		for (size_type i = 0; i < t_size; ++i)
-		{
-			if (m_data[i] > c1.m_data[i])
-				return false;
-		}
-		return true;
-	}
-	
-	
-	/*!
-	 *  Please refer to the documentation of \p std::vector.
-	 */
-	template <typename T>
-	bool Vector<T>::operator>=(const Vector<T>& c1)
-	{
-		c1.updateHost();
-		updateHost();
-		
-		size_type t_size = (c1.size() < size()) ? c1.size() : size();
-		
-		for (size_type i = 0; i < t_size; ++i)
-		{
-			if (m_data[i] < c1.m_data[i])
-				return false;
-		}
-		return true;
-	}
 
 ///////////////////////////////////////////////
 // Comparison operators END

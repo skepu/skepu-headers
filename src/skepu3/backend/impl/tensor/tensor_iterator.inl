@@ -48,7 +48,7 @@ namespace skepu
 	}
 	
 	template <typename T>
-	const T& Tensor3Iterator<T>::operator()(const ssize_t index) const 
+	const T& Tensor3Iterator<T>::operator()(const ssize_t index) const
 	{
 		return m_std_iterator[index];
 	}
@@ -263,7 +263,7 @@ namespace skepu
 	}
 	
 	template <typename T>
-	const T& Tensor4Iterator<T>::operator()(const ssize_t index) const 
+	const T& Tensor4Iterator<T>::operator()(const ssize_t index) const
 	{
 		return m_std_iterator[index];
 	}

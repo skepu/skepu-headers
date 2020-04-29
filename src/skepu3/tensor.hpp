@@ -39,7 +39,7 @@ namespace skepu
 		using ContainerType = Tensor3<T>;
 		
 		Ten3(T *dataptr, size_t si, size_t sj, size_t sk):
-			data{dataptr}, size_i{si}, size_j{sj}, size_k{sk} {} 
+			data{dataptr}, size_i{si}, size_j{sj}, size_k{sk} {}
 		Ten3(): data{nullptr}, size_i{0}, size_j{0}, size_k{0} {} // empty proxy constructor
 		
 		T &operator[](size_t index)       { return this->data[index]; }
@@ -77,6 +77,11 @@ namespace skepu
 			return iterator(*this, &Vector<T>::m_data[0]);
 		}
 		
+		iterator end()
+		{
+			return iterator(*this, &Vector<T>::m_data[this->m_size]);
+		}
+		
 		template<typename Ignore>
 		Ten3<T> hostProxy(ProxyTag::Default, Ignore)
 		{
@@ -85,27 +90,27 @@ namespace skepu
 		
 		Ten3<T> hostProxy() { return this->hostProxy(ProxyTag::Default{}, 0); }
 		
-		size_type size() const 
+		size_type size() const
 		{
 			return Vector<T>::m_size;
 		}
 		
-		size_type size_i() const 
+		size_type size_i() const
 		{
 			return m_size_i;
 		}
 		
-		size_type size_j() const 
+		size_type size_j() const
 		{
 			return m_size_j;
 		}
 		
-		size_type size_k() const 
+		size_type size_k() const
 		{
 			return m_size_k;
 		}
 		
-		size_type size_l() const 
+		size_type size_l() const
 		{
 			return 0;
 		}
@@ -229,13 +234,13 @@ namespace skepu
 		using ContainerType = Tensor4<T>;
 		
 		Ten4(T *dataptr, size_t si, size_t sj, size_t sk, size_t sl):
-			data{dataptr}, size_i{si}, size_j{sj}, size_k{sk}, size_l{sl} {} 
+			data{dataptr}, size_i{si}, size_j{sj}, size_k{sk}, size_l{sl} {}
 		Ten4(): data{nullptr}, size_i{0}, size_j{0}, size_k{0}, size_l{0} {} // empty proxy constructor
 		
 		T &operator[](size_t index)       { return this->data[index]; }
 		T  operator[](size_t index) const { return this->data[index]; }
 		
-		T &operator()(size_t i, size_t j, size_t k, size_t l)       
+		T &operator()(size_t i, size_t j, size_t k, size_t l)
 			{ return this->data[i * this->size_j * this->size_k * this->size_l + j * this->size_k * this->size_l + k * this->size_l + l]; }
 		T  operator()(size_t i, size_t j, size_t k, size_t l) const
 			{ return this->data[i * this->size_j * this->size_k * this->size_l + j * this->size_k * this->size_l + k * this->size_l + l]; }
@@ -270,6 +275,11 @@ namespace skepu
 			return iterator(*this, &Vector<T>::m_data[0]);
 		}
 		
+		iterator end()
+		{
+			return iterator(*this, &Vector<T>::m_data[this->m_size]);
+		}
+		
 		template<typename Ignore>
 		Ten4<T> hostProxy(ProxyTag::Default, Ignore)
 		{
@@ -278,27 +288,27 @@ namespace skepu
 		
 		Ten4<T> hostProxy() { return this->hostProxy(ProxyTag::Default{}, 0); }
 		
-		size_type size() const 
+		size_type size() const
 		{
 			return Vector<T>::m_size;
 		}
 		
-		size_type size_i() const 
+		size_type size_i() const
 		{
 			return m_size_i;
 		}
 		
-		size_type size_j() const 
+		size_type size_j() const
 		{
 			return m_size_j;
 		}
 		
-		size_type size_k() const 
+		size_type size_k() const
 		{
 			return m_size_k;
 		}
 		
-		size_type size_l() const 
+		size_type size_l() const
 		{
 			return m_size_l;
 		}
