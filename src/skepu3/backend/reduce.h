@@ -163,20 +163,18 @@ namespace skepu
 			
 			Vector<T> &operator()(Vector<T> &res, Matrix<T>& arg)
 			{
-				assert(this->m_execPlan != NULL && this->m_execPlan->isCalibrated());
+			//	assert(this->m_execPlan != NULL && this->m_execPlan->isCalibrated());
 				
 				const size_t size = arg.size();
 				
 				// TODO: check size
 				
-				this->m_selected_spec = (this->m_user_spec != nullptr)
-					? this->m_user_spec
-					: &this->m_execPlan->find(size);
+				this->selectBackend(size);
 				
 				VectorIterator<T> it = res.begin();
 				Matrix<T> &arg_tr = (this->m_mode == ReduceMode::ColWise) ? arg.transpose(*this->m_selected_spec) : arg;
 				
-				switch (this->m_selected_spec->backend())
+				switch (this->m_selected_spec->activateBackend())
 				{
 				case Backend::Type::Hybrid:
 #ifdef SKEPU_HYBRID
@@ -209,15 +207,13 @@ namespace skepu
 			template<typename Iterator>
 			T backendDispatch(size_t size, Iterator arg)
 			{
-				assert(this->m_execPlan != NULL && this->m_execPlan->isCalibrated());
+			//	assert(this->m_execPlan != NULL && this->m_execPlan->isCalibrated());
 				
 				T res = this->m_start;
 				
-				this->m_selected_spec = (this->m_user_spec != nullptr)
-					? this->m_user_spec
-					: &this->m_execPlan->find(size);
+				this->selectBackend(size);
 				
-				switch (this->m_selected_spec->backend())
+				switch (this->m_selected_spec->activateBackend())
 				{
 				case Backend::Type::Hybrid:
 #ifdef SKEPU_HYBRID
@@ -288,8 +284,6 @@ namespace skepu
 			
 			T OMP(T &res, Matrix<T>& arg);
 			
-			T ompVectorReduce(T &res, std::vector<T> &input, size_t numThreads);
-			
 #endif
 			
 #ifdef SKEPU_CUDA
@@ -328,17 +322,16 @@ namespace skepu
 			
 			T operator()(Matrix<T>& arg)
 			{
-				assert(this->m_execPlan != NULL && this->m_execPlan->isCalibrated());
+			//	assert(this->m_execPlan != NULL && this->m_execPlan->isCalibrated());
 				
-				this->m_selected_spec = (this->m_user_spec != nullptr)
-					? this->m_user_spec
-					: &this->m_execPlan->find(arg.size());
-					
+				this->selectBackend(arg.size());
+				
 				T res = this->m_start;
 				
 				Matrix<T> &arg_tr = (this->m_mode == ReduceMode::ColWise) ? arg.transpose(*this->m_selected_spec) : arg;
 				
-				switch (this->m_selected_spec->backend())
+				
+				switch (this->m_selected_spec->activateBackend())
 				{
 				case Backend::Type::Hybrid:
 #ifdef SKEPU_HYBRID

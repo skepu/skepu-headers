@@ -44,7 +44,7 @@ namespace skepu
 		using F = ConditionalIndexForwarder<indexed, MapPairsFunc>;
 		
 		// For iterators
-		template<size_t... VEI, size_t... HEI, size_t... AI, size_t... CI, typename Iterator, typename... CallArgs> 
+		template<size_t... VEI, size_t... HEI, size_t... AI, size_t... CI, typename Iterator, typename... CallArgs>
 		void apply(pack_indices<VEI...>, pack_indices<HEI...>, pack_indices<AI...>, pack_indices<CI...>, size_t Vsize, size_t Hsize, Iterator res, CallArgs&&... args)
 		{
 			if (disjunction((get<VEI>(args...).size() < Vsize)...))
@@ -76,11 +76,11 @@ namespace skepu
 			this->default_size_y = y;
 		}
 		
-		template<template<class> class Container, typename... CallArgs>
-		Container<Ret> &operator()(Container<Ret> &res, CallArgs&&... args)
+		template<typename... CallArgs>
+		Matrix<Ret> &operator()(Matrix<Ret> &res, CallArgs&&... args)
 		{
 			static_assert(sizeof...(CallArgs) == numArgs, "Number of arguments not matching Map function");
-			this->apply(Helwise_indices, Velwise_indices, any_indices, const_indices, res.total_cols(), res.total_rows(), res.begin(), std::forward<CallArgs>(args)...);
+			this->apply(Helwise_indices, Velwise_indices, any_indices, const_indices, res.total_rows(), res.total_cols(), res.begin(), std::forward<CallArgs>(args)...);
 			return res;
 		}
 		
@@ -92,8 +92,8 @@ namespace skepu
 			return res;
 		}
 		
-		template<template<class> class Container = Vector, typename... CallArgs>
-		Container<Ret> operator()(CallArgs&&... args)
+		template<typename... CallArgs>
+		Matrix<Ret> operator()(CallArgs&&... args)
 		{
 			static_assert(sizeof...(CallArgs) == numArgs, "Number of arguments not matching Map function");
 			
@@ -105,7 +105,7 @@ namespace skepu
 			}
 			else
 			{*/
-				Container<Ret> res(this->default_size_x);
+				Matrix<Ret> res(this->default_size_x);
 				this->apply(Helwise_indices, Velwise_indices, any_indices, const_indices, res.size(), res.begin(), std::forward<CallArgs>(args)...);
 				return std::move(res);
 		//	}

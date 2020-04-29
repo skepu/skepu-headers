@@ -47,8 +47,10 @@ namespace skepu
 		private:
 			CUDAKernel m_cuda_kernel;
 			CUDAReduceKernel m_cuda_reduce_kernel;
-			size_t default_size_x;
-			size_t default_size_y;
+			size_t default_size_i;
+			size_t default_size_j;
+			size_t default_size_k;
+			size_t default_size_l;
 			
 			static constexpr size_t numArgs = MapFunc::totalArity - (MapFunc::indexed ? 1 : 0);
 			static constexpr size_t anyArity = std::tuple_size<typename MapFunc::ContainerArgs>::value;
@@ -56,6 +58,7 @@ namespace skepu
 			static constexpr typename make_pack_indices<arity + anyArity, arity>::type any_indices{};
 			static constexpr typename make_pack_indices<numArgs, arity + anyArity>::type const_indices{};
 			
+			using defaultDim = typename std::conditional<MapFunc::indexed, index_dimension<typename MapFunc::IndexType>, std::integral_constant<int, 1>>::type;
 			using First = typename parameter_type<MapFunc::indexed ? 1 : 0, decltype(&MapFunc::CPU)>::type;
 			
 			using F = ConditionalIndexForwarder<MapFunc::indexed, decltype(&MapFunc::CPU)>;
@@ -72,10 +75,12 @@ namespace skepu
 				this->m_start = val;
 			}
 			
-			void setDefaultSize(size_t x, size_t y = 0)
+			void setDefaultSize(size_t i, size_t j = 0, size_t k = 0, size_t l = 0)
 			{
-				this->default_size_x = x;
-				this->default_size_y = y;
+				this->default_size_i = i;
+				this->default_size_j = j;
+				this->default_size_k = k;
+				this->default_size_l = l;
 			}
 			
 			template<typename... Args>
@@ -107,29 +112,23 @@ namespace skepu
 			{
 				static_assert(sizeof...(CallArgs) == numArgs, "Number of arguments not matching Map function");
 				
-			//	if (this->default_size_y != 0)
-					return this->backendDispatch(elwise_indices, any_indices, const_indices, this->default_size_x, std::forward<CallArgs>(args)...);
-				
-			//	else
-			//		return this->zero_apply_2D(any_indices, const_indices, this->default_size_x, this->default_size_y, std::forward<CallArgs>(args)...);
+				return this->backendDispatch(elwise_indices, any_indices, const_indices, this->default_size_i, std::forward<CallArgs>(args)...);
 			}
 			
 		private:
-			template<size_t... EI, size_t... AI, size_t... CI, typename... CallArgs> 
+			template<size_t... EI, size_t... AI, size_t... CI, typename... CallArgs>
 			Ret backendDispatch(pack_indices<EI...> ei, pack_indices<AI...> ai, pack_indices<CI...> ci, size_t size, CallArgs&&... args)
 			{
-				assert(this->m_execPlan != NULL && this->m_execPlan->isCalibrated());
+			//	assert(this->m_execPlan != NULL && this->m_execPlan->isCalibrated());
 				
 				Ret res = this->m_start;
 				
 				if (disjunction((get<EI, CallArgs...>(args...).size() < size)...))
 					SKEPU_ERROR("Non-matching container sizes");
 				
-				this->m_selected_spec = (this->m_user_spec != nullptr)
-					? this->m_user_spec
-					: &this->m_execPlan->find(size);
+				this->selectBackend(size);
 				
-				switch (this->m_selected_spec->backend())
+				switch (this->m_selected_spec->activateBackend())
 				{
 				case Backend::Type::Hybrid:
 #ifdef SKEPU_HYBRID
@@ -153,38 +152,38 @@ namespace skepu
 			}
 			
 			
-			template<size_t... EI, size_t... AI, size_t... CI, typename... CallArgs> 
+			template<size_t... EI, size_t... AI, size_t... CI, typename... CallArgs>
 			Ret CPU(size_t size, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, Ret &res, CallArgs&&... args);
 			
-			template<size_t... AI, size_t... CI, typename... CallArgs> 
+			template<size_t... AI, size_t... CI, typename... CallArgs>
 			Ret CPU(size_t size, pack_indices<>, pack_indices<AI...>, pack_indices<CI...>, Ret &res, CallArgs&&... args);
 			
 			
 #ifdef SKEPU_OPENMP
 			
-			template<size_t... EI, size_t... AI, size_t... CI, typename ...CallArgs> 
+			template<size_t... EI, size_t... AI, size_t... CI, typename ...CallArgs>
 			Ret OMP(size_t size, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, Ret &res, CallArgs&&... args);
 			
-			template<size_t... AI, size_t... CI, typename ...CallArgs> 
+			template<size_t... AI, size_t... CI, typename ...CallArgs>
 			Ret OMP(size_t size, pack_indices<>, pack_indices<AI...>, pack_indices<CI...>, Ret &res, CallArgs&&... args);
 			
 #endif // SKEPU_OPENMP
 			
 #ifdef SKEPU_CUDA
 			
-			template<size_t... EI, size_t... AI, size_t... CI, typename... CallArgs> 
+			template<size_t... EI, size_t... AI, size_t... CI, typename... CallArgs>
 			Ret CUDA(size_t startIdx, size_t size, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, Ret &res, CallArgs&&... args);
 			
-			template<size_t... EI, size_t... AI, size_t... CI, typename ...CallArgs> 
+			template<size_t... EI, size_t... AI, size_t... CI, typename ...CallArgs>
 			Ret mapReduceSingleThread_CU(size_t deviceID, size_t startIdx, size_t size, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, Ret &res, CallArgs&&... args);
 			
-			template<size_t... EI, size_t... AI, size_t... CI, typename ...CallArgs> 
+			template<size_t... EI, size_t... AI, size_t... CI, typename ...CallArgs>
 			Ret mapReduceMultiStream_CU(size_t deviceID, size_t startIdx, size_t size, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, Ret &res, CallArgs&&... args);
 			
-			template<size_t... EI, size_t... AI, size_t... CI, typename... CallArgs> 
+			template<size_t... EI, size_t... AI, size_t... CI, typename... CallArgs>
 			Ret mapReduceSingleThreadMultiGPU_CU(size_t useNumGPU, size_t startIdx, size_t size, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, Ret &res, CallArgs&&... args);
 			
-			template<size_t... EI, size_t... AI, size_t... CI, typename ...CallArgs> 
+			template<size_t... EI, size_t... AI, size_t... CI, typename ...CallArgs>
 			Ret mapReduceMultiStreamMultiGPU_CU(size_t useNumGPU, size_t startIdx, size_t size, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, Ret &res, CallArgs&&... args);
 			
 			
@@ -192,13 +191,13 @@ namespace skepu
 			
 #ifdef SKEPU_OPENCL
 			
-			template<size_t... EI, size_t... AI, size_t... CI, typename... CallArgs> 
+			template<size_t... EI, size_t... AI, size_t... CI, typename... CallArgs>
 			Ret CL(size_t startIdx, size_t size, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, Ret &res, CallArgs&&... args);
 			
-			template<size_t... EI, size_t... AI, size_t... CI, typename... CallArgs> 
+			template<size_t... EI, size_t... AI, size_t... CI, typename... CallArgs>
 			Ret mapReduceNumDevices_CL(size_t numDevices, size_t startIdx, size_t size, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, Ret &res, CallArgs&&... args);
 			
-			template<size_t... EI, size_t... AI, size_t... CI, typename... CallArgs> 
+			template<size_t... EI, size_t... AI, size_t... CI, typename... CallArgs>
 			Ret mapReduceSingle_CL(size_t deviceID, size_t startIdx, size_t size, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, Ret &res, CallArgs&&... args);
 			
 #endif // SKEPU_OPENCL
@@ -206,10 +205,10 @@ namespace skepu
 			
 #ifdef SKEPU_HYBRID
 			
-			template<size_t... EI, size_t... AI, size_t... CI, typename ...CallArgs> 
+			template<size_t... EI, size_t... AI, size_t... CI, typename ...CallArgs>
 			Ret Hybrid(size_t size, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, Ret &res, CallArgs&&... args);
 			
-			template<size_t... AI, size_t... CI, typename ...CallArgs> 
+			template<size_t... AI, size_t... CI, typename ...CallArgs>
 			Ret Hybrid(size_t size, pack_indices<>, pack_indices<AI...>, pack_indices<CI...>, Ret &res, CallArgs&&... args);
 			
 #endif // SKEPU_HYBRID
@@ -229,7 +228,7 @@ public:
 	MapReduceImpl(Ret (*)(Args...), Ret (*)(Ret, Ret));
 
 	void setStartValue(Ret val);
-	void setDefaultSize(size_t x, size_t y = 0);
+	void setDefaultSize(size_t i, size_t j = 0, size_t k = 0, size_t l = 0);
 
 	template<
 		template<class> class Container,

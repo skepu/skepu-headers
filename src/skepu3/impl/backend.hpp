@@ -7,27 +7,37 @@
 #include <algorithm>
 #include <map>
 
+
+#ifdef SKEPU_OPENMP
+#include <omp.h>
+#endif
+
 #include "../backend/debug.h"
 #include "skepu3/impl/execution_model.hpp"
 
-#ifndef MAX_DEVICES
-#define MAX_DEVICES 4
+#ifndef SKEPU_DEFAULT_MAX_DEVICES
+#define SKEPU_DEFAULT_MAX_DEVICES 4
 #endif
 
-#ifndef CPU_THREADS
-#define CPU_THREADS 16
+// Set default CPU thread count if not supplied from elsewhere.
+// Try to get the number of hardware threads from OpenMP if possible.
+#ifndef SKEPU_DEFAULT_CPU_THREADS
+#define SKEPU_DEFAULT_CPU_THREADS 16
 #endif
 
-#ifndef GPU_BLOCKS
-#define GPU_BLOCKS 256
+// Set default GPU block count if not supplied from elsewhere.
+#ifndef SKEPU_DEFAULT_GPU_BLOCKS
+#define SKEPU_DEFAULT_GPU_BLOCKS 256
 #endif
 
-#ifndef GPU_THREADS
-#define GPU_THREADS 65535
+// Set default GPU thread count if not supplied from elsewhere.
+#ifndef SKEPU_DEFAULT_GPU_THREADS
+#define SKEPU_DEFAULT_GPU_THREADS 65535
 #endif
 
-#ifndef CPU_PARTITION_RATIO
-#define CPU_PARTITION_RATIO 0.2f
+// Set default hybrid partition ratio if not supplied from elsewhere.
+#ifndef SKEPU_DEFAULT_CPU_PARTITION_RATIO
+#define SKEPU_DEFAULT_CPU_PARTITION_RATIO 0.2f
 #endif
 
 namespace skepu
@@ -38,6 +48,13 @@ namespace skepu
 		{
 			Auto, CPU, OpenMP, OpenCL, CUDA, Hybrid
 		};
+		
+		enum class Scheduling
+		{
+			Static, Dynamic, Guided, Auto
+		};
+		
+		static constexpr size_t chunkSizeDefault = 0;
 		
 		static const std::vector<Type> &allTypes()
 		{
@@ -64,13 +81,26 @@ namespace skepu
 				Backend::Type::CUDA,
 #endif
 #ifdef SKEPU_HYBRID
-                Backend::Type::Hybrid,
+				Backend::Type::Hybrid,
 #endif
 			};
 			
 			return types;
 		}
 		
+#ifdef SKEPU_OPENMP
+		static omp_sched_t convertSchedulingToOpenMP(Scheduling mode)
+		{
+			switch (mode)
+			{
+			case Scheduling::Static:  return omp_sched_static;
+			case Scheduling::Dynamic: return omp_sched_dynamic;
+			case Scheduling::Guided:  return omp_sched_guided;
+			case Scheduling::Auto:    return omp_sched_auto;
+			default: return omp_sched_static;
+			}
+		}
+#endif
 		
 		static Type typeFromString(std::string s)
 		{
@@ -111,6 +141,19 @@ namespace skepu
 		return o;
 	}
 	
+	inline std::ostream &operator<<(std::ostream &o, Backend::Scheduling mode)
+	{
+		switch (mode)
+		{
+		case Backend::Scheduling::Static:  o << "static"; break;
+		case Backend::Scheduling::Dynamic: o << "dynamic"; break;
+		case Backend::Scheduling::Guided:  o << "guided"; break;
+		case Backend::Scheduling::Auto:    o << "auto"; break;
+		default: o << ("Invalid scheduling mode");
+		}
+		return o;
+	}
+	
 	
 	// "Tagged union" structure for specifying backend and parameters in a skeleton invocation
 	struct BackendSpec
@@ -128,17 +171,30 @@ namespace skepu
 #endif
 		};
 		
-		static const size_t defaultNumDevices {MAX_DEVICES};
-		static const size_t defaultCPUThreads {CPU_THREADS};
-		static const size_t defaultGPUThreads {GPU_BLOCKS};
-		static const size_t defaultGPUBlocks {GPU_THREADS};
-		constexpr static const float defaultCPUPartitionRatio {CPU_PARTITION_RATIO};
+		static constexpr size_t defaultNumDevices {SKEPU_DEFAULT_MAX_DEVICES};
+		static constexpr size_t defaultCPUThreads {SKEPU_DEFAULT_CPU_THREADS};
+		static constexpr size_t defaultGPUThreads {SKEPU_DEFAULT_GPU_BLOCKS};
+		static constexpr size_t defaultGPUBlocks {SKEPU_DEFAULT_GPU_THREADS};
+		static constexpr float defaultCPUPartitionRatio {SKEPU_DEFAULT_CPU_PARTITION_RATIO};
 		
-		BackendSpec(Backend::Type b)
-		: m_backend(b) {}
+		BackendSpec(Backend::Type type)
+		: m_backend(type) {}
+		
+		BackendSpec(std::string type)
+		: m_backend(Backend::typeFromString(type)) {}
 		
 		BackendSpec()
 		: m_backend(defaultType) {}
+		
+		void setType(Backend::Type type)
+		{
+			this->m_backend = type;
+		}
+		
+		Backend::Type getType()
+		{
+			return this->m_backend;
+		}
 		
 		size_t devices() const
 		{
@@ -159,6 +215,26 @@ namespace skepu
 		void setCPUThreads(size_t threads)
 		{
 			this->m_CPUThreads = threads;
+		}
+		
+		Backend::Scheduling schedulingMode() const
+		{
+			return this->m_openmp_scheduling_mode;
+		}
+		
+		void setSchedulingMode(Backend::Scheduling mode)
+		{
+			this->m_openmp_scheduling_mode = mode;
+		}
+		
+		size_t CPUChunkSize() const
+		{
+			return this->m_openmp_chunk_size;
+		}
+		
+		void setCPUChunkSize(size_t chunkSize)
+		{
+			this->m_openmp_chunk_size = chunkSize;
 		}
 		
 		
@@ -203,15 +279,83 @@ namespace skepu
 			return (this->m_backend != Backend::Type::Auto) ? this->m_backend : defaultType;
 		}
 		
+		Backend::Type activateBackend() const
+		{
+			auto type = this->backend();
+			
+#ifdef SKEPU_OPENMP
+			if (type == Backend::Type::OpenMP)
+			{
+				DEBUG_TEXT_LEVEL1("Setting OpenMP scheduling mode to " << this->m_openmp_scheduling_mode << " with chunk size " << this->m_openmp_chunk_size);
+				omp_set_schedule(Backend::convertSchedulingToOpenMP(this->m_openmp_scheduling_mode), this->m_openmp_chunk_size);
+				DEBUG_TEXT_LEVEL1("Setting OpenMP thread count to " << this->CPUThreads());
+				omp_set_num_threads(this->CPUThreads());
+			}
+#endif
+			return type;
+		}
+		
 	private:
 		Backend::Type m_backend;
+		
+		// GPU parameters
 		size_t m_devices {defaultNumDevices};
-		size_t m_CPUThreads {defaultCPUThreads};
 		size_t m_GPUThreads {defaultGPUThreads};
 		size_t m_blocks {defaultGPUBlocks};
+		
+		// OpenMP parameters
+#ifdef SKEPU_OPENMP
+		size_t m_CPUThreads {(size_t)omp_get_num_procs()};
+#else
+		size_t m_CPUThreads {defaultCPUThreads};
+#endif
+		Backend::Scheduling m_openmp_scheduling_mode = Backend::Scheduling::Static;
+		size_t m_openmp_chunk_size {Backend::chunkSizeDefault};
+		
+		// Hybrid parameters
 		float m_cpuPartitionRatio {defaultCPUPartitionRatio};
 		
+		friend std::ostream &operator<<(std::ostream &o, BackendSpec b);
 	};
+	
+	
+	inline std::ostream &operator<<(std::ostream &o, BackendSpec b)
+	{
+		o << "-----------------------------\n SkePU Backend Specification\n-----------------------------\n";
+		o << " - Backend Type: " << b.m_backend << "\n";
+		
+		if (b.m_backend == Backend::Type::OpenMP)
+		{
+			o << " - OpenMP Threads:    " << b.m_CPUThreads << "\n";
+			o << " - OpenMP Scheduling: " << b.m_openmp_scheduling_mode << "\n";
+			o << " - OpenMP Chunk Size: " << b.m_openmp_chunk_size << "\n";
+		}
+		if (b.m_backend == Backend::Type::OpenCL || b.m_backend == Backend::Type::CUDA || b.m_backend == Backend::Type::Hybrid)
+		{
+			o << " - GPU Devices: " << b.m_devices << "\n";
+			o << " - GPU Blocks:  " << b.m_blocks << "\n";
+			o << " - GPU Threads: " << b.m_GPUThreads << "\n";
+		}
+		if (b.m_backend == Backend::Type::Hybrid)
+		{
+			o << " - Hybrid Partition Ratio (CPU): " << b.m_cpuPartitionRatio  << "\n";
+		}
+		o << "-----------------------------";
+		return o;
+	}
+	
+	static const BackendSpec m_defaultGlobalBackendSpec{};
+	static BackendSpec m_globalBackendSpec = m_defaultGlobalBackendSpec;
+	
+	void setGlobalBackendSpec(BackendSpec &spec)
+	{
+		m_globalBackendSpec = spec;
+	}
+	
+	void restoreDefaultGlobalBackendSpec()
+	{
+		m_globalBackendSpec = m_defaultGlobalBackendSpec;
+	}
 	
 	
 	/*!

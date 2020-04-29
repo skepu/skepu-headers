@@ -11,7 +11,7 @@ namespace skepu
 	namespace backend
 	{
 		template<size_t Varity, size_t Harity, typename MapPairsFunc, typename CUDAKernel, typename CLKernel>
-		template<size_t... VEI, size_t... HEI, size_t... AI, size_t... CI, typename Iterator, typename... CallArgs> 
+		template<size_t... VEI, size_t... HEI, size_t... AI, size_t... CI, typename Iterator, typename... CallArgs>
 		void MapPairs<Varity, Harity, MapPairsFunc, CUDAKernel, CLKernel>
 		::OMP(size_t Vsize, size_t Hsize, pack_indices<VEI...>, pack_indices<HEI...>, pack_indices<AI...>, pack_indices<CI...>, Iterator res, CallArgs&&... args)
 		{
@@ -24,10 +24,7 @@ namespace skepu
 			pack_expand((get<AI, CallArgs...>(args...).getParent().invalidateDeviceData(hasWriteAccess(MapPairsFunc::anyAccessMode[AI-Varity-Harity])), 0)...);
 			res.getParent().invalidateDeviceData();
 			
-			omp_set_num_threads(this->m_selected_spec->CPUThreads());
-			
-#pragma omp parallel for
-			
+#pragma omp parallel for schedule(runtime)
 			for (size_t i = 0; i < Vsize; ++i)
 			{
 				for (size_t j = 0; j < Hsize; ++j)

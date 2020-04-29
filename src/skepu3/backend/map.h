@@ -114,13 +114,13 @@ namespace skepu
 			
 			// ==========================    Implementation     ==========================
 			
-			template<size_t... OI, size_t... EI, size_t... AI, size_t... CI, typename... CallArgs> 
+			template<size_t... OI, size_t... EI, size_t... AI, size_t... CI, typename... CallArgs>
 			void CPU(size_t size, pack_indices<OI...>, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args);
 			
 			
 #ifdef SKEPU_OPENMP
 			
-			template<size_t... OI, size_t... EI, size_t... AI, size_t... CI, typename ...CallArgs> 
+			template<size_t... OI, size_t... EI, size_t... AI, size_t... CI, typename ...CallArgs>
 			void OMP(size_t size, pack_indices<OI...>, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args);
 			
 #endif // SKEPU_OPENMP
@@ -128,19 +128,19 @@ namespace skepu
 			
 #ifdef SKEPU_CUDA
 			
-			template<size_t... OI, size_t... EI, size_t... AI, size_t... CI, typename... CallArgs> 
+			template<size_t... OI, size_t... EI, size_t... AI, size_t... CI, typename... CallArgs>
 			void CUDA(size_t startIdx, size_t size, pack_indices<OI...>, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, Iterator res, CallArgs&&... args);
 			
-			template<size_t... OI, size_t... EI, size_t... AI, size_t... CI, typename ...CallArgs> 
+			template<size_t... OI, size_t... EI, size_t... AI, size_t... CI, typename ...CallArgs>
 			void         mapSingleThread_CU(size_t deviceID, size_t startIdx, size_t size, pack_indices<OI...>, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args);
 			
-			template<size_t... OI, size_t... EI, size_t... AI, size_t... CI, typename ...CallArgs> 
+			template<size_t... OI, size_t... EI, size_t... AI, size_t... CI, typename ...CallArgs>
 			void          mapMultiStream_CU(size_t deviceID, size_t startIdx, size_t size, pack_indices<OI...>, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args);
 			
-			template<size_t... OI, size_t... EI, size_t... AI, size_t... CI, typename... CallArgs> 
+			template<size_t... OI, size_t... EI, size_t... AI, size_t... CI, typename... CallArgs>
 			void mapSingleThreadMultiGPU_CU(size_t useNumGPU, size_t startIdx, size_t size, pack_indices<OI...>, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args);
 			
-			template<size_t... OI, size_t... EI, size_t... AI, size_t... CI, typename ...CallArgs> 
+			template<size_t... OI, size_t... EI, size_t... AI, size_t... CI, typename ...CallArgs>
 			void  mapMultiStreamMultiGPU_CU(size_t useNumGPU, size_t startIdx, size_t size, pack_indices<OI...>, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args);
 			
 #endif // SKEPU_CUDA
@@ -148,28 +148,25 @@ namespace skepu
 			
 #ifdef SKEPU_OPENCL
 			
-			template<size_t... OI, size_t... EI, size_t... AI, size_t... CI, typename... CallArgs> 
+			template<size_t... OI, size_t... EI, size_t... AI, size_t... CI, typename... CallArgs>
 			void CL(size_t startIdx, size_t size, pack_indices<OI...>, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args);
 			
-			template<size_t... OI, size_t... EI, size_t... AI, size_t... CI, typename... CallArgs> 
+			template<size_t... OI, size_t... EI, size_t... AI, size_t... CI, typename... CallArgs>
 			void mapNumDevices_CL(size_t startIdx, size_t numDevices, size_t size, pack_indices<OI...>, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args);
 			
 #endif // SKEPU_OPENCL
   
 #ifdef SKEPU_HYBRID
 			
-			template<size_t... OI, size_t... EI, size_t... AI, size_t... CI, typename... CallArgs> 
+			template<size_t... OI, size_t... EI, size_t... AI, size_t... CI, typename... CallArgs>
 			void Hybrid(size_t size, pack_indices<OI...>, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args);
 			
 #endif // SKEPU_HYBRID
 			
-			template<size_t... OI, size_t... EI, size_t... AI, size_t... CI, typename... CallArgs> 
+			template<size_t... OI, size_t... EI, size_t... AI, size_t... CI, typename... CallArgs>
 			void backendDispatch(size_t size, pack_indices<OI...> oi, pack_indices<EI...> ei, pack_indices<AI...> ai, pack_indices<CI...> ci, CallArgs&&... args)
 			{
-				assert(this->m_execPlan != nullptr && this->m_execPlan->isCalibrated());
-				
-			//	if (disjunction((get<EI, CallArgs...>(args...).size() < size)...))
-			//		SKEPU_ERROR("Map: Non-matching container sizes");
+			//	assert(this->m_execPlan != nullptr && this->m_execPlan->isCalibrated());
 				
 				if (disjunction((get<OI>(args...).size() < size)...))
 					SKEPU_ERROR("Non-matching output container sizes");
@@ -177,11 +174,9 @@ namespace skepu
 				if (disjunction((get<EI>(args...).size() < size)...))
 					SKEPU_ERROR("Non-matching input container sizes");
 				
-				this->m_selected_spec = (this->m_user_spec != nullptr)
-					? this->m_user_spec
-					: &this->m_execPlan->find(size);
+				this->selectBackend(size);
 				
-				switch (this->m_selected_spec->backend())
+				switch (this->m_selected_spec->activateBackend())
 				{
 				case Backend::Type::Hybrid:
 #ifdef SKEPU_HYBRID

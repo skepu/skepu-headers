@@ -45,6 +45,7 @@ namespace skepu
 		static constexpr size_t numArgs = sizeof...(Args) - (indexed ? 1 : 0);
 		static constexpr size_t anyCont = trait_count_all<is_skepu_container_proxy, Args...>::value;
 		
+		using defaultDim = typename std::conditional<indexed, index_dimension<typename first_element<Args...>::type>, std::integral_constant<int, 1>>::type;
 		using First = typename pack_element<indexed ? 1 : 0, Args...>::type;
 		
 		// Supports the "index trick": using a variant of tag dispatching to index template parameter packs
@@ -55,7 +56,7 @@ namespace skepu
 		using F = ConditionalIndexForwarder<indexed, MapFunc>;
 		
 		
-		template<size_t... EI, size_t... AI, size_t... CI, typename... CallArgs> 
+		template<size_t... EI, size_t... AI, size_t... CI, typename... CallArgs>
 		Ret apply(pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, size_t size, CallArgs&&... args)
 		{
 			if (disjunction((get<EI>(args...).size() < size)...))
@@ -74,29 +75,22 @@ namespace skepu
 			return res;
 		}
 		
-		template<size_t... AI, size_t... CI, typename... CallArgs> 
-		Ret zero_apply_1D(pack_indices<AI...>, pack_indices<CI...>, size_t size, CallArgs&&... args)
+		template<size_t... AI, size_t... CI, typename... CallArgs>
+		Ret zero_apply(pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args)
 		{
+			size_t size = this->default_size_i;
+			if (defaultDim::value >= 2) size *= this->default_size_j;
+			if (defaultDim::value >= 3) size *= this->default_size_k;
+			if (defaultDim::value >= 4) size *= this->default_size_l;
+			
 			Ret res = this->m_start;
 			for (size_t i = 0; i < size; ++i)
 			{
-				Ret temp = F::forward(mapFunc, Index1D{i}, get<AI>(args...).hostProxy()..., get<CI>(args...)...);
+				Ret temp = F::forward(mapFunc,
+					make_index(defaultDim{}, i, this->default_size_j, this->default_size_k, this->default_size_l),
+					get<AI>(args...).hostProxy()..., get<CI>(args...)...
+				);
 				res = redFunc(res, temp);
-			}
-			return res;
-		}
-		
-		template<size_t... AI, size_t... CI, typename... CallArgs> 
-		Ret zero_apply_2D(pack_indices<AI...>, pack_indices<CI...>, size_t height, size_t width, CallArgs&&... args)
-		{
-			Ret res = this->m_start;
-			for (size_t i = 0; i < height; ++i)
-			{
-				for (size_t j = 0; j < width; ++j)
-				{
-					Ret temp = F::forward(mapFunc, Index2D{i, j}, get<AI>(args...).hostProxy()..., get<CI>(args...)...);
-					res = redFunc(res, temp);
-				}
 			}
 			return res;
 		}
@@ -109,10 +103,12 @@ namespace skepu
 			this->m_start = val;
 		}
 		
-		void setDefaultSize(size_t x, size_t y = 0)
+		void setDefaultSize(size_t i, size_t j = 0, size_t k = 0, size_t l = 0)
 		{
-			this->default_size_x = x;
-			this->default_size_y = y;
+			this->default_size_i = i;
+			this->default_size_j = j;
+			this->default_size_k = k;
+			this->default_size_l = l;
 		}
 		
 		template<template<class> class Container, typename... CallArgs, REQUIRES_VALUE(is_skepu_container<Container<First>>)>
@@ -141,12 +137,7 @@ namespace skepu
 		Ret operator()(CallArgs&&... args)
 		{
 			static_assert(sizeof...(CallArgs) == numArgs, "Number of arguments not matching Map function");
-			
-		//	if (this->default_size_y != 0)
-				return this->zero_apply_1D(any_indices, const_indices, this->default_size_x, std::forward<CallArgs>(args)...);
-			
-		//	else
-		//		return this->zero_apply_2D(any_indices, const_indices, this->default_size_x, this->default_size_y, std::forward<CallArgs>(args)...);
+			return this->zero_apply(any_indices, const_indices, std::forward<CallArgs>(args)...);
 		}
 		
 	private:
@@ -155,8 +146,10 @@ namespace skepu
 		MapReduceImpl(MapFunc map, RedFunc red): mapFunc(map), redFunc(red) {}
 		
 		Ret m_start{};
-		size_t default_size_x;
-		size_t default_size_y;
+		size_t default_size_i = 0;
+		size_t default_size_j = 0;
+		size_t default_size_k = 0;
+		size_t default_size_l = 0;
 		
 		friend MapReduceImpl<arity, Ret, Args...> MapReduceWrapper<arity, Ret, Args...>(MapFunc, RedFunc);
 		

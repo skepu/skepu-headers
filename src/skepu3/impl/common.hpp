@@ -17,6 +17,7 @@
 #include <cassert>
 #include <algorithm>
 #include <functional>
+#include <cstdbool>
 
 namespace skepu
 {
@@ -50,6 +51,55 @@ namespace skepu
 		struct MatRow {};
 	};
 	
+	Index1D make_index(std::integral_constant<int, 1>, size_t index, size_t, size_t, size_t)
+	{
+		return Index1D{index};
+	}
+	
+	Index2D make_index(std::integral_constant<int, 2>, size_t index, size_t size_j, size_t, size_t)
+	{
+		return Index2D{ index / size_j, index % size_j };
+	}
+	
+	Index3D make_index(std::integral_constant<int, 3>, size_t index, size_t size_j, size_t size_k, size_t)
+	{
+		size_t ci = index / (size_j * size_k);
+		index = index % (size_j * size_k);
+		size_t cj = index / (size_k);
+		index = index % (size_k);
+		return Index3D{ ci, cj, index };
+	}
+	
+	Index4D make_index(std::integral_constant<int, 4>, size_t index, size_t size_j, size_t size_k, size_t size_l)
+	{
+		size_t ci = index / (size_j * size_k * size_l);
+		index = index % (size_j * size_k * size_l);
+		size_t cj = index / (size_k * size_l);
+		index = index % (size_k * size_l);
+		size_t ck = index / (size_l);
+		index = index % (size_l);
+		return Index4D{ ci, cj, ck, index };
+	}
+	
+	std::ostream & operator<<(std::ostream &o, Index1D idx)
+	{
+		return o << "Index1D(" << idx.i << ")";
+	}
+	
+	std::ostream & operator<<(std::ostream &o, Index2D idx)
+	{
+		return o << "Index2D(" << idx.row << ", " << idx.col << ")";
+	}
+	
+	std::ostream & operator<<(std::ostream &o, Index3D idx)
+	{
+		return o << "Index3D(" << idx.i << ", "  << idx.j << ", " << idx.k << ")";
+	}
+	
+	std::ostream & operator<<(std::ostream &o, Index4D idx)
+	{
+		return o << "Index4D(" << idx.i << ", "  << idx.j << ", " << idx.k << ", " << idx.l << ")";
+	}
 	
 	// Container Regions (perhaps relocate)
 	
@@ -157,6 +207,7 @@ namespace skepu
 		Map,
 		MapReduce,
 		MapPairs,
+		MapPairsReduce,
 		Reduce1D,
 		Reduce2D,
 		Scan,
@@ -208,6 +259,11 @@ namespace skepu
 	public:
 		void setBackend(BackendSpec) {}
 		void resetBackend() {}
+		std::string selectBackend(size_t size = 0)
+		{
+			return "N/A";
+		}
+		
 		void setExecPlan(ExecPlan *plan)
 		{
 			delete plan;
@@ -335,32 +391,36 @@ namespace skepu
 	
 	
 	// ----------------------------------------------------------------
-	// is_skepu_index trait class
+	// index trait classes for skepu::IndexND (N in [1,2,3,4])
 	// ----------------------------------------------------------------
-	
+
+	// returns the dimensionality of an index type.
+	// that is, if the type is skepu::IndexND, then returns N, else 0.
 	template<typename T>
-	struct is_skepu_index: std::false_type{};
+	struct index_dimension: std::integral_constant<int, 0>{};
 	
 	template<>
-	struct is_skepu_index<Index1D>: std::true_type{};
+	struct index_dimension<Index1D>: std::integral_constant<int, 1>{};
 	
 	template<>
-	struct is_skepu_index<Index2D>: std::true_type{};
+	struct index_dimension<Index2D>: std::integral_constant<int, 2>{};
 	
 	template<>
-	struct is_skepu_index<Index3D>: std::true_type{};
+	struct index_dimension<Index3D>: std::integral_constant<int, 3>{};
 	
 	template<>
-	struct is_skepu_index<Index4D>: std::true_type{};
+	struct index_dimension<Index4D>: std::integral_constant<int, 4>{};
 	
+	// true iff T is a SkePU index type
+	template<typename T>
+	struct is_skepu_index: bool_constant<index_dimension<T>::value != 0>{};
 	
+	// true iff first element of Args is SkePU index type
 	template<typename... Args>
-	struct is_indexed
-	: bool_constant<is_skepu_index<typename pack_element<0, Args...>::type>::value> {};
+	struct is_indexed: bool_constant<is_skepu_index<typename first_element<Args...>::type>::value>{};
 	
 	template<>
-	struct is_indexed<>
-	: std::false_type{};
+	struct is_indexed<>: std::false_type{};
 	
 	// ----------------------------------------------------------------
 	// matrix row proxy trait class
@@ -388,7 +448,7 @@ namespace skepu
 	void flush() {}
 	
 	/*
-	 *  
+	 *
 	 */
 	template<FlushMode mode = FlushMode::Default, typename First, typename... Args>
 	void flush(First&& first, Args&&... args)

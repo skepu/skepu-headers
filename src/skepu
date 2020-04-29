@@ -47,6 +47,7 @@
 #include "skepu3/mapoverlap.hpp"
 #include "skepu3/mapreduce.hpp"
 #include "skepu3/mappairs.hpp"
+#include "skepu3/mappairsreduce.hpp"
 #include "skepu3/call.hpp"
 
 #else
@@ -58,6 +59,7 @@
 #include "skepu3/backend/scan.h"
 #include "skepu3/backend/mapoverlap.h"
 #include "skepu3/backend/mappairs.h"
+#include "skepu3/backend/mappairsreduce.h"
 #include "skepu3/backend/call.h"
 
 

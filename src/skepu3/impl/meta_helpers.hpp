@@ -86,6 +86,12 @@ struct pack_element<0, First, Rest...>
 };
 
 /////////////////////////////
+// first_element
+
+template<typename... Args>
+struct first_element: pack_element<0, Args...>{};
+
+/////////////////////////////
 // get
 template <typename R, size_t Ip, size_t Ij, typename... Tp>
 struct get_impl
@@ -121,6 +127,13 @@ get(Tp&&... tps)
 template <size_t Ip, typename... Tp>
 inline typename pack_element<Ip, Tp...>::type&
 get(Tp&... tps)
+{
+	return get_impl<typename pack_element<Ip, Tp...>::type, Ip, 0, Tp...>::dispatch(tps...);
+}
+
+template <size_t Ip, typename... Tp>
+inline typename pack_element<Ip, Tp...>::type
+get_noref(Tp... tps)
 {
 	return get_impl<typename pack_element<Ip, Tp...>::type, Ip, 0, Tp...>::dispatch(tps...);
 }

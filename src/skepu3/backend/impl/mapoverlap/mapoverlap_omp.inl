@@ -32,7 +32,7 @@ namespace skepu
 			
 			omp_set_num_threads(this->m_selected_spec->CPUThreads());
 			
-#pragma omp parallel for
+#pragma omp parallel for schedule(runtime)
 			for (size_t i = 0; i < overlap; ++i)
 			{
 				switch (this->m_edge)
@@ -61,7 +61,7 @@ namespace skepu
 				res(i) = MapOverlapFunc::OMP({overlap, stride, &start[i + overlap]},
 						get<AI, CallArgs...>(args...).hostProxy()..., get<CI, CallArgs...>(args...)...);
 				
-#pragma omp parallel for
+#pragma omp parallel for schedule(runtime)
 			for (size_t i = overlap; i < size - overlap; ++i)
 				res(i) = MapOverlapFunc::OMP({overlap, stride, &arg(i)},
 					get<AI, CallArgs...>(args...).hostProxy()..., get<CI, CallArgs...>(args...)...);
@@ -104,7 +104,7 @@ namespace skepu
 			{
 				inputEnd = inputBegin + rowWidth;
 				
-#pragma omp parallel for
+#pragma omp parallel for schedule(runtime)
 				for (size_t i = 0; i < overlap; ++i)
 				{
 					switch (this->m_edge)
@@ -133,7 +133,7 @@ namespace skepu
 				for (size_t i = 0; i < overlap; ++i)
 					out[i] = MapOverlapFunc::OMP({overlap, stride, &start[i + overlap]}, get<AI, CallArgs...>(args...).hostProxy()..., get<CI, CallArgs...>(args...)...);
 					
-#pragma omp parallel for
+#pragma omp parallel for schedule(runtime)
 				for (size_t i = overlap; i < rowWidth - overlap; ++i)
 					out[i] = MapOverlapFunc::OMP({overlap, stride, &inputBegin[i]}, get<AI, CallArgs...>(args...).hostProxy()..., get<CI, CallArgs...>(args...)...);
 					
@@ -178,7 +178,7 @@ namespace skepu
 			{
 				inputEnd = inputBegin + (rowWidth * (colWidth-1));
 				
-#pragma omp parallel for
+#pragma omp parallel for schedule(runtime)
 				for (size_t i = 0; i < overlap; ++i)
 				{
 					switch (this->m_edge)
@@ -208,7 +208,7 @@ namespace skepu
 					res(i * stride + col) = MapOverlapFunc::OMP({overlap, 1, &start[i + overlap]},
 						get<AI, CallArgs...>(args...).hostProxy()..., get<CI, CallArgs...>(args...)...);
 					
-#pragma omp parallel for
+#pragma omp parallel for schedule(runtime)
 				for (size_t i = overlap; i < colWidth - overlap; ++i)
 					res(i * stride + col) = MapOverlapFunc::OMP({overlap, stride, &inputBegin[i*stride]},
 						get<AI, CallArgs...>(args...).hostProxy()..., get<CI, CallArgs...>(args...)...);
@@ -241,7 +241,7 @@ namespace skepu
 			const size_t cols = res.total_cols();
 			const size_t in_cols = arg.total_cols();
 			
-#pragma omp parallel for
+#pragma omp parallel for schedule(runtime)
 			for (size_t i = 0; i < rows; i++)
 				for (size_t j = 0; j < cols; j++)
 					res(i, j) = MapOverlapFunc::CPU({overlap_x, overlap_y, in_cols, &arg((i + overlap_y) * in_cols + (j + overlap_x))}, get<AI, CallArgs...>(args...).hostProxy()..., get<CI, CallArgs...>(args...)...);
@@ -258,7 +258,7 @@ namespace skepu
 			pack_expand((get<AI, CallArgs...>(args...).getParent().invalidateDeviceData(hasWriteAccess(MapOverlapFunc::anyAccessMode[AI])), 0)...);
 			res.invalidateDeviceData();
 			
-#pragma omp parallel for
+#pragma omp parallel for schedule(runtime)
 			for (size_t i = 0; i < res.size_i(); i++)
 				for (size_t j = 0; j < res.size_j(); j++)
 					for (size_t k = 0; k < res.size_k(); k++)
@@ -281,7 +281,7 @@ namespace skepu
 			pack_expand((get<AI, CallArgs...>(args...).getParent().invalidateDeviceData(hasWriteAccess(MapOverlapFunc::anyAccessMode[AI])), 0)...);
 			res.invalidateDeviceData();
 			
-#pragma omp parallel for
+#pragma omp parallel for schedule(runtime)
 			for (size_t i = 0; i < res.size_i(); i++)
 				for (size_t j = 0; j < res.size_j(); j++)
 					for (size_t k = 0; k < res.size_k(); k++)

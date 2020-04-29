@@ -3,6 +3,7 @@
 #include <skepu3/backend/benchmark.h>
 #include <skepu3/backend/tuner.h>
 
+#define HYBRID_TUNE_CPU_THREADS 16
 #define HYBRID_MEASURE_REPEATS 5
 #define HYBRID_ARG_NUM_STEPS 10
 #define HYBRID_ARG_SIZE_MIN 1024
@@ -134,7 +135,7 @@ namespace skepu
 			
 			
 			template<typename Skeleton>
-			void hybridTune(Skeleton& instance, size_t numThreads = CPU_THREADS, size_t numDevices = 1, size_t minSize = HYBRID_ARG_SIZE_MIN, size_t maxSize = HYBRID_ARG_SIZE_MAX, size_t numSteps = HYBRID_ARG_NUM_STEPS)
+			void hybridTune(Skeleton& instance, size_t numThreads = HYBRID_TUNE_CPU_THREADS, size_t numDevices = 1, size_t minSize = HYBRID_ARG_SIZE_MIN, size_t maxSize = HYBRID_ARG_SIZE_MAX, size_t numSteps = HYBRID_ARG_NUM_STEPS)
 			{
 				hybrid_tune_impl(instance, numThreads, numDevices, minSize, maxSize, numSteps, HYBRID_MEASURE_REPEATS,
 					typename future_std::make_index_sequence<std::tuple_size<typename Skeleton::ResultArg>::value>::type(),
@@ -146,7 +147,7 @@ namespace skepu
 #else
 			
 			template<typename S>
-			void hybridTune(S& instance, size_t numThreads = CPU_THREADS, size_t numDevices = 1, size_t minSize = HYBRID_ARG_SIZE_MIN, size_t maxSize = HYBRID_ARG_SIZE_MAX)
+			void hybridTune(S& instance, size_t numThreads = HYBRID_TUNE_CPU_THREADS, size_t numDevices = 1, size_t minSize = HYBRID_ARG_SIZE_MIN, size_t maxSize = HYBRID_ARG_SIZE_MAX)
 			{
 				// Do nothing
 			}

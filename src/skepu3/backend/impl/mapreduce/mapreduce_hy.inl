@@ -13,7 +13,7 @@ namespace skepu
 	namespace backend
 	{
 		template<size_t arity, typename MapFunc, typename ReduceFunc, typename CUDAKernel, typename CUDAReduceKernel, typename CLKernel>
-		template<size_t... EI, size_t... AI, size_t... CI, typename ...CallArgs> 
+		template<size_t... EI, size_t... AI, size_t... CI, typename ...CallArgs>
 		typename ReduceFunc::Ret MapReduce<arity, MapFunc, ReduceFunc, CUDAKernel, CUDAReduceKernel, CLKernel>
 		::Hybrid(size_t size, pack_indices<EI...> ei, pack_indices<AI...> ai, pack_indices<CI...> ci, Ret &res, CallArgs&&... args)
 		{
@@ -94,7 +94,7 @@ namespace skepu
 		
 		
 		template<size_t arity, typename MapFunc, typename ReduceFunc, typename CUDAKernel, typename CUDAReduceKernel, typename CLKernel>
-		template<size_t... AI, size_t... CI, typename ...CallArgs> 
+		template<size_t... AI, size_t... CI, typename ...CallArgs>
 		typename ReduceFunc::Ret MapReduce<arity, MapFunc, ReduceFunc, CUDAKernel, CUDAReduceKernel, CLKernel>
 		::Hybrid(size_t size, pack_indices<> ei, pack_indices<AI...> ai, pack_indices<CI...> ci, Ret &res, CallArgs&&... args)
 		{
@@ -153,11 +153,13 @@ namespace skepu
 					const size_t first = myId * q;
 					const size_t last = (myId + 1) * q + (myId == numCPUThreads - 1 ? rest : 0);
 					
-					Ret psum = F::forward(MapFunc::OMP, skepu::Index1D{first}, get<AI, CallArgs...>(args...).hostProxy()..., get<CI, CallArgs...>(args...)...);
+					auto index = make_index(defaultDim{}, first, this->default_size_j, this->default_size_k, this->default_size_l);
+					Ret psum = F::forward(MapFunc::OMP, index, get<AI, CallArgs...>(args...).hostProxy()..., get<CI, CallArgs...>(args...)...);
 					
 					for (size_t i = first+1; i < last; ++i)
 					{
-						Temp tempMap = F::forward(MapFunc::OMP, skepu::Index1D{i}, get<AI, CallArgs...>(args...).hostProxy()..., get<CI, CallArgs...>(args...)...);
+						auto index = make_index(defaultDim{}, i, this->default_size_j, this->default_size_k, this->default_size_l);
+						Temp tempMap = F::forward(MapFunc::OMP, index, get<AI, CallArgs...>(args...).hostProxy()..., get<CI, CallArgs...>(args...)...);
 						psum = ReduceFunc::OMP(psum, tempMap);
 					}
 					parsums[myId] = psum;
@@ -175,4 +177,3 @@ namespace skepu
 } // namespace skepu
 
 #endif
-

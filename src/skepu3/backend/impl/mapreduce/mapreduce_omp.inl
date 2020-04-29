@@ -13,7 +13,7 @@ namespace skepu
 	namespace backend
 	{
 		template<size_t arity, typename MapFunc, typename ReduceFunc, typename CUDAKernel, typename CUDAReduceKernel, typename CLKernel>
-		template<size_t... EI, size_t... AI, size_t... CI, typename ...CallArgs> 
+		template<size_t... EI, size_t... AI, size_t... CI, typename ...CallArgs>
 		typename ReduceFunc::Ret MapReduce<arity, MapFunc, ReduceFunc, CUDAKernel, CUDAReduceKernel, CLKernel>
 		::OMP(size_t size, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, Ret &res, CallArgs&&... args)
 		{
@@ -22,29 +22,16 @@ namespace skepu
 			pack_expand((get<AI, CallArgs...>(args...).getParent().updateHost(hasReadAccess(MapFunc::anyAccessMode[AI-arity])), 0)...);
 			pack_expand((get<AI, CallArgs...>(args...).getParent().invalidateDeviceData(hasWriteAccess(MapFunc::anyAccessMode[AI-arity])), 0)...);
 			
-			// Set up thread indexing
-			omp_set_num_threads(std::min(this->m_selected_spec->CPUThreads(), size / 2));
-			const size_t nthr = omp_get_max_threads();
-			const size_t q = size / nthr;
-			const size_t rest = size % nthr;
-			
-			std::vector<Ret> parsums(nthr);
+			std::vector<Ret> parsums(this->m_selected_spec->CPUThreads(), this->m_start);
 			
 			// Perform Map and partial Reduce with OpenMP
-#pragma omp parallel
+#pragma omp parallel for schedule(runtime)
+			for (size_t i = 0; i < size; ++i)
 			{
-				const size_t myid = omp_get_thread_num();
-				const size_t first = myid * q;
-				const size_t last = (myid + 1) * q + (myid == nthr - 1 ? rest : 0);
-				
-				Ret psum = F::forward(MapFunc::OMP, (get<0, CallArgs...>(args...) + first).getIndex(), get<EI, CallArgs...>(args...)(first)..., get<AI, CallArgs...>(args...).hostProxy()..., get<CI, CallArgs...>(args...)...);
-				
-				for (size_t i = first+1; i < last; ++i)
-				{
-					Temp tempMap = F::forward(MapFunc::OMP, (get<0, CallArgs...>(args...) + i).getIndex(), get<EI, CallArgs...>(args...)(i)..., get<AI, CallArgs...>(args...).hostProxy()..., get<CI, CallArgs...>(args...)...);
-					psum = ReduceFunc::OMP(psum, tempMap);
-				}
-				parsums[myid] = psum;
+				size_t myid = omp_get_thread_num();
+				auto index = (get<0, CallArgs...>(args...) + i).getIndex();
+				Temp tempMap = F::forward(MapFunc::OMP, index, get<EI, CallArgs...>(args...)(i)..., get<AI, CallArgs...>(args...).hostProxy()..., get<CI, CallArgs...>(args...)...);
+				parsums[myid] = ReduceFunc::OMP(parsums[myid], tempMap);
 			}
 			
 			// Final Reduce sequentially
@@ -57,7 +44,7 @@ namespace skepu
 		
 		
 		template<size_t arity, typename MapFunc, typename ReduceFunc, typename CUDAKernel, typename CUDAReduceKernel, typename CLKernel>
-		template<size_t... AI, size_t... CI, typename ...CallArgs> 
+		template<size_t... AI, size_t... CI, typename ...CallArgs>
 		typename ReduceFunc::Ret MapReduce<arity, MapFunc, ReduceFunc, CUDAKernel, CUDAReduceKernel, CLKernel>
 		::OMP(size_t size, pack_indices<>, pack_indices<AI...>, pack_indices<CI...>, Ret &res, CallArgs&&... args)
 		{
@@ -65,29 +52,16 @@ namespace skepu
 			pack_expand((get<AI, CallArgs...>(args...).getParent().updateHost(hasReadAccess(MapFunc::anyAccessMode[AI-arity])), 0)...);
 			pack_expand((get<AI, CallArgs...>(args...).getParent().invalidateDeviceData(hasWriteAccess(MapFunc::anyAccessMode[AI-arity])), 0)...);
 			
-			// Set up thread indexing
-			omp_set_num_threads(std::min(this->m_selected_spec->CPUThreads(), size / 2));
-			const size_t nthr = omp_get_max_threads();
-			const size_t q = size / nthr;
-			const size_t rest = size % nthr;
-			
-			std::vector<Ret> parsums(nthr);
+			std::vector<Ret> parsums(this->m_selected_spec->CPUThreads(), this->m_start);
 			
 			// Perform Map and partial Reduce with OpenMP
-#pragma omp parallel
+#pragma omp parallel for schedule(runtime)
+			for (size_t i = 0; i < size; ++i)
 			{
-				const size_t myid = omp_get_thread_num();
-				const size_t first = myid * q;
-				const size_t last = (myid + 1) * q + (myid == nthr - 1 ? rest : 0);
-				
-				Ret psum = F::forward(MapFunc::OMP, skepu::Index1D{first}, get<AI, CallArgs...>(args...).hostProxy()..., get<CI, CallArgs...>(args...)...);
-				
-				for (size_t i = first+1; i < last; ++i)
-				{
-					Temp tempMap = F::forward(MapFunc::OMP, skepu::Index1D{i}, get<AI, CallArgs...>(args...).hostProxy()..., get<CI, CallArgs...>(args...)...);
-					psum = ReduceFunc::OMP(psum, tempMap);
-				}
-				parsums[myid] = psum;
+				size_t myid = omp_get_thread_num();
+				auto index = make_index(defaultDim{}, i, this->default_size_j, this->default_size_k, this->default_size_l);
+				Temp tempMap = F::forward(MapFunc::OMP, index, get<AI, CallArgs...>(args...).hostProxy()..., get<CI, CallArgs...>(args...)...);
+				parsums[myid] = ReduceFunc::OMP(parsums[myid], tempMap);
 			}
 			
 			// Final Reduce sequentially
@@ -101,4 +75,3 @@ namespace skepu
 } // namespace skepu
 
 #endif
-

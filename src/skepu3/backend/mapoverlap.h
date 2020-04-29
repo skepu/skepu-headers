@@ -233,11 +233,9 @@ namespace skepu
 				typename make_pack_indices<anyCont, 0>::type any_indices;
 				typename make_pack_indices<sizeof...(CallArgs), anyCont>::type const_indices;
 				
-				this->m_selected_spec = (this->m_user_spec != nullptr)
-					? this->m_user_spec
-					: &this->m_execPlan->find(arg.size());
-				
-				switch (this->m_selected_spec->backend())
+				this->selectBackend(arg.size());
+					
+				switch (this->m_selected_spec->activateBackend())
 				{
 				case Backend::Type::Hybrid:
 #ifdef SKEPU_HYBRID
@@ -277,9 +275,7 @@ namespace skepu
 				typename make_pack_indices<anyCont, 0>::type any_indices;
 				typename make_pack_indices<sizeof...(CallArgs), anyCont>::type const_indices;
 				
-				this->m_selected_spec = (this->m_user_spec != nullptr)
-					? this->m_user_spec
-					: &this->m_execPlan->find(arg.size());
+				this->selectBackend(arg.size());
 				
 				size_t numrows = arg.total_rows();
 				size_t numcols = arg.total_cols();
@@ -288,7 +284,7 @@ namespace skepu
 				{
 					case Overlap::RowColWise: {
 						Matrix<Ret> tmp(res.total_rows(), res.total_cols());
-						switch (this->m_selected_spec->backend())
+						switch (this->m_selected_spec->activateBackend())
 						{
 						case Backend::Type::Hybrid:
 #ifdef SKEPU_HYBRID
@@ -324,7 +320,7 @@ namespace skepu
 					
 					case Overlap::ColRowWise: {
 						Matrix<Ret> tmp(res.total_rows(), res.total_cols());
-						switch (this->m_selected_spec->backend())
+						switch (this->m_selected_spec->activateBackend())
 						{
 						case Backend::Type::Hybrid:
 #ifdef SKEPU_HYBRID
@@ -359,7 +355,7 @@ namespace skepu
 					}
 					
 					case Overlap::ColWise:
-						switch (this->m_selected_spec->backend())
+						switch (this->m_selected_spec->activateBackend())
 						{
 						case Backend::Type::Hybrid:
 #ifdef SKEPU_HYBRID
@@ -388,7 +384,7 @@ namespace skepu
 						break;
 					
 					case Overlap::RowWise:
-						switch (this->m_selected_spec->backend())
+						switch (this->m_selected_spec->activateBackend())
 						{
 						case Backend::Type::Hybrid:
 #ifdef SKEPU_HYBRID
@@ -551,11 +547,9 @@ namespace skepu
 				if ((in_rows - overlap_y*2 != out_rows) && (in_cols - overlap_x*2 != out_cols))
 					SKEPU_ERROR("MapOverlap 2D: Non-matching container sizes");
 				
-				this->m_selected_spec = (this->m_user_spec != nullptr)
-					? this->m_user_spec
-					: &this->m_execPlan->find(arg.size());
-				
-				switch (this->m_selected_spec->backend())
+				this->selectBackend(arg.size());
+					
+				switch (this->m_selected_spec->activateBackend())
 				{
 				case Backend::Type::Hybrid:
 #ifdef SKEPU_HYBRID
@@ -716,11 +710,9 @@ namespace skepu
 					&& (arg.size_k() - this->m_overlap_k*2 != res.size_k()))
 					SKEPU_ERROR("MapOverlap3D: Non-matching container sizes");
 				
-				this->m_selected_spec = (this->m_user_spec != nullptr)
-					? this->m_user_spec
-					: &this->m_execPlan->find(arg.size());
-				
-				switch (this->m_selected_spec->backend())
+				this->selectBackend(arg.size());
+					
+				switch (this->m_selected_spec->activateBackend())
 				{
 				case Backend::Type::Hybrid:
 #ifdef SKEPU_HYBRID
@@ -884,11 +876,9 @@ namespace skepu
 					&& (arg.size_l() - this->m_overlap_l*2 != res.size_l()))
 					SKEPU_ERROR("MapOverlap4D: Non-matching container sizes");
 				
-				this->m_selected_spec = (this->m_user_spec != nullptr)
-					? this->m_user_spec
-					: &this->m_execPlan->find(arg.size());
-				
-				switch (this->m_selected_spec->backend())
+				this->selectBackend(arg.size());
+					
+				switch (this->m_selected_spec->activateBackend())
 				{
 				case Backend::Type::Hybrid:
 #ifdef SKEPU_HYBRID

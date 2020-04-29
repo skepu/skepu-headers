@@ -65,14 +65,14 @@ namespace skepu
 			
 			// ==========================  CPU implementation   ==========================
 			
-			template<size_t... AI, size_t... CI, typename... CallArgs> 
+			template<size_t... AI, size_t... CI, typename... CallArgs>
 			void  CPU(pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args);
 			
 			
 			// ========================== OpenMP implementation ==========================
 #ifdef SKEPU_OPENMP
 			
-			template<size_t... AI, size_t... CI, typename ...CallArgs> 
+			template<size_t... AI, size_t... CI, typename ...CallArgs>
 			void  OMP(pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args);
 			
 #endif // SKEPU_OPENMP
@@ -81,19 +81,19 @@ namespace skepu
 			// ==========================  CUDA implementation  ==========================
 #ifdef SKEPU_CUDA
 			
-			template<size_t... AI, size_t... CI, typename... CallArgs> 
+			template<size_t... AI, size_t... CI, typename... CallArgs>
 			void CUDA(pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args);
 			
-			template<size_t... AI, size_t... CI, typename... CallArgs> 
+			template<size_t... AI, size_t... CI, typename... CallArgs>
 			void         callSingleThread_CU(size_t deviceID,  pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args);
 			
-			template<size_t... AI, size_t... CI, typename... CallArgs> 
+			template<size_t... AI, size_t... CI, typename... CallArgs>
 			void          callMultiStream_CU(size_t deviceID,  pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args);
 			
-			template<size_t... AI, size_t... CI, typename... CallArgs> 
+			template<size_t... AI, size_t... CI, typename... CallArgs>
 			void callSingleThreadMultiGPU_CU(size_t useNumGPU, pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args);
 			
-			template<size_t... AI, size_t... CI, typename... CallArgs> 
+			template<size_t... AI, size_t... CI, typename... CallArgs>
 			void  callMultiStreamMultiGPU_CU(size_t useNumGPU, pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args);
 			
 #endif // SKEPU_CUDA
@@ -102,21 +102,19 @@ namespace skepu
 			// ========================== OpenCL implementation ==========================
 #ifdef SKEPU_OPENCL
 			
-			template<size_t... AI, size_t... CI, typename... CallArgs> 
+			template<size_t... AI, size_t... CI, typename... CallArgs>
 			void   CL(pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args);
 			
 #endif // SKEPU_OPENCL
 			
-			template<size_t... AI, size_t... CI, typename... CallArgs> 
+			template<size_t... AI, size_t... CI, typename... CallArgs>
 			void backendDispatch(pack_indices<AI...> ai, pack_indices<CI...> ci, CallArgs&&... args)
 			{
 				assert(this->m_execPlan != NULL && this->m_execPlan->isCalibrated());
 				
-				this->m_selected_spec = (this->m_user_spec != nullptr)
-					? this->m_user_spec
-					: &this->m_execPlan->find(0);
+				this->selectBackend(0);
 				
-				switch (this->m_selected_spec->backend())
+				switch (this->m_selected_spec->activateBackend())
 				{
 				case Backend::Type::CUDA:
 #ifdef SKEPU_CUDA

@@ -24,9 +24,7 @@ namespace skepu
 			pack_expand((get<AI, CallArgs...>(args...).getParent().invalidateDeviceData(hasWriteAccess(MapFunc::anyAccessMode[AI-arity])), 0)...);
 			pack_expand((get<OI, CallArgs...>(args...).getParent().invalidateDeviceData(), 0)...);
 			
-			omp_set_num_threads(this->m_selected_spec->CPUThreads());
-			
-#pragma omp parallel for
+#pragma omp parallel for schedule(runtime)
 			for (size_t i = 0; i < size; ++i)
 			{
 				auto index = (std::get<0>(std::make_tuple(get<OI, CallArgs...>(args...).begin()...)) + i).getIndex();

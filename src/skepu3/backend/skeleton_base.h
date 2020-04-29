@@ -29,21 +29,38 @@ namespace skepu
 				this->m_execPlan = plan;
 			}
 			
-			void setBackend(BackendSpec spec)
+			void setBackend(BackendSpec const& spec)
 			{
 				this->m_user_spec = new BackendSpec(spec);
 			}
 			
 			void resetBackend()
 			{
+				if (this->m_user_spec)
+					delete this->m_user_spec;
 				this->m_user_spec = nullptr;
+			}
+			
+			const BackendSpec& selectBackend(size_t size = 0)
+			{
+				if (this->m_user_spec)
+					this->m_selected_spec = this->m_user_spec;
+				else if (this->m_execPlan)
+					this->m_selected_spec = &this->m_execPlan->find(size);
+				else
+					this->m_selected_spec = &m_globalBackendSpec;
+				
+			//	this->m_selected_spec = (this->m_user_spec != nullptr)
+			//		? this->m_user_spec
+			//		: &this->m_execPlan->find(size);
+				return *this->m_selected_spec;
 			}
 			
 		protected:
 			SkeletonBase()
 			{
 				this->m_environment = Environment<int>::getInstance();
-			
+			/*
 #if defined(SKEPU_OPENCL)
 				BackendSpec bspec(Backend::Type::OpenCL);
 				bspec.setDevices(this->m_environment->m_devices_CL.size());
@@ -67,6 +84,7 @@ namespace skepu
 				plan->setCalibrated();
 				plan->add(1, MAX_SIZE, bspec);
 				setExecPlan(plan);
+			*/
 			}
 			
 			Environment<int>* m_environment;

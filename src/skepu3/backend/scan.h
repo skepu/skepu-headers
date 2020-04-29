@@ -104,22 +104,20 @@ namespace skepu
 			template<typename OutIterator, typename InIterator>
 			void backendDispatch(size_t size, OutIterator res, InIterator arg)
 			{
-				assert(this->m_execPlan != NULL && this->m_execPlan->isCalibrated());
+			//	assert(this->m_execPlan != NULL && this->m_execPlan->isCalibrated());
 				
 				if (arg.size() < size)
 					SKEPU_ERROR("Map: Non-matching container sizes");
 				
-				this->m_selected_spec = (this->m_user_spec != nullptr)
-					? this->m_user_spec
-					: &this->m_execPlan->find(size);
+				this->selectBackend(size);
 				
-				switch (this->m_selected_spec->backend())
+				switch (this->m_selected_spec->activateBackend())
 				{
 				case Backend::Type::Hybrid:
 #ifdef SKEPU_HYBRID
 					this->Hybrid(size, res, arg, this->m_mode, this->m_initial);
 					break;
-#endif				
+#endif
 				case Backend::Type::CUDA:
 #ifdef SKEPU_CUDA
 					this->CU(size, res, arg, this->m_mode, this->m_initial);
