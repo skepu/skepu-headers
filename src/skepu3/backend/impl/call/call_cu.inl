@@ -172,7 +172,7 @@ namespace skepu
 			auto aArgs = std::make_tuple(get<AI, CallArgs...>(args...)...);
 			auto scArgs = std::make_tuple(get<CI, CallArgs...>(args...)...);
 			
-			typename to_proxy_cu<decltype(CallFunc::ProxyTags), decltype(aArgs)>::type anyMemP[MAX_GPU_DEVICES];
+			typename to_proxy_cu<typename CallFunc::ProxyTags, decltype(aArgs)>::type anyMemP[MAX_GPU_DEVICES];
 			
 			// First create CUDA memory if not created already.
 			for (size_t i = 0; i < numDevices; ++i)

@@ -858,6 +858,12 @@ namespace skepu
 			using type = std::tuple<typename to_proxy_cu<Rs, Ts>::type...>;
 		};
 		
+		template<typename... Rs, typename...Ts>
+		struct to_proxy_cu<std::tuple<Rs...>, std::tuple<Ts...>>
+		{
+			using type = std::tuple<typename to_proxy_cu<Rs, Ts>::type...>;
+		};
+		
 	}
 }
 

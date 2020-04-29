@@ -124,7 +124,7 @@ namespace skepu
 			const size_t numElemPerSlice = size / numDevices;
 			const size_t rest = size % numDevices;
 			
-			Vector<T> deviceSums;
+			Vector<T> deviceSums(numDevices);
 			T ret = 0;
 			
 			// Fill out argument struct with right information and start threads.
@@ -139,7 +139,7 @@ namespace skepu
 				
 				cudaSetDevice(i);
 				ret = scanLargeVectorRecursivelyM_CU(in_mem_p, out_mem_p, blockSums, numElem, mode, initial, this->m_environment->m_devices_CU.at(i));
-				deviceSums.push_back(ret);
+				deviceSums(i) = ret;
 				out_mem_p->changeDeviceData();
 				
 				// Clean up

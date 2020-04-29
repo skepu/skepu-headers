@@ -128,13 +128,8 @@ namespace skepu
 			
 #ifdef SKEPU_CUDA
 			
-<<<<<<< ours
-			template<size_t... OI, size_t... EI, size_t... AI, size_t... CI, typename... CallArgs>
-			void CUDA(size_t startIdx, size_t size, pack_indices<OI...>, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, Iterator res, CallArgs&&... args);
-=======
 			template<size_t... OI, size_t... EI, size_t... AI, size_t... CI, typename... CallArgs> 
 			void CUDA(size_t startIdx, size_t size, pack_indices<OI...>, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args);
->>>>>>> theirs
 			
 			template<size_t... OI, size_t... EI, size_t... AI, size_t... CI, typename ...CallArgs>
 			void         mapSingleThread_CU(size_t deviceID, size_t startIdx, size_t size, pack_indices<OI...>, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args);

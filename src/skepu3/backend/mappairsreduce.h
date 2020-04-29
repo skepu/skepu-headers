@@ -213,7 +213,7 @@ namespace skepu
 
 #include "impl/mappairsreduce/mappairsreduce_cpu.inl"
 #include "impl/mappairsreduce/mappairsreduce_omp.inl"
-#include "impl/mappairsreduce/mappairsreduce_cl.inl"
+//#include "impl/mappairsreduce/mappairsreduce_cl.inl"
 //#include "impl/mappairsreduce/mappairsreduce_cu.inl"
 //#include "impl/mappairsreduce/mappairsreduce_hy.inl"
 

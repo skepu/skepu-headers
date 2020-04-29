@@ -285,15 +285,33 @@ namespace skepu
 
 namespace skepu
 {
-	inline size_t elwise_width(std::tuple<>)
+	inline size_t elwise_i(std::tuple<>) { return 0; }
+	inline size_t elwise_j(std::tuple<>) { return 0; }
+	inline size_t elwise_k(std::tuple<>) { return 0; }
+	inline size_t elwise_l(std::tuple<>) { return 0; }
+	
+	template<typename... Args>
+	inline size_t elwise_i(std::tuple<Args...> &t)
 	{
-		return 0;
+		return std::get<0>(t).getParent().size_i();
 	}
 	
 	template<typename... Args>
-	inline size_t elwise_width(std::tuple<Args...> &t)
+	inline size_t elwise_j(std::tuple<Args...> &t)
 	{
-		return std::get<0>(t).getParent().total_cols();
+		return std::get<0>(t).getParent().size_j();
+	}
+	
+	template<typename... Args>
+	inline size_t elwise_k(std::tuple<Args...> &t)
+	{
+		return std::get<0>(t).getParent().size_k();
+	}
+	
+	template<typename... Args>
+	inline size_t elwise_l(std::tuple<Args...> &t)
+	{
+		return std::get<0>(t).getParent().size_l();
 	}
 	
 	// ----------------------------------------------------------------

@@ -51,7 +51,7 @@ namespace skepu
 				std::get<AI-arity>(anyMemP).second...,
 				std::get<CI-arity-anyArity>(scArgs)...,
 				d_odata,
-				elwise_width(eArgs),
+				elwise_j(eArgs), elwise_k(eArgs), elwise_l(eArgs),
 				size,
 				startIdx
 			);
@@ -98,7 +98,7 @@ namespace skepu
 			
 			Ret result[numKernels];
 			typename to_device_pointer_cu<decltype(eArgs)>::type elwiseMemP[numKernels];
-			typename to_proxy_cu<decltype(MapFunc::ProxyTags), decltype(aArgs)>::type             anyMemP[numKernels];
+			typename to_proxy_cu<typename MapFunc::ProxyTags, decltype(aArgs)>::type             anyMemP[numKernels];
 			DeviceMemPointer_CU<Ret>* outMemP[numKernels];
 			
 			size_t numBlocks[numKernels];
@@ -147,7 +147,7 @@ namespace skepu
 					std::get<AI-arity>(anyMemP[i]).second...,
 					std::get<CI-arity-anyArity>(scArgs)...,
 					deviceOutMemP,
-					elwise_width(eArgs),
+					elwise_j(eArgs), elwise_k(eArgs), elwise_l(eArgs),
 					numElem,
 					baseIndex
 				);
@@ -214,7 +214,7 @@ namespace skepu
 			
 			Ret result[MAX_GPU_DEVICES][maxKernels];
 			typename to_device_pointer_cu<decltype(eArgs)>::type elwiseMemP[MAX_GPU_DEVICES][maxKernels];
-			typename to_proxy_cu<decltype(aArgs)>::type anyMemP[MAX_GPU_DEVICES][maxKernels];
+			typename to_proxy_cu<typename MapFunc::ProxyTags, decltype(aArgs)>::type anyMemP[MAX_GPU_DEVICES][maxKernels];
 			DeviceMemPointer_CU<Ret>* outMemP[MAX_GPU_DEVICES][maxKernels];
 			
 			size_t numBlocks[MAX_GPU_DEVICES][maxKernels];
@@ -269,7 +269,8 @@ namespace skepu
 						std::get<AI-arity>(anyMemP[i][j]).second...,
 						std::get<CI-arity-anyArity>(scArgs)...,
 						deviceOutMemP,
-						elwise_width(eArgs), numElem, baseIndex
+						elwise_j(eArgs), elwise_k(eArgs), elwise_l(eArgs),
+						numElem, baseIndex
 					);
 					
 					size_t threads, blocks;
@@ -316,7 +317,7 @@ namespace skepu
 			auto scArgs = std::make_tuple(get<CI, CallArgs...>(args...)...);
 			
 			typename to_device_pointer_cu<decltype(eArgs)>::type elwiseMemP[MAX_GPU_DEVICES];
-			typename to_proxy_cu<decltype(MapFunc::ProxyTags), decltype(aArgs)>::type anyMemP[MAX_GPU_DEVICES];
+			typename to_proxy_cu<typename MapFunc::ProxyTags, decltype(aArgs)>::type anyMemP[MAX_GPU_DEVICES];
 			
 			Ret result[MAX_GPU_DEVICES];
 			DeviceMemPointer_CU<Ret>* outMemP[MAX_GPU_DEVICES];
@@ -363,7 +364,7 @@ namespace skepu
 					std::get<AI-arity>(anyMemP[i]).second...,
 					std::get<CI-arity-anyArity>(scArgs)...,
 					deviceOutMemP,
-					elwise_width(eArgs),
+					elwise_j(eArgs), elwise_k(eArgs), elwise_l(eArgs),
 					numElem,
 					baseIndex
 				);
