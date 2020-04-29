@@ -247,10 +247,16 @@ namespace skepu
 		bool isVectorOnDevice_CU(size_t deviceID) const;
 		bool isModified_CU(size_t deviceID) const;
 		
-		std::pair<device_pointer_type_cu, Vec<T>> cudaProxy(size_t deviceID, AccessMode accessMode)
+		template<typename Ignore>
+		std::pair<device_pointer_type_cu, Vec<T>> cudaProxy(size_t deviceID, AccessMode accessMode, ProxyTag::Default, Ignore)
 		{
 			device_pointer_type_cu devptr = this->updateDevice_CU(this->m_data, this->m_size, deviceID, accessMode);
 			return {devptr, {devptr->getDeviceDataPointer(), this->m_size}};
+		}
+		
+		std::pair<device_pointer_type_cu, Vec<T>> cudaProxy(size_t deviceID, AccessMode accessMode)
+		{
+			return this->cudaProxy(deviceID, accessMode, ProxyTag::Default{}, 0);
 		}
 #endif
 		

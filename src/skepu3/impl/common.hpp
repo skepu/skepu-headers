@@ -174,6 +174,9 @@ namespace skepu
 	using multiple = std::tuple<args...>;
 	
 	template <typename... Args>
+#ifdef SKEPU_CUDA
+		__host__ __device__
+#endif
 	auto ret(Args&&... args) -> decltype(std::make_tuple(std::forward<Args>(args)...)) {
 		return std::make_tuple(std::forward<Args>(args)...);
 	}

@@ -13,13 +13,14 @@ namespace skepu
 	namespace backend
 	{
 		template<size_t arity, typename MapFunc, typename CUDAKernel, typename CLKernel>
-		template<size_t... EI, size_t... AI, size_t... CI, typename Iterator, typename ...CallArgs> 
+		template<size_t... OI, size_t... EI, size_t... AI, size_t... CI, typename ...CallArgs>
 		void Map<arity, MapFunc, CUDAKernel, CLKernel>
-		::mapSingleThread_CU(size_t deviceID, size_t startIdx, size_t size, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, Iterator res, CallArgs&&... args)
+		::mapSingleThread_CU(size_t deviceID, size_t startIdx, size_t size, pack_indices<OI...>, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args)
 		{
-			auto eArgs = std::make_tuple(get<EI, CallArgs...>(args...)...);
-			auto aArgs = std::make_tuple(get<AI, CallArgs...>(args...)...);
-			auto scArgs = std::make_tuple(get<CI, CallArgs...>(args...)...);
+			auto oArgs = std::tie(get<OI, CallArgs...>(std::forward<CallArgs>(args)...)...);
+			auto eArgs = std::tie(get<EI, CallArgs...>(std::forward<CallArgs>(args)...)...);
+			auto aArgs = std::tie(get<AI, CallArgs...>(std::forward<CallArgs>(args)...)...);
+			auto scArgs = std::tie(get<CI, CallArgs...>(std::forward<CallArgs>(args)...)...);
 			
 			// Setup parameters
 			const size_t numThreads = std::min(this->m_selected_spec->GPUThreads(), size);
@@ -28,9 +29,10 @@ namespace skepu
 			DEBUG_TEXT_LEVEL1("CUDA Map: numBlocks = " << numBlocks << ", numThreads = " << numThreads);
 			
 			// Copies the elements to the device
-			auto elwiseMemP = std::make_tuple(std::get<EI>(eArgs).getParent().updateDevice_CU(std::get<EI>(eArgs).getAddress() + startIdx, size, deviceID, AccessMode::Read)...);
-			auto anyMemP = std::make_tuple(std::get<AI-arity>(aArgs).getParent().cudaProxy(deviceID, MapFunc::anyAccessMode[AI-arity])...);
-			auto outMemP = res.getParent().updateDevice_CU(res.getAddress() + startIdx, size, deviceID, AccessMode::Write);
+			auto outMemP    = std::make_tuple(std::get<OI>(oArgs)         .getParent().updateDevice_CU(std::get<OI>         (oArgs).getAddress() + startIdx, size, deviceID, AccessMode::Write)...);
+			auto elwiseMemP = std::make_tuple(std::get<EI-outArity>(eArgs).getParent().updateDevice_CU(std::get<EI-outArity>(eArgs).getAddress() + startIdx, size, deviceID, AccessMode::Read)...);
+			auto anyMemP    = std::make_tuple(std::get<AI-arity-outArity>(aArgs).getParent().cudaProxy(deviceID, MapFunc::anyAccessMode[AI-arity-outArity], std::get<AI-arity-outArity>(MapFunc::ProxyTags), Index1D{0})...);
+		//	auto outMemP = res.getParent().updateDevice_CU(res.getAddress() + startIdx, size, deviceID, AccessMode::Write);
 			
 			// Launches the kernel (asynchronous)
 #ifdef USE_PINNED_MEMORY
@@ -39,18 +41,22 @@ namespace skepu
 			this->m_cuda_kernel<<<numBlocks, numThreads>>>
 #endif // USE_PINNED_MEMORY
 			(
-				std::get<EI>(elwiseMemP)->getDeviceDataPointer()...,
-				std::get<AI-arity>(anyMemP).second...,
-				std::get<CI-arity-anyArity>(scArgs)...,
-				outMemP->getDeviceDataPointer(),
-				res.getParent().total_cols(),
+				std::get<OI>(outMemP)->getDeviceDataPointer()...,
+				std::get<EI-outArity>(elwiseMemP)->getDeviceDataPointer()...,
+				std::get<AI-arity-outArity>(anyMemP).second...,
+				std::get<CI-arity-anyArity-outArity>(scArgs)...,
+			//	outMemP->getDeviceDataPointer(),
+				get<0>(args...).getParent().size_j(),
+				get<0>(args...).getParent().size_k(),
+				get<0>(args...).getParent().size_l(),
 				size,
 				startIdx
 			);
 			
 			// Make sure the data is marked as changed by the device
-			pack_expand((std::get<AI-arity>(anyMemP).first->changeDeviceData(hasWriteAccess(MapFunc::anyAccessMode[AI-arity])), 0)...);
-			outMemP->changeDeviceData();
+			pack_expand((std::get<OI>(outMemP)->changeDeviceData(), 0)...);
+			pack_expand((std::get<AI-arity-outArity>(anyMemP).first->changeDeviceData(hasWriteAccess(MapFunc::anyAccessMode[AI-arity-outArity])), 0)...);
+		//	outMemP->changeDeviceData();
 			
 #ifdef TUNER_MODE
 			cudaDeviceSynchronize();
@@ -59,22 +65,24 @@ namespace skepu
 		
 		
 		template<size_t arity, typename MapFunc, typename CUDAKernel, typename CLKernel>
-		template<size_t... EI, size_t... AI, size_t... CI, typename Iterator, typename ...CallArgs> 
+		template<size_t... OI, size_t... EI, size_t... AI, size_t... CI, typename ...CallArgs>
 		void Map<arity, MapFunc, CUDAKernel, CLKernel>
-		::mapMultiStream_CU(size_t deviceID, size_t startIdx, size_t size, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, Iterator res, CallArgs&&... args)
+		::mapMultiStream_CU(size_t deviceID, size_t startIdx, size_t size, pack_indices<OI...>, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args)
 		{
 			CHECK_CUDA_ERROR(cudaSetDevice(deviceID));
 			size_t numKernels = std::min<size_t>(this->m_environment->m_devices_CU.at(deviceID)->getNoConcurrentKernels(), size);
 			size_t numElemPerSlice = size / numKernels;
 			size_t rest = size % numKernels;
 			
-			auto eArgs = std::make_tuple(get<EI, CallArgs...>(args...)...);
-			auto aArgs = std::make_tuple(get<AI, CallArgs...>(args...)...);
-			auto scArgs = std::make_tuple(get<CI, CallArgs...>(args...)...);
+			auto oArgs = std::tie(get<OI, CallArgs...>(args...)...);
+			auto eArgs = std::tie(get<EI, CallArgs...>(args...)...);
+			auto aArgs = std::tie(get<AI, CallArgs...>(args...)...);
+			auto scArgs = std::tie(get<CI, CallArgs...>(args...)...);
 			
-			typename to_device_pointer_cu<decltype(eArgs)>::type elwiseMemP[numKernels];
-			typename to_proxy_cu<decltype(aArgs)>::type anyMemP[numKernels];
-			typename Iterator::device_pointer_type_cu outMemP[numKernels];
+			typename to_device_pointer_cu<decltype(std::make_tuple(get<OI, CallArgs...>(args...).getParent()...))>::type    outMemP[numKernels];
+			typename to_device_pointer_cu<decltype(std::make_tuple(get<EI, CallArgs...>(args...).getParent()...))>::type elwiseMemP[numKernels];
+			typename to_proxy_cu<decltype(MapFunc::ProxyTags), decltype(std::make_tuple(get<AI, CallArgs...>(args...).getParent()...))>::type             anyMemP[numKernels];
+		//	typename Iterator::device_pointer_type_cu outMemP[numKernels];
 			
 			// First create CUDA memory if not created already.
 			for (size_t i = 0; i < numKernels; ++i)
@@ -82,9 +90,10 @@ namespace skepu
 				const size_t numElem = numElemPerSlice + ((i == numKernels-1) ? rest : 0);
 				const size_t baseIndex = i * numElemPerSlice;
 				
-				elwiseMemP[i] = std::make_tuple(std::get<EI>(eArgs).getParent().updateDevice_CU((std::get<EI>(eArgs) + baseIndex).getAddress(), numElem, deviceID, AccessMode::None, false, i)...);
-				anyMemP[i] = std::make_tuple(std::get<AI-arity>(aArgs).cudaProxy(deviceID, AccessMode::None, false, i)...);
-				outMemP[i] = res.getParent().updateDevice_CU((res + baseIndex).getAddress(), numElem, deviceID, AccessMode::None, false, i);
+				outMemP[i]    = std::make_tuple(std::get<OI>(oArgs)         .getParent().updateDevice_CU((std::get<OI>         (oArgs) + baseIndex).getAddress(), numElem, deviceID, AccessMode::None, false, i)...);
+				elwiseMemP[i] = std::make_tuple(std::get<EI-outArity>(eArgs).getParent().updateDevice_CU((std::get<EI-outArity>(eArgs) + baseIndex).getAddress(), numElem, deviceID, AccessMode::None, false, i)...);
+				anyMemP[i]    = std::make_tuple(std::get<AI-arity-outArity>(aArgs).cudaProxy(deviceID, AccessMode::None, false, i, std::get<AI-arity-outArity>(MapFunc::ProxyTags), Index1D{0})...);
+			//	outMemP[i] = res.getParent().updateDevice_CU((res + baseIndex).getAddress(), numElem, deviceID, AccessMode::None, false, i);
 			}
 			
 			// Breadth-first memory transfers and kernel executions
@@ -93,10 +102,11 @@ namespace skepu
 			{
 				const size_t numElem = numElemPerSlice + ((i == numKernels-1) ? rest : 0);
 				const size_t baseIndex = startIdx + i * numElemPerSlice;
-			
-				elwiseMemP[i] = std::make_tuple(std::get<EI>(eArgs).getParent().updateDevice_CU((std::get<EI>(eArgs) + baseIndex).getAddress(), numElem, deviceID, AccessMode::Read, false, i)...);
-				anyMemP[i] = std::make_tuple(std::get<AI-arity>(aArgs).getParent().cudaProxy(deviceID, MapFunc::anyAccessMode[AI-arity], false, i)...);
-				outMemP[i] = res.getParent().updateDevice_CU((res + baseIndex).getAddress(), numElem, deviceID, AccessMode::Write, false, i);
+				
+				outMemP[i]    = std::make_tuple(std::get<OI>(oArgs)         .getParent().updateDevice_CU((std::get<OI>         (oArgs) + baseIndex).getAddress(), numElem, deviceID, AccessMode::Write, false, i)...);
+				elwiseMemP[i] = std::make_tuple(std::get<EI-outArity>(eArgs).getParent().updateDevice_CU((std::get<EI-outArity>(eArgs) + baseIndex).getAddress(), numElem, deviceID, AccessMode::Read,  false, i)...);
+				anyMemP[i]    = std::make_tuple(std::get<AI-arity-outArity>(aArgs).getParent().cudaProxy(deviceID, MapFunc::anyAccessMode[AI-arity-outArity], false, i, std::get<AI-arity-outArity>(MapFunc::ProxyTags), Index1D{0})...);
+			//	outMemP[i] = res.getParent().updateDevice_CU((res + baseIndex).getAddress(), numElem, deviceID, AccessMode::Write, false, i);
 			}
 			
 			// Kernel executions
@@ -115,18 +125,22 @@ namespace skepu
 				this->m_cuda_kernel<<<numBlocks, numThreads>>>
 #endif // USE_PINNED_MEMORY
 				(
-					std::get<EI>(elwiseMemP[i])->getDeviceDataPointer()...,
-					std::get<AI-arity>(anyMemP[i]).second...,
-					std::get<CI-arity-anyArity>(scArgs)...,
-					outMemP[i]->getDeviceDataPointer(),
-					res.getParent().total_cols(),
+					std::get<OI>(outMemP[i])->getDeviceDataPointer()...,
+					std::get<EI-outArity>(elwiseMemP[i])->getDeviceDataPointer()...,
+					std::get<AI-arity-outArity>(anyMemP[i]).second...,
+					std::get<CI-arity-anyArity-outArity>(scArgs)...,
+				//	outMemP[i]->getDeviceDataPointer(),
+					get<0>(args...).getParent().size_j(),
+					get<0>(args...).getParent().size_k(),
+					get<0>(args...).getParent().size_l(),
 					numElem,
 					baseIndex
 				);
 				
 				// Change device data
-				pack_expand((std::get<AI-arity>(anyMemP[i]).first->changeDeviceData(hasWriteAccess(MapFunc::anyAccessMode[AI-arity])), 0)...);
-				outMemP[i]->changeDeviceData();
+				pack_expand((std::get<OI>(outMemP[i])->changeDeviceData(), 0)...);
+				pack_expand((std::get<AI-arity-outArity>(anyMemP[i]).first->changeDeviceData(hasWriteAccess(MapFunc::anyAccessMode[AI-arity-outArity])), 0)...);
+			//	outMemP[i]->changeDeviceData();
 			}
 
 #ifdef TUNER_MODE
@@ -136,9 +150,9 @@ namespace skepu
 		
 		
 		template<size_t arity, typename MapFunc, typename CUDAKernel, typename CLKernel>
-		template<size_t... EI, size_t... AI, size_t... CI, typename Iterator, typename ...CallArgs> 
+		template<size_t... OI, size_t... EI, size_t... AI, size_t... CI, typename ...CallArgs>
 		void Map<arity, MapFunc, CUDAKernel, CLKernel>
-		::mapMultiStreamMultiGPU_CU(size_t useNumGPU, size_t startIdx, size_t size, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, Iterator res, CallArgs&&... args)
+		::mapMultiStreamMultiGPU_CU(size_t useNumGPU, size_t startIdx, size_t size, pack_indices<OI...>, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args)
 		{
 #ifdef USE_PINNED_MEMORY
 			const size_t numElemPerDevice = size / useNumGPU;
@@ -148,9 +162,10 @@ namespace skepu
 			size_t streamRest[MAX_GPU_DEVICES];
 			size_t maxKernels = 0;
 			
-			auto eArgs = std::make_tuple(get<EI, CallArgs...>(args...)...);
-			auto aArgs = std::make_tuple(get<AI, CallArgs...>(args...)...);
-			auto scArgs = std::make_tuple(get<CI, CallArgs...>(args...)...);
+			auto oArgs = std::tie(get<OI, CallArgs...>(args...)...);
+			auto eArgs = std::tie(get<EI, CallArgs...>(args...)...);
+			auto aArgs = std::tie(get<AI, CallArgs...>(args...)...);
+			auto scArgs = std::tie(get<CI, CallArgs...>(args...)...);
 			
 			for (size_t i = 0; i < useNumGPU; ++i)
 			{
@@ -163,11 +178,12 @@ namespace skepu
 				streamRest[i] = temp % numKernels[i];
 			}
 			
-			typename to_device_pointer_cu<decltype(eArgs)>::type elwiseMemP[MAX_GPU_DEVICES][maxKernels];
-			typename to_proxy_cu<decltype(aArgs)>::type anyMemP[MAX_GPU_DEVICES][maxKernels];
-			typename Iterator::device_pointer_type_cu outMemP[MAX_GPU_DEVICES][maxKernels];
+			typename to_device_pointer_cu<decltype(std::make_tuple(get<OI, CallArgs...>(args...).getParent()...))>::type    outMemP[MAX_GPU_DEVICES][maxKernels];
+			typename to_device_pointer_cu<decltype(std::make_tuple(get<EI, CallArgs...>(args...).getParent()...))>::type elwiseMemP[MAX_GPU_DEVICES][maxKernels];
+			typename to_proxy_cu<decltype(MapFunc::ProxyTags), decltype(std::make_tuple(get<AI, CallArgs...>(args...).getParent()...))>::type             anyMemP[MAX_GPU_DEVICES][maxKernels];
+		//	typename Iterator::device_pointer_type_cu outMemP[MAX_GPU_DEVICES][maxKernels];
 			
-			// First create CUDA memory if not created already.	
+			// First create CUDA memory if not created already.
 			for (size_t i = 0; i < useNumGPU; ++i)
 			{
 				CHECK_CUDA_ERROR(cudaSetDevice(i));
@@ -176,9 +192,10 @@ namespace skepu
 					const size_t numElem = numElemPerStream[i] + ((j == numKernels[i]-1) ? streamRest[i] : 0);
 					const size_t baseIndex = startIdx + i * numElemPerDevice + j * numElemPerStream[i];
 					
-					elwiseMemP[i][j] = std::make_tuple(std::get<EI>(eArgs).getParent().updateDevice_CU((std::get<EI>(eArgs) + baseIndex).getAddress(), numElem, i, AccessMode::None, false, j)...);
-					anyMemP[i][j]    = std::make_tuple(std::get<AI-arity>(aArgs).cudaProxy(i, AccessMode::None, false, j)...);
-					outMemP[i][j]    = res.getParent().updateDevice_CU((res + baseIndex).getAddress(), numElem, i, AccessMode::None, false, j);
+					outMemP[i][j]    = std::make_tuple(std::get<OI>(oArgs)         .getParent().updateDevice_CU((std::get<OI>         (oArgs) + baseIndex).getAddress(), numElem, i, AccessMode::None, false, j)...);
+					elwiseMemP[i][j] = std::make_tuple(std::get<EI-outArity>(eArgs).getParent().updateDevice_CU((std::get<EI-outArity>(eArgs) + baseIndex).getAddress(), numElem, i, AccessMode::None, false, j)...);
+					anyMemP[i][j]    = std::make_tuple(std::get<AI-arity-outArity>(aArgs).cudaProxy(i, AccessMode::None, false, j, std::get<AI-arity-outArity>(MapFunc::ProxyTags), Index1D{0})...);
+				//	outMemP[i][j]    = res.getParent().updateDevice_CU((res + baseIndex).getAddress(), numElem, i, AccessMode::None, false, j);
 				}
 			}
 			
@@ -191,9 +208,10 @@ namespace skepu
 					const size_t numElem = numElemPerStream[i] + ((j == numKernels[i]-1) ? streamRest[i] : 0);
 					const size_t baseIndex = startIdx + i * numElemPerDevice + j * numElemPerStream[i];
 					
-					elwiseMemP[i][j] = std::make_tuple(std::get<EI>(eArgs).getParent().updateDevice_CU((std::get<EI>(eArgs) + baseIndex).getAddress(), numElem, i, AccessMode::Read, false, j)...);
-					anyMemP[i][j]    = std::make_tuple(std::get<AI-arity>(aArgs).cudaProxy(i, MapFunc::anyAccessMode[AI-arity], false, j)...);
-					outMemP[i][j]    = res.getParent().updateDevice_CU((res +baseIndex).getAddress(), numElem, i, AccessMode::Write, false, j);
+					outMemP[i][j]    = std::make_tuple(std::get<OI>(oArgs)         .getParent().updateDevice_CU((std::get<OI>         (oArgs) + baseIndex).getAddress(), numElem, i, AccessMode::Write, false, j)...);
+					elwiseMemP[i][j] = std::make_tuple(std::get<EI-outArity>(eArgs).getParent().updateDevice_CU((std::get<EI-outArity>(eArgs) + baseIndex).getAddress(), numElem, i, AccessMode::Read,  false, j)...);
+					anyMemP[i][j]    = std::make_tuple(std::get<AI-arity-outArity>(aArgs).cudaProxy(i, MapFunc::anyAccessMode[AI-arity-outArity], false, j, std::get<AI-arity-outArity>(MapFunc::ProxyTags), Index1D{0})...);
+				//	outMemP[i][j]    = res.getParent().updateDevice_CU((res +baseIndex).getAddress(), numElem, i, AccessMode::Write, false, j);
 				}
 			}
 			
@@ -211,17 +229,21 @@ namespace skepu
 					DEBUG_TEXT_LEVEL1("CUDA Map: Device " << i << ", kernel = " << j << "numElem = " << numElem << ", numBlocks = " << numBlocks << ", numThreads = " << numThreads);
 					
 					this->m_cuda_kernel<<<numBlocks, numThreads, 0, this->m_environment->m_devices_CU.at(i)->m_streams[j]>>>(
-						std::get<EI>(elwiseMemP[i][j])->getDeviceDataPointer()...,
-						std::get<AI-arity>(anyMemP[i][j]).second...,
-						std::get<CI-arity-anyArity>(scArgs)...,
-						outMemP[i][j]->getDeviceDataPointer(),
-						res.getParent().total_cols(),
+						std::get<OI>(outMemP[i][j])->getDeviceDataPointer()...,
+						std::get<EI-outArity>(elwiseMemP[i][j])->getDeviceDataPointer()...,
+						std::get<AI-arity-outArity>(anyMemP[i][j]).second...,
+						std::get<CI-arity-anyArity-outArity>(scArgs)...,
+					//	outMemP[i][j]->getDeviceDataPointer(),
+						get<0>(args...).getParent().size_j(),
+						get<0>(args...).getParent().size_k(),
+						get<0>(args...).getParent().size_l(),
 						numElem,
 						baseIndex
 					);
 					
-					pack_expand((std::get<AI-arity>(anyMemP[i][j]).first->changeDeviceData(hasWriteAccess(MapFunc::anyAccessMode[AI-arity])), 0)...);
-					outMemP[i][j]->changeDeviceData();
+					pack_expand((std::get<OI>(outMemP[i][j])->changeDeviceData(), 0)...);
+					pack_expand((std::get<AI-arity-outArity>(anyMemP[i][j]).first->changeDeviceData(hasWriteAccess(MapFunc::anyAccessMode[AI-arity-outArity])), 0)...);
+				//	outMemP[i][j]->changeDeviceData();
 				}
 			}
 #endif // USE_PINNED_MEMORY
@@ -229,20 +251,22 @@ namespace skepu
 		
 		
 		template<size_t arity, typename MapFunc, typename CUDAKernel, typename CLKernel>
-		template<size_t... EI, size_t... AI, size_t... CI, typename Iterator, typename ...CallArgs> 
+		template<size_t... OI, size_t... EI, size_t... AI, size_t... CI, typename ...CallArgs>
 		void Map<arity, MapFunc, CUDAKernel, CLKernel>
-		::mapSingleThreadMultiGPU_CU(size_t numDevices, size_t startIdx, size_t size, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, Iterator res, CallArgs&&... args)
+		::mapSingleThreadMultiGPU_CU(size_t numDevices, size_t startIdx, size_t size, pack_indices<OI...>, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args)
 		{
 			const size_t numElemPerSlice = size / numDevices;
 			const size_t rest = size % numDevices;
 			
-			auto eArgs = std::make_tuple(get<EI, CallArgs...>(args...)...);
-			auto aArgs = std::make_tuple(get<AI, CallArgs...>(args...)...);
-			auto scArgs = std::make_tuple(get<CI, CallArgs...>(args...)...);
+			auto oArgs = std::tie(get<OI, CallArgs...>(args...)...);
+			auto eArgs = std::tie(get<EI, CallArgs...>(args...)...);
+			auto aArgs = std::tie(get<AI, CallArgs...>(args...)...);
+			auto scArgs = std::tie(get<CI, CallArgs...>(args...)...);
 			
-			typename to_device_pointer_cu<decltype(eArgs)>::type elwiseMemP[MAX_GPU_DEVICES];
-			typename to_proxy_cu<decltype(aArgs)>::type anyMemP[MAX_GPU_DEVICES];
-			typename Iterator::device_pointer_type_cu outMemP[MAX_GPU_DEVICES];
+			typename to_device_pointer_cu<decltype(std::make_tuple(get<OI, CallArgs...>(args...).getParent()...))>::type    outMemP[MAX_GPU_DEVICES];
+			typename to_device_pointer_cu<decltype(std::make_tuple(get<EI, CallArgs...>(args...).getParent()...))>::type elwiseMemP[MAX_GPU_DEVICES];
+			typename to_proxy_cu<decltype(MapFunc::ProxyTags), decltype(std::make_tuple(get<AI, CallArgs...>(args...).getParent()...))>::type             anyMemP[MAX_GPU_DEVICES];
+		//	typename Iterator::device_pointer_type_cu outMemP[MAX_GPU_DEVICES];
 			
 			// First create CUDA memory if not created already.
 			for (size_t i = 0; i < numDevices; ++i)
@@ -250,9 +274,10 @@ namespace skepu
 				const size_t numElem = numElemPerSlice + ((i == numDevices-1) ? rest : 0);
 				const size_t baseIndex = startIdx + i * numElemPerSlice;
 				
-				elwiseMemP[i] = std::make_tuple(std::get<EI>(eArgs).getParent().updateDevice_CU((std::get<EI>(eArgs) + baseIndex).getAddress(), numElem, i, AccessMode::None)...);
-				anyMemP[i]    = std::make_tuple(std::get<AI-arity>(aArgs).cudaProxy(i, AccessMode::None)...);
-				outMemP[i]    = res.getParent().updateDevice_CU((res + baseIndex).getAddress(), numElem, i, AccessMode::None);
+				outMemP[i]    = std::make_tuple(std::get<OI>(oArgs)         .getParent().updateDevice_CU((std::get<OI>         (oArgs) + baseIndex).getAddress(), numElem, i, AccessMode::None)...);
+				elwiseMemP[i] = std::make_tuple(std::get<EI-outArity>(eArgs).getParent().updateDevice_CU((std::get<EI-outArity>(eArgs) + baseIndex).getAddress(), numElem, i, AccessMode::None)...);
+				anyMemP[i]    = std::make_tuple(std::get<AI-arity-outArity>(aArgs).cudaProxy(i, AccessMode::None, std::get<AI-arity-outArity>(MapFunc::ProxyTags), Index1D{0})...);
+			//	outMemP[i]    = res.getParent().updateDevice_CU((res + baseIndex).getAddress(), numElem, i, AccessMode::None);
 			}
 			
 			// Fill out argument struct with right information and start threads.
@@ -266,9 +291,10 @@ namespace skepu
 				
 				DEBUG_TEXT_LEVEL1("CUDA Map: device " << i << ", numElem = " << numElem << ", numBlocks = " << numBlocks << ", numThreads = " << numThreads);
 				
-				elwiseMemP[i] = std::make_tuple(std::get<EI>(eArgs).getParent().updateDevice_CU((std::get<EI>(eArgs) + baseIndex).getAddress(), numElem, i, AccessMode::Read)...);
-				anyMemP[i]    = std::make_tuple(std::get<AI-arity>(aArgs).cudaProxy(i, MapFunc::anyAccessMode[AI-arity])...);
-				outMemP[i]    = res.getParent().updateDevice_CU((res + baseIndex).getAddress(), numElem, i, AccessMode::Write, true);
+				outMemP[i]    = std::make_tuple(std::get<OI>(oArgs)         .getParent().updateDevice_CU((std::get<OI>         (oArgs) + baseIndex).getAddress(), numElem, i, AccessMode::Write, true)...);
+				elwiseMemP[i] = std::make_tuple(std::get<EI-outArity>(eArgs).getParent().updateDevice_CU((std::get<EI-outArity>(eArgs) + baseIndex).getAddress(), numElem, i, AccessMode::Read)...);
+				anyMemP[i]    = std::make_tuple(std::get<AI-arity-outArity>(aArgs).cudaProxy(i, MapFunc::anyAccessMode[AI-arity-outArity], std::get<AI-arity-outArity>(MapFunc::ProxyTags), Index1D{0})...);
+			//	outMemP[i]    = res.getParent().updateDevice_CU((res + baseIndex).getAddress(), numElem, i, AccessMode::Write, true);
 				
 				// Launches the kernel (asynchronous)
 #ifdef USE_PINNED_MEMORY
@@ -277,30 +303,35 @@ namespace skepu
 				this->m_cuda_kernel<<<numBlocks, numThreads>>>
 #endif // USE_PINNED_MEMORY
 				(
-					std::get<EI>(elwiseMemP[i])->getDeviceDataPointer()...,
-					std::get<AI-arity>(anyMemP[i]).second...,
-					std::get<CI-arity-anyArity>(scArgs)...,
-					outMemP[i]->getDeviceDataPointer(),
-					res.getParent().total_cols(),
+					std::get<OI>(outMemP[i])->getDeviceDataPointer()...,
+					std::get<EI-outArity>(elwiseMemP[i])->getDeviceDataPointer()...,
+					std::get<AI-arity-outArity>(anyMemP[i]).second...,
+					std::get<CI-arity-anyArity-outArity>(scArgs)...,
+				//	outMemP[i]->getDeviceDataPointer(),
+					get<0>(args...).getParent().size_j(),
+					get<0>(args...).getParent().size_k(),
+					get<0>(args...).getParent().size_l(),
 					numElem,
 					baseIndex
 				);
 				
 				// Change device data
-				pack_expand((std::get<AI-arity>(anyMemP[i]).first->changeDeviceData(hasWriteAccess(MapFunc::anyAccessMode[AI-arity])), 0)...);
-				outMemP[i]->changeDeviceData();
+				pack_expand((std::get<OI>(outMemP[i])->changeDeviceData(), 0)...);
+				pack_expand((std::get<AI-arity-outArity>(anyMemP[i]).first->changeDeviceData(hasWriteAccess(MapFunc::anyAccessMode[AI-arity-outArity])), 0)...);
+			//	outMemP[i]->changeDeviceData();
 			}
 			
 			CHECK_CUDA_ERROR(cudaSetDevice(m_environment->bestCUDADevID));
 			
-			res.getParent().setValidFlag(false);
+			pack_expand((get<OI, CallArgs...>(args...).getParent().setValidFlag(false), 0)...);
+		//	res.getParent().setValidFlag(false);
 		}
 		
 		
 		template<size_t arity, typename MapFunc, typename CUDAKernel, typename CLKernel>
-		template<size_t... EI, size_t... AI, size_t... CI, typename Iterator, typename... CallArgs> 
+		template<size_t... OI, size_t... EI, size_t... AI, size_t... CI, typename... CallArgs>
 		void Map<arity, MapFunc, CUDAKernel, CLKernel>
-		::CUDA(size_t startIdx, size_t size, pack_indices<EI...> ei, pack_indices<AI...> ai, pack_indices<CI...> ci, Iterator res, CallArgs&&... args)
+		::CUDA(size_t startIdx, size_t size, pack_indices<OI...> oi, pack_indices<EI...> ei, pack_indices<AI...> ai, pack_indices<CI...> ci, CallArgs&&... args)
 		{
 			DEBUG_TEXT_LEVEL1("CUDA Map: size = " << size << ", maxDevices = " << this->m_selected_spec->devices()
 				<< ", maxBlocks = " << this->m_selected_spec->GPUBlocks() << ", maxThreads = " << this->m_selected_spec->GPUThreads());
@@ -315,11 +346,11 @@ namespace skepu
 				
 				// Checks whether or not the GPU supports MemoryTransfer/KernelExec overlapping, if not call mapSingleThread function
 				if (this->m_environment->m_devices_CU.at(m_environment->bestCUDADevID)->isOverlapSupported())
-					return this->mapMultiStream_CU(this->m_environment->bestCUDADevID, startIdx, size, ei, ai, ci, res, args...);
+					return this->mapMultiStream_CU(this->m_environment->bestCUDADevID, startIdx, size, oi, ei, ai, ci, args...);
 				
 #endif // USE_PINNED_MEMORY
 				
-				return this->mapSingleThread_CU(this->m_environment->bestCUDADevID, startIdx, size, ei, ai, ci, res, args...);
+				return this->mapSingleThread_CU(this->m_environment->bestCUDADevID, startIdx, size, oi, ei, ai, ci, args...);
 			}
 			
 #endif // SKEPU_DEBUG_FORCE_MULTI_GPU_IMPL
@@ -329,11 +360,11 @@ namespace skepu
 			// if pinned memory is used but the device does not support overlap the function continues with the previous implementation.
 			// if the multistream version is being used the function will exit at this point.
 			if (this->m_environment->supportsCUDAOverlap())
-				return this->mapMultiStreamMultiGPU_CU(numDevices, startIdx, size, ei, ai, ci, res, args...);
+				return this->mapMultiStreamMultiGPU_CU(numDevices, startIdx, size, oi, ei, ai, ci, args...);
 			
 #endif // USE_PINNED_MEMORY
 			
-			this->mapSingleThreadMultiGPU_CU(numDevices, startIdx, size, ei, ai, ci, res, args...);
+			this->mapSingleThreadMultiGPU_CU(numDevices, startIdx, size, oi, ei, ai, ci, args...);
 		}
 	} // namespace backend
 } // namespace skepu

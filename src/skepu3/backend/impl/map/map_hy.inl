@@ -50,8 +50,8 @@ namespace skepu
 			
 			// Sync with device data
 			pack_expand((get<EI, CallArgs...>(args...).getParent().updateHost(), 0)...);
-			pack_expand((get<AI, CallArgs...>(args...).getParent().updateHost(hasReadAccess(MapFunc::anyAccessMode[AI-arity])), 0)...);
-			pack_expand((get<AI, CallArgs...>(args...).getParent().invalidateDeviceData(hasWriteAccess(MapFunc::anyAccessMode[AI-arity])), 0)...);
+			pack_expand((get<AI, CallArgs...>(args...).getParent().updateHost(hasReadAccess(MapFunc::anyAccessMode[AI-arity-outArity])), 0)...);
+			pack_expand((get<AI, CallArgs...>(args...).getParent().invalidateDeviceData(hasWriteAccess(MapFunc::anyAccessMode[AI-arity-outArity])), 0)...);
 			
 			if(nthr < 2)
 				nthr = 2; // Make sure to always have at least one CPU and one GPU thread
