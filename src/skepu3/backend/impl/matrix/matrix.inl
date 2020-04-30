@@ -137,6 +137,14 @@ void Matrix<T>::item_swap(Type &t1, Type &t2)
    t2=temp;
 }
 
+/*
+ * Default constructor of an empty matrix.
+ */
+template<typename T>
+Matrix<T>::Matrix()
+: m_rows(0), m_cols(0), m_data(), m_dataChanged(false), m_transpose_matrix(0), m_noValidDeviceCopy(true), m_valid(false) {}
+
+
 /*!
  *  Constructor, used to allocate memory ($_rows * _cols$).
  * \param _rows Number of rows in the matrix.

@@ -97,10 +97,15 @@ namespace skepu
 ///////////////////////////////////////////////
 // Constructors START
 ///////////////////////////////////////////////
+
+	/*!
+	 *  Constructs an empty vector.
+	 */
+	template <typename T>
+	inline Vector<T>::Vector(): m_data(nullptr), m_size(0), m_deallocEnabled(false), m_valid(false), m_noValidDeviceCopy(true) {}
 	
 	/*!
-	 *  Please refer to the documentation of \p std::vector. The copy occurs w.r.t. elements.
-	 *  As copy constructor creates a new storage.
+	 *  The copy occurs w.r.t. elements. As copy constructor creates a new storage.
 	 *
 	 *  Updates vector \p c before copying.
 	 */

@@ -127,6 +127,7 @@ namespace skepu
 
 	public: //-- Constructors & Destructor --//
 		
+		Vector();
 		Vector(const Vector& vec);
 		Vector(Vector&& vec);
 		Vector(std::initializer_list<T> l);

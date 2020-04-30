@@ -176,6 +176,7 @@ namespace skepu
 				delete m_transpose_matrix;
 		}
 		
+		Matrix();
 		Matrix(size_type _rows, size_type _cols);
 		Matrix(size_type _rows, size_type _cols, const T& val);
 		Matrix(size_type _rows, size_type _cols, const std::vector<T>& vals);
