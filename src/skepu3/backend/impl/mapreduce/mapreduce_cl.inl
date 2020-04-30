@@ -37,7 +37,7 @@ namespace skepu
 				std::make_tuple(&get<AI, CallArgs...>(args...).getParent(), std::get<AI-arity>(anyMemP))...,
 				get<CI, CallArgs...>(args...)...,
 				&outMemP,
-				elwise_width(eArgs),
+				elwise_j(eArgs), elwise_k(eArgs), elwise_l(eArgs),
 				size,
 				startIdx,
 				sizeof(Ret) * numThreads
@@ -95,7 +95,7 @@ namespace skepu
 					std::make_tuple(&get<AI, CallArgs...>(args...).getParent(), std::get<AI-arity>(anyMemP))...,
 					get<CI, CallArgs...>(args...)...,
 					&outMemP[i],
-					elwise_width(eArgs),
+					elwise_j(eArgs), elwise_k(eArgs), elwise_l(eArgs),
 					numElem,
 					baseIndex,
 					sizeof(Ret) * numThreads
