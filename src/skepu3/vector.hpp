@@ -183,6 +183,12 @@ namespace skepu
 		size_type size_k() const { return 0; }
 		size_type size_l() const { return 0; }
 		
+		// All dimensions
+		std::tuple<size_type> size_info() const
+		{
+			return {this->m_size};
+		}
+		
 		const Vector<T>& getParent() const { return *this; }
 		Vector<T>& getParent() { return *this; }
 		

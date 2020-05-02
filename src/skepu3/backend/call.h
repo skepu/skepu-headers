@@ -110,7 +110,7 @@ namespace skepu
 			template<size_t... AI, size_t... CI, typename... CallArgs>
 			void backendDispatch(pack_indices<AI...> ai, pack_indices<CI...> ci, CallArgs&&... args)
 			{
-				assert(this->m_execPlan != NULL && this->m_execPlan->isCalibrated());
+			//	assert(this->m_execPlan != NULL && this->m_execPlan->isCalibrated());
 				
 				this->selectBackend(0);
 				

@@ -120,6 +120,12 @@ namespace skepu
 			return 0;
 		}
 		
+		// All dimensions
+		std::tuple<size_type, size_type, size_type> size_info() const
+		{
+			return {this->m_size_i, this->m_size_j, this->m_size_k};
+		}
+		
 		T& operator()(size_type i, size_type j, size_type k)
 		{
 			return Vector<T>::m_data[i * this->m_size_j * this->m_size_k + j * this->m_size_k + k];
@@ -342,6 +348,12 @@ namespace skepu
 		size_type size_l() const
 		{
 			return m_size_l;
+		}
+		
+		// All dimensions
+		std::tuple<size_type, size_type, size_type, size_type> size_info() const
+		{
+			return {this->m_size_i, this->m_size_j, this->m_size_k, this->m_size_l};
 		}
 		
 		T& operator()(size_type i, size_type j, size_type k, size_type l)

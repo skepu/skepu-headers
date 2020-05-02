@@ -482,6 +482,36 @@ namespace skepu
 		using type = ProxyTag::MatRow;
 	};
 	
+	// ----------------------------------------------------------------
+	// smart container size extractor
+	// ----------------------------------------------------------------
+	
+	inline std::tuple<size_t> size_info(index_dimension<skepu::Index1D>, size_t i, size_t, size_t, size_t)
+	{
+		return {i};
+	}
+	
+	inline std::tuple<size_t, size_t> size_info(index_dimension<skepu::Index2D>, size_t i, size_t j, size_t, size_t)
+	{
+		return {i, j};
+	}
+	
+	inline std::tuple<size_t, size_t, size_t> size_info(index_dimension<skepu::Index3D>, size_t i, size_t j, size_t k, size_t)
+	{
+		return {i, j, k};
+	}
+	
+	inline std::tuple<size_t, size_t, size_t, size_t> size_info(index_dimension<skepu::Index4D>, size_t i, size_t j, size_t k, size_t l)
+	{
+		return {i, j, k, l};
+	}
+	
+	template<typename Index, typename... Args>
+	inline auto size_info(Index, size_t, size_t, size_t, size_t, Args&&... args) -> decltype(get<0, Args...>(args...).getParent().size_info())
+	{
+		return get<0, Args...>(args...).getParent().size_info();
+	}
+	
 	
 	// ----------------------------------------------------------------
 	// Smart Container Coherency Helpers

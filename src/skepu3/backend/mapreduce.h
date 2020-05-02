@@ -58,7 +58,7 @@ namespace skepu
 			static constexpr typename make_pack_indices<arity + anyArity, arity>::type any_indices{};
 			static constexpr typename make_pack_indices<numArgs, arity + anyArity>::type const_indices{};
 			
-			using defaultDim = typename std::conditional<MapFunc::indexed, index_dimension<typename MapFunc::IndexType>, std::integral_constant<int, 1>>::type;
+			using defaultDim = index_dimension<typename std::conditional<MapFunc::indexed, typename MapFunc::IndexType, skepu::Index1D>::type>;
 			using First = typename parameter_type<MapFunc::indexed ? 1 : 0, decltype(&MapFunc::CPU)>::type;
 			
 			using F = ConditionalIndexForwarder<MapFunc::indexed, decltype(&MapFunc::CPU)>;
@@ -112,7 +112,12 @@ namespace skepu
 			{
 				static_assert(sizeof...(CallArgs) == numArgs, "Number of arguments not matching Map function");
 				
-				return this->backendDispatch(elwise_indices, any_indices, const_indices, this->default_size_i, std::forward<CallArgs>(args)...);
+				size_t size = this->default_size_i;
+				if (defaultDim::value >= 2) size *= this->default_size_j;
+				if (defaultDim::value >= 3) size *= this->default_size_k;
+				if (defaultDim::value >= 4) size *= this->default_size_l;
+				
+				return this->backendDispatch(elwise_indices, any_indices, const_indices, size, std::forward<CallArgs>(args)...);
 			}
 			
 		private:

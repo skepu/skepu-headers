@@ -225,6 +225,12 @@ namespace skepu
 		size_type size_k() const { return 0; }
 		size_type size_l() const { return 0; }
 		
+		// All dimensions
+		std::tuple<size_type, size_type> size_info() const
+		{
+			return {this->m_rows, this->m_cols};
+		}
+		
 		// highly dangerous, use with care.
 		T *getAddress()
 		{
