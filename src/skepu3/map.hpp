@@ -72,12 +72,6 @@ namespace skepu
 		
 	public:
 		
-		void setDefaultSize(size_t x, size_t y = 0)
-		{
-			this->default_size_x = x;
-			this->default_size_y = y;
-		}
-		
 		template<typename... CallArgs>
 		auto operator()(CallArgs&&... args) -> decltype(get<0>(args...))
 		{
@@ -94,31 +88,9 @@ namespace skepu
 			return res;
 		}
 		
-	/*	template<template<class> class Container = Vector, typename... CallArgs>
-		Container<Ret> operator()(CallArgs&&... args)
-		{
-			static_assert(sizeof...(CallArgs) == numArgs, "Number of arguments not matching Map function");
-			
-			if (this->default_size_y != 0)
-			{
-				Container<Ret> res(this->default_size_x, this->default_size_y);
-				this->apply(elwise_indices, any_indices, const_indices, res, std::forward<CallArgs>(args)...);
-				return std::move(res);
-			}
-			else
-			{
-				Container<Ret> res(this->default_size_x);
-				this->apply(out_indices, elwise_indices, any_indices, const_indices, res.size(), res.begin(), std::forward<CallArgs>(args)...);
-				return std::move(res);
-		//	}
-		}*/
-		
 	private:
 		MapFunc mapFunc;
 		MapImpl(MapFunc map): mapFunc(map) {}
-		
-		size_t default_size_x;
-		size_t default_size_y;
 		
 		friend MapImpl<InArity, Ret, Args...> MapWrapper<InArity, Ret, Args...>(MapFunc);
 		

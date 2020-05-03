@@ -41,9 +41,6 @@ namespace skepu
 			
 			CUDAKernel m_cuda_kernel;
 			
-			size_t default_size_x;
-			size_t default_size_y;
-			
 		public:
 			
 			static constexpr auto skeletonType = SkeletonType::Map;
@@ -58,21 +55,11 @@ namespace skepu
 			static constexpr typename make_pack_indices<arity + anyArity + outArity, arity + outArity>::type any_indices{};
 			static constexpr typename make_pack_indices<numArgs, arity + anyArity + outArity>::type const_indices{};
 			
-			// =========================      Constructors      ==========================
-			
 			Map(CUDAKernel kernel) : m_cuda_kernel(kernel)
 			{
 #ifdef SKEPU_OPENCL
 				CLKernel::initialize();
 #endif
-			}
-			
-			// =======================  Persistent parameters   ==========================
-			
-			void setDefaultSize(size_t x, size_t y = 0)
-			{
-				this->default_size_x = x;
-				this->default_size_y = y;
 			}
 			
 			template<typename... Args>
@@ -99,16 +86,6 @@ namespace skepu
 				this->backendDispatch(res_end - res, out_indices, elwise_indices, any_indices, const_indices, res, args...);
 				return res;
 			}
-			
-		/*	template<template<class> class Container = Vector, typename... CallArgs>
-			Container<T> operator()(CallArgs&&... args)
-			{
-				static_assert(sizeof...(CallArgs) == numArgs, "Number of arguments not matching Map function");
-				
-				Container<T> res(this->default_size_x);
-				this->backendDispatch(elwise_indices, any_indices, const_indices, res.size(), res.begin(), std::forward<CallArgs>(args)...);
-				return std::move(res);
-			}*/
 			
 		private:
 			
@@ -213,8 +190,6 @@ template<typename Ret, typename... Args>
 struct MapImpl : public SeqSkeletonBase
 {
 	MapImpl(Ret(*)(Args...));
-
-	void setDefaultSize(size_t x, size_t y = 0);
 
 	template<template<class> class Container, typename... CallArgs>
 	Container<Ret> &operator()(Container<Ret> &res, CallArgs&&... args);

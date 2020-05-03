@@ -623,7 +623,7 @@ namespace skepu
 			{
 				this->m_overlap_i = o;
 				this->m_overlap_j = o;
-				this->m_overlap_j = o;
+				this->m_overlap_k = o;
 			}
 			
 			void setOverlap(int oi, int oj, int ok)
@@ -786,7 +786,7 @@ namespace skepu
 			{
 				this->m_overlap_i = o;
 				this->m_overlap_j = o;
-				this->m_overlap_j = o;
+				this->m_overlap_k = o;
 				this->m_overlap_l = o;
 			}
 			

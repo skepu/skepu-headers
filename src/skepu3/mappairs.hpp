@@ -31,28 +31,35 @@ namespace skepu
 	class MapPairsImpl: public SeqSkeletonBase
 	{
 		static constexpr bool indexed = is_indexed<Args...>::value;
-		static constexpr size_t numArgs = sizeof...(Args) - (indexed ? 1 : 0);
+		static constexpr size_t OutArity = out_size<Ret>::value;
+		static constexpr size_t numArgs = sizeof...(Args) - (indexed ? 1 : 0) + OutArity;
 		static constexpr size_t anyCont = trait_count_all<is_skepu_container_proxy, Args...>::value;
 		
 		// Supports the "index trick": using a variant of tag dispatching to index template parameter packs
-		static constexpr typename make_pack_indices<Varity, 0>::type Helwise_indices{};
-		static constexpr typename make_pack_indices<Harity + Varity, Varity>::type Velwise_indices{};
-		static constexpr typename make_pack_indices<Varity + Harity + anyCont, Varity + Harity>::type any_indices{};
-		static constexpr typename make_pack_indices<numArgs, Varity + Harity + anyCont>::type const_indices{};
+		static constexpr typename make_pack_indices<OutArity, 0>::type out_indices{};
+		static constexpr typename make_pack_indices<OutArity + Varity, OutArity>::type Velwise_indices{};
+		static constexpr typename make_pack_indices<OutArity + Varity + Harity, OutArity + Varity>::type Helwise_indices{};
+		static constexpr typename make_pack_indices<OutArity + Varity + Harity + anyCont, OutArity + Varity + Harity>::type any_indices{};
+		static constexpr typename make_pack_indices<numArgs, OutArity + Varity + Harity + anyCont>::type const_indices{};
 		
 		using MapPairsFunc = std::function<Ret(Args...)>;
 		using F = ConditionalIndexForwarder<indexed, MapPairsFunc>;
 		
 		// For iterators
-		template<size_t... VEI, size_t... HEI, size_t... AI, size_t... CI, typename Iterator, typename... CallArgs>
-		void apply(pack_indices<VEI...>, pack_indices<HEI...>, pack_indices<AI...>, pack_indices<CI...>, size_t Vsize, size_t Hsize, Iterator res, CallArgs&&... args)
+		template<size_t... OI, size_t... VEI, size_t... HEI, size_t... AI, size_t... CI, typename... CallArgs>
+		void apply(pack_indices<OI...>, pack_indices<VEI...>, pack_indices<HEI...>, pack_indices<AI...>, pack_indices<CI...>, size_t Vsize, size_t Hsize, CallArgs&&... args)
 		{
+			if (  disjunction((get<OI, CallArgs...>(args...).total_rows() < Vsize)...)
+				|| disjunction((get<OI, CallArgs...>(args...).total_cols() < Hsize)...))
+				SKEPU_ERROR("Non-matching output container sizes");
+			
 			if (disjunction((get<VEI>(args...).size() < Vsize)...))
-				SKEPU_ERROR("Non-matching container sizes");
+				SKEPU_ERROR("Non-matching vertical container sizes");
 			
 			if (disjunction((get<HEI>(args...).size() < Hsize)...))
-				SKEPU_ERROR("Non-matching container sizes");
+				SKEPU_ERROR("Non-matching horizontal container sizes");
 			
+			auto out = std::forward_as_tuple(get<OI>(args...)...);
 			auto HelwiseIterators = std::make_tuple(get<VEI>(args...).begin()...);
 			auto VelwiseIterators = std::make_tuple(get<HEI>(args...).begin()...);
 			
@@ -61,7 +68,10 @@ namespace skepu
 				for (size_t j = 0; j < Hsize; ++j)
 				{
 					auto index = Index2D { i, j };
-					res(i, j) = F::forward(mapPairsFunc, index, std::get<VEI>(HelwiseIterators)(i)..., std::get<HEI-Varity>(VelwiseIterators)(j)..., get<AI>(args...).hostProxy()..., get<CI>(args...)...);
+					auto res = F::forward(mapPairsFunc, index,
+						std::get<VEI-OutArity>(HelwiseIterators)(i)..., std::get<HEI-Varity-OutArity>(VelwiseIterators)(j)...,
+						get<AI>(args...).hostProxy()..., get<CI>(args...)...);
+					std::tie(std::get<OI>(out)(i, j)...) = res;
 				}
 			}
 			
@@ -70,45 +80,18 @@ namespace skepu
 		
 	public:
 		
-		void setDefaultSize(size_t x, size_t y = 0)
+		void setDefaultSize(size_t x, size_t y)
 		{
 			this->default_size_x = x;
 			this->default_size_y = y;
 		}
 		
 		template<typename... CallArgs>
-		Matrix<Ret> &operator()(Matrix<Ret> &res, CallArgs&&... args)
+		auto operator()(CallArgs&&... args) -> typename std::add_lvalue_reference<decltype(get<0>(args...))>::type
 		{
 			static_assert(sizeof...(CallArgs) == numArgs, "Number of arguments not matching Map function");
-			this->apply(Helwise_indices, Velwise_indices, any_indices, const_indices, res.total_rows(), res.total_cols(), res.begin(), std::forward<CallArgs>(args)...);
-			return res;
-		}
-		
-		template<typename Iterator, typename... CallArgs, REQUIRES(is_skepu_iterator<Iterator, Ret>())>
-		Iterator operator()(Iterator res, Iterator res_end, CallArgs&&... args)
-		{
-			static_assert(sizeof...(CallArgs) == numArgs, "Number of arguments not matching Map function");
-			this->apply(Helwise_indices, Velwise_indices, any_indices, const_indices, res_end - res, res, std::forward<CallArgs>(args)...);
-			return res;
-		}
-		
-		template<typename... CallArgs>
-		Matrix<Ret> operator()(CallArgs&&... args)
-		{
-			static_assert(sizeof...(CallArgs) == numArgs, "Number of arguments not matching Map function");
-			
-		/*	if (this->default_size_y != 0)
-			{
-				Container<Ret> res(this->default_size_x, this->default_size_y);
-				this->apply(elwise_indices, any_indices, const_indices, res, std::forward<CallArgs>(args)...);
-				return std::move(res);
-			}
-			else
-			{*/
-				Matrix<Ret> res(this->default_size_x);
-				this->apply(Helwise_indices, Velwise_indices, any_indices, const_indices, res.size(), res.begin(), std::forward<CallArgs>(args)...);
-				return std::move(res);
-		//	}
+			this->apply(out_indices, Velwise_indices, Helwise_indices, any_indices, const_indices, get<0>(args...).total_rows(), get<0>(args...).total_cols(), std::forward<CallArgs>(args)...);
+			return get<0>(args...);
 		}
 		
 	private:

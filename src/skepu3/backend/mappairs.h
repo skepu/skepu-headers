@@ -30,7 +30,8 @@ namespace skepu
 			
 			// ==========================     Class members     ==========================
 			
-			static constexpr size_t numArgs = MapPairsFunc::totalArity - (MapPairsFunc::indexed ? 1 : 0);
+			static constexpr size_t outArity = MapPairsFunc::outArity;
+			static constexpr size_t numArgs = MapPairsFunc::totalArity - (MapPairsFunc::indexed ? 1 : 0) + outArity;
 			static constexpr size_t anyArity = std::tuple_size<typename MapPairsFunc::ContainerArgs>::value;
 			
 			// ==========================    Instance members   ==========================
@@ -48,10 +49,11 @@ namespace skepu
 			using ContainerArgs = typename MapPairsFunc::ContainerArgs;
 			using UniformArgs = typename MapPairsFunc::UniformArgs;
 			
-			static constexpr typename make_pack_indices<Varity, 0>::type Velwise_indices{};
-			static constexpr typename make_pack_indices<Harity + Varity, Varity>::type Helwise_indices{};
-			static constexpr typename make_pack_indices<Varity + Harity + anyArity, Varity + Harity>::type any_indices{};
-			static constexpr typename make_pack_indices<numArgs, Varity + Harity + anyArity>::type const_indices{};
+			static constexpr typename make_pack_indices<outArity, 0>::type out_indices{};
+			static constexpr typename make_pack_indices<outArity + Varity, outArity>::type Velwise_indices{};
+			static constexpr typename make_pack_indices<outArity + Varity + Harity, outArity + Varity>::type Helwise_indices{};
+			static constexpr typename make_pack_indices<outArity + Varity + Harity + anyArity, outArity + Varity + Harity>::type any_indices{};
+			static constexpr typename make_pack_indices<numArgs, outArity + Varity + Harity + anyArity>::type const_indices{};
 			
 			// =========================      Constructors      ==========================
 			
@@ -78,64 +80,80 @@ namespace skepu
 			
 			// =======================      Call operators      ==========================
 			
-			template<template<class> class Container, typename... CallArgs, REQUIRES(is_skepu_container<Container<T>>::value)>
-			Container<T> &operator()(Container<T> &res, CallArgs&&... args)
+			template<typename... CallArgs>
+			auto operator()(CallArgs&&... args) -> typename std::add_lvalue_reference<decltype(get<0>(args...))>::type
 			{
-				this->backendDispatch(Velwise_indices, Helwise_indices, any_indices, const_indices, res.total_cols(), res.total_rows(), res.begin(), args...);
-				return res;
+				this->backendDispatch(out_indices, Velwise_indices, Helwise_indices, any_indices, const_indices, get<0>(args...).total_rows(), get<0>(args...).total_cols(), std::forward<CallArgs>(args)...);
+				return get<0>(args...);
 			}
 			
 		private:
 			
 			// ==========================    Implementation     ==========================
 			
-			template<size_t... VEI, size_t... HEI,  size_t... AI, size_t... CI, typename Iterator, typename... CallArgs>
-			void CPU(size_t Vsize, size_t Hsize,  pack_indices<VEI...>, pack_indices<HEI...>, pack_indices<AI...>, pack_indices<CI...>, Iterator res, CallArgs&&... args);
+			template<size_t... OI, size_t... VEI, size_t... HEI,  size_t... AI, size_t... CI, typename... CallArgs>
+			void CPU(size_t Vsize, size_t Hsize, pack_indices<OI...>, pack_indices<VEI...>, pack_indices<HEI...>, pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args);
 			
 			
 #ifdef SKEPU_OPENMP
 			
-			template<size_t... VEI, size_t... HEI, size_t... AI, size_t... CI, typename Iterator, typename ...CallArgs>
-			void OMP(size_t Vsize, size_t Hsize,  pack_indices<VEI...>, pack_indices<HEI...>, pack_indices<AI...>, pack_indices<CI...>, Iterator res, CallArgs&&... args);
+			template<size_t... OI, size_t... VEI, size_t... HEI, size_t... AI, size_t... CI, typename ...CallArgs>
+			void OMP(size_t Vsize, size_t Hsize, pack_indices<OI...>, pack_indices<VEI...>, pack_indices<HEI...>, pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args);
 			
 #endif // SKEPU_OPENMP
 			
 			
 #ifdef SKEPU_CUDA
 			
-			template<size_t... VEI, size_t... HEI, size_t... AI, size_t... CI, typename Iterator, typename... CallArgs>
-			void CUDA(size_t startIdx, size_t Vsize, size_t Hsize, pack_indices<VEI...>, pack_indices<HEI...>, pack_indices<AI...>, pack_indices<CI...>, Iterator res, CallArgs&&... args);
+			template<size_t... OI, size_t... VEI, size_t... HEI, size_t... AI, size_t... CI, typename... CallArgs>
+			void CUDA(size_t startIdx, size_t Vsize, size_t Hsize, pack_indices<OI...>, pack_indices<VEI...>, pack_indices<HEI...>, pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args);
+			
+			template<size_t... OI, size_t... VEI, size_t... HEI, size_t... AI, size_t... CI, typename... CallArgs>
+			void mapPairsSingleThread_CU(size_t deviceID, size_t startIdx, size_t Vsize, size_t Hsize, pack_indices<OI...>, pack_indices<VEI...>, pack_indices<HEI...>, pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args);
+			
+			template<size_t... OI, size_t... VEI, size_t... HEI, size_t... AI, size_t... CI, typename... CallArgs>
+			void mapPairsMultiStream_CU(size_t deviceID, size_t startIdx, size_t Vsize, size_t Hsize, pack_indices<OI...>, pack_indices<VEI...>, pack_indices<HEI...>, pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args);
+			
+			template<size_t... OI, size_t... VEI, size_t... HEI, size_t... AI, size_t... CI, typename... CallArgs>
+			void mapPairsSingleThreadMultiGPU_CU(size_t numDevices, size_t startIdx, size_t Vsize, size_t Hsize, pack_indices<OI...>, pack_indices<VEI...>, pack_indices<HEI...>, pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args);
+			
+			template<size_t... OI, size_t... VEI, size_t... HEI, size_t... AI, size_t... CI, typename... CallArgs>
+			void mapPairsMultiStreamMultiGPU_CU(size_t numDevices, size_t startIdx, size_t Vsize, size_t Hsize, pack_indices<OI...>, pack_indices<VEI...>, pack_indices<HEI...>, pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args);
 			
 #endif // SKEPU_CUDA
 			
 			
 #ifdef SKEPU_OPENCL
 			
-			template<size_t... VEI, size_t... HEI, size_t... AI, size_t... CI, typename Iterator, typename... CallArgs>
-			void CL(size_t startIdx, size_t Vsize, size_t Hsize, pack_indices<VEI...>, pack_indices<HEI...>, pack_indices<AI...>, pack_indices<CI...>, Iterator res, CallArgs&&... args);
+			template<size_t... OI, size_t... VEI, size_t... HEI, size_t... AI, size_t... CI, typename... CallArgs>
+			void CL(size_t startIdx, size_t Vsize, size_t Hsize, pack_indices<OI...>, pack_indices<VEI...>, pack_indices<HEI...>, pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args);
 			
-			template<size_t... VEI, size_t... HEI, size_t... AI, size_t... CI, typename Iterator, typename... CallArgs>
-			void mapNumDevices_CL(size_t startIdx, size_t numDevices, size_t Vsize, size_t Hsize, pack_indices<VEI...>, pack_indices<HEI...>, pack_indices<AI...>, pack_indices<CI...>, Iterator res, CallArgs&&... args);
+			template<size_t... OI, size_t... VEI, size_t... HEI, size_t... AI, size_t... CI, typename... CallArgs>
+			void mapNumDevices_CL(size_t startIdx, size_t numDevices, size_t Vsize, size_t Hsize, pack_indices<OI...>, pack_indices<VEI...>, pack_indices<HEI...>, pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args);
 			
 #endif // SKEPU_OPENCL
   
 #ifdef SKEPU_HYBRID
 			
-			template<size_t... VEI, size_t... HEI, size_t... AI, size_t... CI, typename Iterator, typename... CallArgs>
-			void Hybrid(size_t Vsize, size_t Hsize, pack_indices<VEI...>, pack_indices<HEI...>, pack_indices<AI...>, pack_indices<CI...>, Iterator res, CallArgs&&... args);
+			template<size_t... OI, size_t... VEI, size_t... HEI, size_t... AI, size_t... CI, typename... CallArgs>
+			void Hybrid(size_t Vsize, size_t Hsize, pack_indices<OI...>, pack_indices<VEI...>, pack_indices<HEI...>, pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args);
 			
 #endif // SKEPU_HYBRID
 			
-			template<size_t... VEI, size_t... HEI, size_t... AI, size_t... CI, typename Iterator, typename... CallArgs>
-			void backendDispatch(pack_indices<VEI...> vei, pack_indices<HEI...> hei, pack_indices<AI...> ai, pack_indices<CI...> ci, size_t Hsize, size_t Vsize, Iterator res, CallArgs&&... args)
+			template<size_t... OI, size_t... VEI, size_t... HEI, size_t... AI, size_t... CI, typename... CallArgs>
+			void backendDispatch(pack_indices<OI...> oi, pack_indices<VEI...> vei, pack_indices<HEI...> hei, pack_indices<AI...> ai, pack_indices<CI...> ci, size_t Vsize, size_t Hsize, CallArgs&&... args)
 			{
 			//	assert(this->m_execPlan != nullptr && this->m_execPlan->isCalibrated());
 				
+				if (  disjunction((get<OI, CallArgs...>(args...).total_rows() < Vsize)...)
+					|| disjunction((get<OI, CallArgs...>(args...).total_cols() < Hsize)...))
+					SKEPU_ERROR("Non-matching output container sizes");
+				
 				if (disjunction((get<VEI, CallArgs...>(args...).size() < Vsize)...))
-					SKEPU_ERROR("Non-matching container sizes");
+					SKEPU_ERROR("Non-matching vertical container sizes");
 				
 				if (disjunction((get<HEI, CallArgs...>(args...).size() < Hsize)...))
-					SKEPU_ERROR("Non-matching container sizes");
+					SKEPU_ERROR("Non-matching horizontal container sizes");
 				
 				this->selectBackend(Vsize + Hsize);
 				
@@ -144,27 +162,26 @@ namespace skepu
 				case Backend::Type::Hybrid:
 #ifdef SKEPU_HYBRID
 					std::cerr << "MapPairs Hybrid: Not implemented" << std::endl;
-				//	this->Hybrid(size, vei, hei, ai, ci, res, get<EI, CallArgs...>(args...).begin()..., get<AI, CallArgs...>(args...)..., get<CI, CallArgs...>(args...)...);
+				//	this->Hybrid(Vsize, Hsize, oi, vei, hei, ai, ci, get<OI, CallArgs...>(args...)..., get<VEI, CallArgs...>(args...).begin()..., get<HEI, CallArgs...>(args...).begin()..., get<AI, CallArgs...>(args...)..., get<CI, CallArgs...>(args...)...);
 					break;
 #endif
 				case Backend::Type::CUDA:
 #ifdef SKEPU_CUDA
-					std::cerr << "MapPairs CUDA: Not implemented" << std::endl;
-				//	this->CUDA(0, size, vei, hei, ai, ci, res, get<EI, CallArgs...>(args...).begin()..., get<AI, CallArgs...>(args...)..., get<CI, CallArgs...>(args...)...);
+					this->CUDA(0, Vsize, Hsize, oi, vei, hei, ai, ci, get<OI, CallArgs...>(args...)..., get<VEI, CallArgs...>(args...).begin()..., get<HEI, CallArgs...>(args...).begin()..., get<AI, CallArgs...>(args...)..., get<CI, CallArgs...>(args...)...);
 					break;
 #endif
 				case Backend::Type::OpenCL:
 #ifdef SKEPU_OPENCL
-					this->CL(0, Vsize, Hsize, vei, hei, ai, ci, res, get<VEI, CallArgs...>(args...).begin()..., get<HEI, CallArgs...>(args...).begin()..., get<AI, CallArgs...>(args...)..., get<CI, CallArgs...>(args...)...);
+					this->CL(0, Vsize, Hsize, oi, vei, hei, ai, ci, get<OI, CallArgs...>(args...)..., get<VEI, CallArgs...>(args...).begin()..., get<HEI, CallArgs...>(args...).begin()..., get<AI, CallArgs...>(args...)..., get<CI, CallArgs...>(args...)...);
 					break;
 #endif
 				case Backend::Type::OpenMP:
 #ifdef SKEPU_OPENMP
-					this->OMP(Vsize, Hsize, vei, hei, ai, ci, res, get<VEI, CallArgs...>(args...).begin()..., get<HEI, CallArgs...>(args...).begin()..., get<AI, CallArgs...>(args...)..., get<CI, CallArgs...>(args...)...);
+					this->OMP(Vsize, Hsize, oi, vei, hei, ai, ci, get<OI, CallArgs...>(args...)..., get<VEI, CallArgs...>(args...).begin()..., get<HEI, CallArgs...>(args...).begin()..., get<AI, CallArgs...>(args...)..., get<CI, CallArgs...>(args...)...);
 					break;
 #endif
 				default:
-					this->CPU(Vsize, Hsize, vei, hei, ai, ci, res, get<VEI, CallArgs...>(args...).begin()..., get<HEI, CallArgs...>(args...).begin()...,get<AI, CallArgs...>(args...)..., get<CI, CallArgs...>(args...)...);
+					this->CPU(Vsize, Hsize, oi, vei, hei, ai, ci, get<OI, CallArgs...>(args...)..., get<VEI, CallArgs...>(args...).begin()..., get<HEI, CallArgs...>(args...).begin()...,get<AI, CallArgs...>(args...)..., get<CI, CallArgs...>(args...)...);
 					break;
 				}
 			}
@@ -206,7 +223,7 @@ MapPairs(Ret(*)(Args...))
 #include "impl/mappairs/mappairs_cpu.inl"
 #include "impl/mappairs/mappairs_omp.inl"
 #include "impl/mappairs/mappairs_cl.inl"
-//#include "impl/mappairs/mappairs_cu.inl"
+#include "impl/mappairs/mappairs_cu.inl"
 //#include "impl/mappairs/mappairs_hy.inl"
 
 #endif // MAPPAIRS_H

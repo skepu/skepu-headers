@@ -207,7 +207,7 @@ namespace skepu
 			m_deviceID = m_dev->getDeviceID();
 			CHECK_CUDA_ERROR(cudaSetDevice(m_deviceID));
    
-			DEBUG_TEXT_LEVEL1(m_nameVerbose + " Alloc: " <<m_numElements << ", GPU_" << m_deviceID << "\n")
+			DEBUG_TEXT_LEVEL1(m_nameVerbose + " Alloc: size = " << m_numElements << ", GPU_" << m_deviceID << "\n")
 
 				cudaError_t er;
 			DeviceAllocations_CU<int>* dev_alloc = DeviceAllocations_CU<int>::getInstance();
@@ -250,7 +250,7 @@ namespace skepu
 			m_deviceID = m_dev->getDeviceID();
 			CHECK_CUDA_ERROR(cudaSetDevice(m_deviceID));
    
-			DEBUG_TEXT_LEVEL1(m_nameVerbose + " Alloc: " <<m_numElements << ", GPU_" << m_deviceID << "\n")
+			DEBUG_TEXT_LEVEL1(m_nameVerbose + " Alloc (2D): size = " << rows << " x " << cols << " (" << m_numElements << "), GPU_" << m_deviceID << "\n")
 
 				if(m_usePitch)
 			{
@@ -288,12 +288,12 @@ namespace skepu
 		DeviceMemPointer_CU<T>::~DeviceMemPointer_CU()
 		{
 			DEBUG_TEXT_LEVEL1(m_nameVerbose + " DeAlloc: " <<m_numElements <<", GPU_" << m_deviceID << "\n")
-
-				CHECK_CUDA_ERROR(cudaSetDevice(m_deviceID));
-
-			DeviceAllocations_CU<int>::getInstance()->removeAllocation(m_deviceDataPointer,this,m_deviceID);	
-	
-			cudaFree(m_deviceDataPointer);
+			CHECK_CUDA_ERROR(cudaSetDevice(m_deviceID));
+			
+			DeviceAllocations_CU<int>::getInstance()->removeAllocation(m_deviceDataPointer,this,m_deviceID);
+			
+			if (m_deviceDataPointer)
+				cudaFree(m_deviceDataPointer);
 			m_deviceDataPointer = NULL;
 		}
 
@@ -524,7 +524,8 @@ namespace skepu
 		template <typename T>
 		void DeviceMemPointer_CU<T>::clearDevicePointer()
 		{
-			cudaFree(m_deviceDataPointer);
+			if (m_deviceDataPointer)
+				cudaFree(m_deviceDataPointer);
 			m_deviceDataPointer = NULL;
 		}
 

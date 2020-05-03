@@ -77,12 +77,12 @@ void DeviceAllocations_CU<T>::removeAllocation(void *datapointer, MemPointerBase
 	it = allocations[deviceid].find(datapointer);
 	if (it != allocations[deviceid].end()) // check that the allocation has not allready been removed
 	{
-		// remove from list of allocations
-		allocations[deviceid].erase(it);
 		// invalidate device data
 		it->second->markCopyInvalid();
 		// free up device memory
 		it->second->clearDevicePointer();
+		// remove from list of allocations
+		allocations[deviceid].erase(it);
 	}
 }
 

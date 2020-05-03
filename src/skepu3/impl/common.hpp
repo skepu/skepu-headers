@@ -103,6 +103,7 @@ namespace skepu
 	
 	// Container Regions (perhaps relocate)
 	
+
 	template<typename T>
 	struct Region1D
 	{
@@ -110,11 +111,17 @@ namespace skepu
 		size_t stride;
 		const T *data;
 		
+#ifdef SKEPU_CUDA
+	__host__ __device__
+#endif
 		T operator()(int i)
 		{
 			return data[i * this->stride];
 		}
 		
+#ifdef SKEPU_CUDA
+	__host__ __device__
+#endif
 		Region1D(int arg_oi, size_t arg_stride, const T *arg_data)
 		: oi(arg_oi), stride(arg_stride), data(arg_data) {}
 	};
@@ -126,11 +133,17 @@ namespace skepu
 		size_t stride;
 		const T *data;
 		
+#ifdef SKEPU_CUDA
+	__host__ __device__
+#endif
 		T operator()(int i, int j)
 		{
 			return data[i * this->stride + j];
 		}
 		
+#ifdef SKEPU_CUDA
+	__host__ __device__
+#endif
 		Region2D(int arg_oi, int arg_oj, size_t arg_stride, const T *arg_data)
 		: oi(arg_oi), oj(arg_oj), stride(arg_stride), data(arg_data) {}
 	};
@@ -142,11 +155,17 @@ namespace skepu
 		size_t stride1, stride2;
 		const T *data;
 		
+#ifdef SKEPU_CUDA
+	__host__ __device__
+#endif
 		T operator()(int i, int j, int k)
 		{
 			return data[i * this->stride1 * this->stride2 + j * this->stride2 + k];
 		}
 		
+#ifdef SKEPU_CUDA
+	__host__ __device__
+#endif
 		Region3D(int arg_oi, int arg_oj, int arg_ok, size_t arg_stride1, size_t arg_stride2, const T *arg_data)
 		: oi(arg_oi), oj(arg_oj), ok(arg_ok), stride1(arg_stride1), stride2(arg_stride2), data(arg_data) {}
 	};
@@ -158,11 +177,17 @@ namespace skepu
 		size_t stride1, stride2, stride3;
 		const T *data;
 		
+#ifdef SKEPU_CUDA
+	__host__ __device__
+#endif
 		T operator()(int i, int j, int k, int l)
 		{
 			return data[i * this->stride1 * this->stride2 * this->stride3 + j * this->stride2 * this->stride3 + k * this->stride3 + l];
 		}
 		
+#ifdef SKEPU_CUDA
+	__host__ __device__
+#endif
 		Region4D(int arg_oi, int arg_oj, int arg_ok, int arg_ol, size_t arg_stride1, size_t arg_stride2, size_t arg_stride3, const T *arg_data)
 		: oi(arg_oi), oj(arg_oj), ok(arg_ok), ol(arg_ol), stride1(arg_stride1), stride2(arg_stride2), stride3(arg_stride3), data(arg_data) {}
 	};
