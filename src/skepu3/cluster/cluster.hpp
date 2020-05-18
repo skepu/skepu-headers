@@ -23,7 +23,8 @@ namespace skepu {
 						conf.reserve_ncpus = 1;
 					// Not using starpu_mpi_init_conf because that makes
 					// starpu_mpi_shutdown segfault.
-					assert(!starpu_init(&conf));
+					auto err = starpu_init(&conf);
+					assert(!err);
 					starpu_mpi_init(NULL, NULL, 1);
 
 					mpi_rank = starpu_mpi_world_rank();
