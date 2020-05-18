@@ -57,6 +57,84 @@ namespace skepu
 		struct MatRow {};
 	};
 
+Index1D make_index(
+	std::integral_constant<int, 1>,
+	size_t index,
+	size_t,
+	size_t,
+	size_t)
+{
+	return Index1D{index};
+}
+
+Index2D make_index(
+	std::integral_constant<int, 2>,
+	size_t index,
+	size_t size_j,
+	size_t,
+	size_t)
+{
+	return Index2D{ index / size_j, index % size_j };
+}
+
+Index3D make_index(
+	std::integral_constant<int, 3>,
+	size_t index,
+	size_t size_j,
+	size_t size_k,
+	size_t)
+{
+	size_t ci = index / (size_j * size_k);
+	index = index % (size_j * size_k);
+	size_t cj = index / (size_k);
+	index = index % (size_k);
+	return Index3D{ ci, cj, index };
+}
+
+Index4D make_index(
+	std::integral_constant<int, 4>,
+	size_t index,
+	size_t size_j,
+	size_t size_k,
+	size_t size_l)
+{
+	size_t ci = index / (size_j * size_k * size_l);
+	index = index % (size_j * size_k * size_l);
+	size_t cj = index / (size_k * size_l);
+	index = index % (size_k * size_l);
+	size_t ck = index / (size_l);
+	index = index % (size_l);
+	return Index4D{ ci, cj, ck, index };
+}
+
+std::ostream & operator<<(std::ostream &o, Index1D idx)
+{
+	return o << "Index1D(" << idx.i << ")";
+}
+
+std::ostream & operator<<(std::ostream &o, Index2D idx)
+{
+	return o << "Index2D(" << idx.row << ", " << idx.col << ")";
+}
+
+std::ostream & operator<<(std::ostream &o, Index3D idx)
+{
+	return o << "Index3D(" << idx.i << ", "  << idx.j << ", " << idx.k << ")";
+}
+
+std::ostream & operator<<(std::ostream &o, Index4D idx)
+{
+	return o
+		<< "Index4D("
+		<< idx.i
+		<< ", "
+		<< idx.j
+		<< ", "
+		<< idx.k
+		<< ", "
+		<< idx.l
+		<< ")";
+}
 
 	// Container Regions (perhaps relocate)
 
@@ -164,6 +242,7 @@ namespace skepu
 		Map,
 		MapReduce,
 		MapPairs,
+		MapPairsReduce,
 		Reduce1D,
 		Reduce2D,
 		Scan,
@@ -174,15 +253,56 @@ namespace skepu
 		Call,
 	};
 
-	inline size_t elwise_width(std::tuple<>)
+/* To be able to use getParent on containers. Those are private in MPI. */
+struct cont
+{
+	template<typename T, template<typename>class Container>
+	static auto
+	getParent(Container<T> & c) noexcept
+	-> decltype(c.getParent())
 	{
-		return 0;
+		return c.getParent();
+	}
+};
+
+	// For multiple return Map variants
+	template<typename... args>
+	using multiple = std::tuple<args...>;
+
+	template <typename... Args>
+	auto ret(Args&&... args)
+	-> decltype(std::make_tuple(std::forward<Args>(args)...))
+	{
+		return std::make_tuple(std::forward<Args>(args)...);
+	}
+
+	inline size_t elwise_i(std::tuple<>) { return 0; }
+	inline size_t elwise_j(std::tuple<>) { return 0; }
+	inline size_t elwise_k(std::tuple<>) { return 0; }
+	inline size_t elwise_l(std::tuple<>) { return 0; }
+
+	template<typename... Args>
+	inline size_t elwise_i(std::tuple<Args...> &t)
+ 	{
+		return cont::getParent(std::get<0>(t)).size_i();
+ 	}
+
+ 	template<typename... Args>
+	inline size_t elwise_j(std::tuple<Args...> &t)
+ 	{
+		return cont::getParent(std::get<0>(t)).size_j();
+ 	}
+
+	template<typename... Args>
+	inline size_t elwise_k(std::tuple<Args...> &t)
+	{
+		return cont::getParent(std::get<0>(t)).size_k();
 	}
 
 	template<typename... Args>
-	inline size_t elwise_width(std::tuple<Args...> &t)
+	inline size_t elwise_l(std::tuple<Args...> &t)
 	{
-		return std::get<0>(t).getParent().total_cols();
+		return cont::getParent(std::get<0>(t)).size_l();
 	}
 
 	// ----------------------------------------------------------------
@@ -236,33 +356,39 @@ namespace skepu
 	template<typename T, typename Ret>
 	struct is_skepu_iterator: std::false_type {};
 
-	// ----------------------------------------------------------------
-	// is_skepu_index trait class
-	// ----------------------------------------------------------------
+ 	// ----------------------------------------------------------------
+	// index trait classes for skepu::IndexND (N in [1,2,3,4])
+ 	// ----------------------------------------------------------------
 
+	// returns the dimensionality of an index type.
+	// that is, if the type is skepu::IndexND, then returns N, else 0.
+ 	template<typename T>
+	struct index_dimension: std::integral_constant<int, 0>{};
+
+ 	template<>
+	struct index_dimension<Index1D>: std::integral_constant<int, 1>{};
+
+ 	template<>
+	struct index_dimension<Index2D>: std::integral_constant<int, 2>{};
+
+ 	template<>
+	struct index_dimension<Index3D>: std::integral_constant<int, 3>{};
+
+ 	template<>
+	struct index_dimension<Index4D>: std::integral_constant<int, 4>{};
+
+	// true iff T is a SkePU index type
 	template<typename T>
-	struct is_skepu_index: std::false_type{};
+	struct is_skepu_index: bool_constant<index_dimension<T>::value != 0>{};
 
-	template<>
-	struct is_skepu_index<Index1D>: std::true_type{};
-
-	template<>
-	struct is_skepu_index<Index2D>: std::true_type{};
-
-	template<>
-	struct is_skepu_index<Index3D>: std::true_type{};
-
-	template<>
-	struct is_skepu_index<Index4D>: std::true_type{};
-
-
-	template<typename... Args>
+	// true iff first element of Args is SkePU index type
+ 	template<typename... Args>
 	struct is_indexed
-	: bool_constant<is_skepu_index<typename pack_element<0, Args...>::type>::value> {};
+	: bool_constant<is_skepu_index<
+			typename first_element<Args...>::type>::value>{};
 
-	template<>
-	struct is_indexed<>
-	: std::false_type{};
+ 	template<>
+	struct is_indexed<>: std::false_type{};
 
 	// ----------------------------------------------------------------
 	// matrix row proxy trait class
@@ -273,6 +399,43 @@ namespace skepu
 		using type = ProxyTag::Default;
 	};
 
+	// ----------------------------------------------------------------
+	// smart container size extractor
+	// ----------------------------------------------------------------
+
+	inline std::tuple<size_t>
+	size_info(index_dimension<skepu::Index1D>, size_t i, size_t, size_t, size_t)
+	{
+		return {i};
+	}
+
+	inline std::tuple<size_t, size_t>
+	size_info(index_dimension<skepu::Index2D>, size_t i, size_t j, size_t, size_t)
+	{
+		return {i, j};
+	}
+
+	inline std::tuple<size_t, size_t, size_t>
+	size_info(
+		index_dimension<skepu::Index3D>, size_t i, size_t j, size_t k, size_t)
+	{
+		return {i, j, k};
+	}
+
+	inline std::tuple<size_t, size_t, size_t, size_t>
+	size_info(
+		index_dimension<skepu::Index4D>, size_t i, size_t j, size_t k, size_t l)
+	{
+		return {i, j, k, l};
+	}
+
+	template<typename Index, typename... Args>
+	inline auto
+	size_info(Index, size_t, size_t, size_t, size_t, Args&&... args)
+	-> decltype(get<0, Args...>(args...).getParent().size_info())
+	{
+		return get<0, Args...>(args...).getParent().size_info();
+	}
 
 	// ----------------------------------------------------------------
 	// Smart Container Coherency Helpers
@@ -299,125 +462,39 @@ namespace skepu
 	// ConditionalIndexForwarder utility structure
 	// ----------------------------------------------------------------
 
-	template<bool indexed, typename Func>
-	struct ConditionalIndexForwarder
-	{
-		using Ret = typename return_type<Func>::type;
+ 	template<bool indexed, typename Func>
+ 	struct ConditionalIndexForwarder
+ 	{
+ 		using Ret = typename return_type<Func>::type;
 
-		template<typename... CallArgs>
-		static Ret forward(Func func, Index1D i, CallArgs&&... args)
-		{
-			return func(i, std::forward<CallArgs>(args)...);
-		}
+		// Forward index
 
-		template<typename... CallArgs>
-		static Ret forward(Func func, Index2D i, CallArgs&&... args)
-		{
-			return func(i, std::forward<CallArgs>(args)...);
-		}
+		template<typename Index, typename... CallArgs, REQUIRES(is_skepu_index<Index>::value && indexed)>
+		static Ret forward(Func func, Index i, CallArgs&&... args)
+ 		{
+ 			return func(i, std::forward<CallArgs>(args)...);
+ 		}
 
-		template<typename... CallArgs>
-		static Ret forward(Func func, Index3D i, CallArgs&&... args)
-		{
-			return func(i, std::forward<CallArgs>(args)...);
-		}
+		template<typename Index, typename... CallArgs, REQUIRES(is_skepu_index<Index>::value && indexed)>
+		static Ret forward_device(Func func, Index i, CallArgs&&... args)
+ 		{
+ 			return func(i, std::forward<CallArgs>(args)...);
+ 		}
 
-		template<typename... CallArgs>
-		static Ret forward(Func func, Index4D i, CallArgs&&... args)
-		{
-			return func(i, std::forward<CallArgs>(args)...);
-		}
+		// Do not forward index
 
+		template<typename Index, typename... CallArgs, REQUIRES(is_skepu_index<Index>::value && !indexed)>
+		static Ret forward(Func func, Index, CallArgs&&... args)
+ 		{
+ 			return func(std::forward<CallArgs>(args)...);
+ 		}
 
-		template<typename... CallArgs>
-		static Ret forward_device(Func func, Index1D i, CallArgs&&... args)
-		{
-			return func(i, std::forward<CallArgs>(args)...);
-		}
-
-		template<typename... CallArgs>
-		static Ret forward_device(Func func, Index2D i, CallArgs&&... args)
-		{
-			return func(i, std::forward<CallArgs>(args)...);
-		}
-
-		template<typename... CallArgs>
-		static Ret forward_device(Func func, Index3D i, CallArgs&&... args)
-		{
-			return func(i, std::forward<CallArgs>(args)...);
-		}
-
-		template<typename... CallArgs>
-		static Ret forward_device(Func func, Index4D i, CallArgs&&... args)
-		{
-			return func(i, std::forward<CallArgs>(args)...);
-		}
-	};
-
-	template<typename Func>
-	struct ConditionalIndexForwarder<false, Func>
-	{
-		using Ret = typename return_type<Func>::type;
-
-		template<typename... CallArgs>
-		static Ret forward(Func func, Index1D, CallArgs&&... args)
-		{
-			return func(std::forward<CallArgs>(args)...);
-		}
-
-		template<typename... CallArgs>
-		static Ret forward(Func func, Index2D, CallArgs&&... args)
-		{
-			return func(std::forward<CallArgs>(args)...);
-		}
-
-		template<typename... CallArgs>
-		static Ret forward(Func func, Index3D, CallArgs&&... args)
-		{
-			return func(std::forward<CallArgs>(args)...);
-		}
-
-		template<typename... CallArgs>
-		static Ret forward(Func func, Index4D, CallArgs&&... args)
-		{
-			return func(std::forward<CallArgs>(args)...);
-		}
-
-		template<typename... CallArgs>
-		static Ret forward_device(Func func, Index1D, CallArgs&&... args)
-		{
-			return func(std::forward<CallArgs>(args)...);
-		}
-
-		template<typename... CallArgs>
-		static Ret forward_device(Func func, Index2D, CallArgs&&... args)
-		{
-			return func(std::forward<CallArgs>(args)...);
-		}
-
-		template<typename... CallArgs>
-		static Ret forward_device(Func func, Index3D, CallArgs&&... args)
-		{
-			return func(std::forward<CallArgs>(args)...);
-		}
-
-		template<typename... CallArgs>
-		static Ret forward_device(Func func, Index4D, CallArgs&&... args)
-		{
-			return func(std::forward<CallArgs>(args)...);
-		}
-	};
-
-struct cont
-{
-	template<typename T, template<typename>class Container>
-	static auto
-	getParent(Container<T> & c) noexcept
-	-> decltype(c.getParent())
-	{
-		return c.getParent();
-	}
-};
+		template<typename Index, typename... CallArgs, REQUIRES(is_skepu_index<Index>::value && !indexed)>
+		static Ret forward_device(Func func, Index, CallArgs&&... args)
+ 		{
+ 			return func(std::forward<CallArgs>(args)...);
+ 		}
+ 	};
 
 } // namespace skepu
 

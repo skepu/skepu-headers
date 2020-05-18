@@ -2,7 +2,7 @@
 #ifndef SKEPU_STARPU_MATRIX_PROXY_HPP
 #define SKEPU_STARPU_MATRIX_PROXY_HPP 1
 
-#include <cstddef>
+#include <skepu3/cluster/common.hpp>
 
 namespace skepu {
 
@@ -89,6 +89,12 @@ struct MatRow
 	{
 		return data[pos];
 	}
+};
+
+template<typename T>
+struct proxy_tag<MatRow<T>>
+{
+	typedef ProxyTag::MatRow type;
 };
 
 } // namespace skepu
