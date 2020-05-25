@@ -3,6 +3,7 @@
 #define SKEPU_STARPU_SKELETON_REDUCE_HPP 1
 
 #include <omp.h>
+#include <set>
 #include <vector>
 
 #include <starpu_mpi.h>
@@ -23,19 +24,17 @@ struct reduce1d
 	typedef typename ReduceFunc::Ret T;
 
 	template<
-		typename Buffers,
-		typename Iterator,
 		size_t... RI,
 		size_t... EI,
-		size_t... CI>
+		size_t... CI,
+		typename Buffers>
 	auto static
 	run(
 		pack_indices<RI...>,
 		pack_indices<EI...>,
 		pack_indices<CI...>,
-		Iterator /* begin */,
-		size_t const count,
-		Buffers && buffers) noexcept
+		Buffers && buffers,
+		size_t const count) noexcept
 	-> void
 	{
 		#pragma omp declare \
@@ -53,7 +52,6 @@ struct reduce1d
 
 	template<
 		typename Buffers,
-		typename Iterator,
 		size_t... RI,
 		size_t... EI,
 		size_t... CI>
@@ -62,9 +60,8 @@ struct reduce1d
 		pack_indices<RI...>,
 		pack_indices<EI...>,
 		pack_indices<CI...>,
-		Iterator /* begin */,
-		size_t const count,
 		Buffers && buffers,
+		size_t const count,
 		size_t const width) noexcept
 	-> void
 	{
@@ -96,15 +93,7 @@ class Reduce1D
 			typename std::remove_reference<
 				decltype(get<0>(typename ReduceFunc::UniformArgs{}))>::type>,
 		std::tuple<>,
-		std::tuple<>>,
-	protected cluster::skeleton_task<
-		_starpu::reduce1d<ReduceFunc>,
-		std::tuple<typename ReduceFunc::Ret>,
-		std::tuple<
-			typename std::remove_reference<
-				decltype(get<0>(typename ReduceFunc::UniformArgs{}))>::type>,
-		std::tuple<>,
-		std::tuple<size_t>>
+		std::tuple<>>
 {
 public:
 	typedef typename ReduceFunc::Ret T;
@@ -117,15 +106,9 @@ public:
 			std::tuple<>,
 			std::tuple<>>
 		skeleton_task;
-	typedef cluster::skeleton_task<
-			_starpu::reduce1d<ReduceFunc>,
-			std::tuple<typename ReduceFunc::Ret>,
-			std::tuple<
-				typename std::remove_reference<
-					decltype(get<0>(typename ReduceFunc::UniformArgs{}))>::type>,
-			std::tuple<>,
-			std::tuple<size_t>>
-		rowwise_task;
+
+	auto static constexpr uniform_indices =
+		make_pack_indices<0>::type{};
 
 private:
 	ReduceMode m_mode = ReduceMode::RowWise;
@@ -145,7 +128,6 @@ public:
 
 	Reduce1D(CUDAKernel) noexcept
 	: skeleton_task("Reduce1D_ElWise"),
-		rowwise_task("Reduce1D_RowWise"),
 		m_start(T()),
 		m_result(0),
 		m_result_handles(skepu::cluster::mpi_size(),  0)
@@ -195,7 +177,8 @@ public:
 	template<typename... Args>
 	auto tune(Args&&...) noexcept -> void {}
 
-	template<template<class> class Container>
+	template<template<class> class Container,
+		REQUIRES_VALUE(is_skepu_container<Container<T>>)>
 	auto
 	operator()(Container<T> & arg) noexcept
 	-> T
@@ -203,7 +186,8 @@ public:
 		return backendDispatch(arg.begin(), arg.end());
 	}
 
-	template<typename Iterator>
+	template<typename Iterator,
+		REQUIRES_VALUE(is_skepu_iterator<Iterator,T>)>
 	auto
 	operator()(Iterator begin, Iterator end) noexcept
 	-> T
@@ -213,8 +197,9 @@ public:
 
 	template<
 		template<typename>class Vector,
-		template<typename>class Matrix>
-	// TODO: Enable if skepu::Vector/Matrix.
+		template<typename>class Matrix,
+		REQUIRES_VALUE(is_skepu_vector<Vector<T>>),
+		REQUIRES_VALUE(is_skepu_matrix<Matrix<T>>)>
 	auto
 	operator()(Vector<T> & res, Matrix<T> & arg) noexcept
 	-> Vector<T>
@@ -256,9 +241,9 @@ private:
 	STARPU(Iterator begin, Iterator const end) noexcept
 	-> T
 	{
+		auto static constexpr cbai = typename make_pack_indices<1>::type{};
 		begin.getParent().partition();
-		auto constexpr const_indices =
-			typename make_pack_indices<0,0>::type{};
+		std::set<int> scheduled_ranks;
 
 		while(begin != end)
 		{
@@ -266,22 +251,24 @@ private:
 			auto count = begin.getParent().block_count_from(pos);
 			auto handle = begin.getParent().handle_for(pos);
 			auto rank = starpu_mpi_data_get_rank(handle);
+			scheduled_ranks.insert(rank);
 			auto handles =
 				std::make_tuple(
 					m_result_handles[rank],
 					handle);
+			auto call_back_args = std::make_tuple(count);
 
 			skeleton_task::schedule(
-				const_indices,
-				begin,
-				count,
-				handles);
+				uniform_indices,
+				cbai,
+				handles,
+				call_back_args);
 
 			begin += count;
 		}
 
 		auto result{m_start};
-		for(size_t i = 0; i < cluster::mpi_size(); ++i)
+		for(auto & i : scheduled_ranks)
 		{
 			auto & handle = m_result_handles[i];
 			starpu_mpi_get_data_on_all_nodes_detached(MPI_COMM_WORLD, handle);
@@ -300,8 +287,7 @@ private:
 	STARPU(Vector & res, Matrix & data)
 	-> Vector
 	{
-		auto constexpr const_indices =
-			typename make_pack_indices<1,0>::type{};
+		auto static constexpr cbai = typename make_pack_indices<2>::type{};
 		auto & rp = cont::getParent(res);
 		auto & dp = cont::getParent(data);
 		auto cols = data.size_j();
@@ -315,13 +301,13 @@ private:
 			auto handles = std::make_tuple(
 				rp.handle_for(i),
 				dp.handle_for(i * cols));
+			auto call_back_args = std::make_tuple(count,cols);
 
-			rowwise_task::schedule(
-				const_indices,
-				res.begin(),
-				count,
+			skeleton_task::schedule(
+				uniform_indices,
+				cbai,
 				handles,
-				cols);
+				call_back_args);
 
 			i += count;
 		}
@@ -338,19 +324,17 @@ struct reduce2d
 	typedef typename row_red_func::Ret T;
 
 	template<
-		typename Buffers,
-		typename Iterator,
 		size_t... RI,
 		size_t... EI,
-		size_t... CI>
+		size_t... CI,
+		typename Buffers>
 	auto static
 	run(
 		pack_indices<RI...>,
 		pack_indices<EI...>,
 		pack_indices<CI...>,
-		Iterator /* begin */,
-		size_t const rows,
 		Buffers && buffers,
+		size_t const rows,
 		size_t const width) noexcept
 	-> void
 	{
@@ -399,7 +383,7 @@ class Reduce2D
 			typename std::remove_reference<
 				decltype(get<0>(typename ReduceFuncRowWise::UniformArgs{}))>::type>,
 		std::tuple<>,
-		std::tuple<size_t>>
+		std::tuple<>>
 {
 	typedef typename cluster::skeleton_task<
 		_starpu::reduce2d<ReduceFuncRowWise, ReduceFuncColWise>,
@@ -408,21 +392,24 @@ class Reduce2D
 			typename std::remove_reference<
 				decltype(get<0>(typename ReduceFuncRowWise::UniformArgs{}))>::type>,
 		std::tuple<>,
-		std::tuple<size_t>> reduce2d_task;
+		std::tuple<>> skeleton_task;
 	typedef Reduce1D<ReduceFuncRowWise, CUDARowWise, CLKernel> row_reduce;
 	typedef typename ReduceFuncRowWise::Ret T;
+
+	auto static constexpr uniform_indices =
+		make_pack_indices<0>::type{};
 
 public:
 	// static constexpr auto skeletonType = SkeletonType::Reduce2D;
 	static constexpr bool prefers_matrix = true;
 
 	Reduce2D(CUDARowWise row, CUDAColWise)
-	: row_reduce(row), reduce2d_task("Reduce2D")
+	: row_reduce(row), skeleton_task("Reduce2D")
 	{}
 
 	template<
 		template<typename>class Vector,
-		REQUIRES(is_skepu_vector<Vector<T>>::value)>
+		REQUIRES_VALUE(is_skepu_vector<Vector<T>>)>
 	auto
 	operator()(Vector<T> & arg)
 	-> T
@@ -432,7 +419,7 @@ public:
 
 	template<
 		template<typename>class Matrix,
-		REQUIRES(is_skepu_matrix<Matrix<T>>::value)>
+		REQUIRES_VALUE(is_skepu_matrix<Matrix<T>>)>
 	auto
 	operator()(Matrix<T> & arg)
 	-> T
@@ -448,35 +435,35 @@ private:
 	STARPU(Matrix & m)
 	-> T
 	{
-		auto constexpr const_indices =
-			typename make_pack_indices<1,0>::type{};
+		auto static constexpr cbai = typename make_pack_indices<2>::type{};
 		auto cols = m.size_j();
 		auto mp = cont::getParent(m);
 		mp.partition();
-		auto unused_iterator = m.begin();
+		std::set<int> scheduled_ranks;
 
 		for(size_t i = 0; i < m.size_j();)
 		{
 			auto count = mp.getParent().block_count_from(i) / cols;
 			auto handle = mp.getParent().handle_for(i);
 			auto rank = starpu_mpi_data_get_rank(handle);
+			scheduled_ranks.insert(rank);
 			auto handles =
 				std::make_tuple(
 					row_reduce::m_result_handles[rank],
 					handle);
+			auto call_back_args = std::make_tuple(count, cols);
 
-			reduce2d_task::schedule(
-				const_indices,
-				unused_iterator,
-				count,
+			skeleton_task::schedule(
+				uniform_indices,
+				cbai,
 				handles,
-				cols);
+				call_back_args);
 
 			i += count;
 		}
 
 		auto result{row_reduce::m_start};
-		for(size_t i = 0; i < cluster::mpi_size(); ++i)
+		for(auto & i : scheduled_ranks)
 		{
 			auto & handle = row_reduce::m_result_handles[i];
 			starpu_mpi_get_data_on_all_nodes_detached(MPI_COMM_WORLD, handle);

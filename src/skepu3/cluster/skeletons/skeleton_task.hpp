@@ -136,48 +136,55 @@ protected:
 
 	template<
 		size_t ... UI,
-		typename Iterator,
+		size_t ... CBAI,
 		typename ... Handles,
+		typename ... CBArgs,
 		typename ... Args>
 	auto
 	schedule(
 		pack_indices<UI...>,
-		Iterator begin,
-		size_t count,
+		pack_indices<CBAI...>,
 		std::tuple<Handles...> & handles,
+		std::tuple<CBArgs...> & cbargs,
 		Args && ... args)
 	-> void
 	{
-		cl.cpu_funcs[0] = starpu_task_callback<Iterator>;
+		cl.cpu_funcs[0] = starpu_task_callback<CBArgs...>;
 		auto modes = helpers::modes_from_codelet(cl);
-		auto uniform = std::make_tuple(begin, count, get<UI>(args...)...);
+		auto args_tuple =
+			std::make_tuple(std::get<CBAI>(cbargs)..., get<UI>(args...)...);
 
-		helpers::schedule_task(&cl, modes, handles, uniform);
+		helpers::schedule_task(&cl, modes, handles, args_tuple);
 	}
 
 private:
-	template<typename Iterator>
+	template<typename ... CBArgs>
 	auto static
 	starpu_task_callback(void ** buffers, void * args) noexcept
 	-> void
 	{
-		handle_callback<Iterator>(
+		auto static constexpr cbai =
+			typename make_pack_indices<sizeof...(CBArgs)>::type{};
+
+		handle_callback<CBArgs...>(
 			handle_indices,
 			ri,
 			ei,
 			ci,
 			ui,
+			cbai,
 			buffers,
 			args);
 	}
 
 	template<
-		typename Iterator,
+		typename ... CBArgs,
 		size_t ... HI,
 		size_t ... RI,
 		size_t ... EI,
 		size_t ... CI,
-		size_t ... UI>
+		size_t ... UI,
+		size_t ... CBAI>
 	auto static
 	handle_callback(
 		pack_indices<HI...>,
@@ -185,21 +192,19 @@ private:
 		pack_indices<EI...>,
 		pack_indices<CI...>,
 		pack_indices<UI...>,
+		pack_indices<CBAI...>,
 		void ** buffers,
 		void * args) noexcept
 	-> void
 	{
-		Iterator begin;
-		size_t count;
+		auto cbargs = std::tuple<CBArgs...>{};
 		UniformArgs uniform_args;
 		helpers::extract_constants(
 			args,
-			begin,
-			count,
+			std::get<CBAI>(cbargs)...,
 			std::get<UI>(uniform_args)...);
 
-		using buffers_type = decltype(std::tuple_cat(
-		//typedef decltype(std::tuple_cat(
+		typedef decltype(std::tuple_cat(
 				std::make_tuple(
 					typename std::add_pointer<
 						decltype(std::get<RI>(ResultArgs{}))>::type{}...),
@@ -207,7 +212,7 @@ private:
 					typename std::add_pointer<
 						decltype(std::get<EI>(ElwiseArgs{}))>::type{}...),
 				ContainerArgs{}))
-		;//	buffers_type;
+			buffers_type;
 
 		buffers_type containers(
 			prepare_buffer(
@@ -217,9 +222,8 @@ private:
 			result_handle_indices,
 			elwise_handle_indices,
 			container_handle_indices,
-			begin,
-			count,
 			std::forward<buffers_type>(containers),
+			std::get<CBAI>(cbargs)...,
 			std::get<UI>(uniform_args)...);
 	}
 

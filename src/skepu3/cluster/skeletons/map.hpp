@@ -63,9 +63,9 @@ struct map_omp
 		pack_indices<RI...>,
 		pack_indices<EI...>,
 		pack_indices<CI...>,
+		Buffers && buffers,
 		Iterator begin,
 		size_t count,
-		Buffers && buffers,
 		CallArgs &&... args) noexcept
 	-> void
 	{
@@ -230,6 +230,8 @@ private:
 		// The proxy elements require the data to be gathered on all nodes.
 		// Except for MatRow, which will be partitioned.
 		auto constexpr static pt = typename MapFunc::ProxyTags{};
+		auto static constexpr cbai = make_pack_indices<2>::type{};
+
 		pack_expand((
 			skeleton_task::handle_container_arg(
 				cont::getParent(get<AI>(args...)),
@@ -259,12 +261,13 @@ private:
 						cont::getParent(get<AI>(args...)),
 						std::get<PI>(pt),
 						pos)...);
+			auto call_back_args = std::make_tuple(begin, task_count);
 
 			this->schedule(
 				const_indices,
-				begin,
-				task_count,
+				cbai,
 				handles,
+				call_back_args,
 				std::forward<CallArgs>(args)...);
 
 			begin += task_count;
