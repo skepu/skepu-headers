@@ -8,11 +8,6 @@ namespace skepu {
 
 namespace backend {
 
-enum class SkeletonType
-{
-	Map = 1,
-};
-
 class SkeletonBase
 {
 public:

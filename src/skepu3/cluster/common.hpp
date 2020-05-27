@@ -256,9 +256,9 @@ std::ostream & operator<<(std::ostream &o, Index4D idx)
 /* To be able to use getParent on containers. Those are private in MPI. */
 struct cont
 {
-	template<typename T, template<typename>class Container>
+	template<typename Container>
 	static auto
-	getParent(Container<T> & c) noexcept
+	getParent(Container && c)
 	-> decltype(c.getParent())
 	{
 		return c.getParent();

@@ -188,7 +188,6 @@ public:
 		return begin;
 	}
 
-	// TODO: Remove if possible. Archaic and weird..
 	template<template<typename>class Container, typename... CallArgs,
 		REQUIRES(is_skepu_container<Container<T>>::value)>
 	Container<T> operator()(CallArgs&&... args)
@@ -196,6 +195,7 @@ public:
 		static_assert(sizeof...(CallArgs) == numArgs,
 			"Number of arguments not matching Map function");
 
+		// TODO: skepu::make_container<Container<T>>(default_dim).
 		Container<T> res(default_size_x);
 		backendDispatch(
 			elwise_indices,
@@ -220,7 +220,7 @@ private:
 	STARPU(
 		pack_indices<EI...>,
 		pack_indices<AI...>,
-		pack_indices<CI...>,
+		pack_indices<CI...> ci,
 		pack_indices<PI...>,
 		Iterator begin,
 		Iterator end,
@@ -264,7 +264,7 @@ private:
 			auto call_back_args = std::make_tuple(begin, task_count);
 
 			this->schedule(
-				const_indices,
+				ci,
 				cbai,
 				handles,
 				call_back_args,
