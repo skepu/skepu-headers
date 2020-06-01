@@ -154,7 +154,9 @@ public:
 
 	template<template<class> class Container, typename... CallArgs,
 		REQUIRES(is_skepu_container<Container<T>>::value)>
-	Container<T> &operator()(Container<T> &res, CallArgs&&... args)
+	auto
+	operator()(Container<T> &res, CallArgs&&... args) noexcept
+	-> Container<T> &
 	{
 		static_assert(sizeof...(CallArgs) == numArgs,
 			"Number of arguments not matching Map function");
@@ -172,7 +174,9 @@ public:
 
 	template<typename Iterator, typename... CallArgs,
 		REQUIRES(is_skepu_iterator<Iterator, T>::value)>
-	Iterator operator()(Iterator begin, Iterator end, CallArgs&&... args)
+	auto
+	operator()(Iterator begin, Iterator end, CallArgs&&... args) noexcept
+	-> Iterator
 	{
 		static_assert(sizeof...(CallArgs) == numArgs,
 			"Number of arguments not matching Map function");
@@ -186,26 +190,6 @@ public:
 			end,
 			std::forward<CallArgs>(args)...);
 		return begin;
-	}
-
-	template<template<typename>class Container, typename... CallArgs,
-		REQUIRES(is_skepu_container<Container<T>>::value)>
-	Container<T> operator()(CallArgs&&... args)
-	{
-		static_assert(sizeof...(CallArgs) == numArgs,
-			"Number of arguments not matching Map function");
-
-		// TODO: skepu::make_container<Container<T>>(default_dim).
-		Container<T> res(default_size_x);
-		backendDispatch(
-			elwise_indices,
-			any_indices,
-			const_indices,
-			ptag_indices,
-			res.size(),
-			res.begin(),
-			std::forward<CallArgs>(args)...);
-		return res;
 	}
 
 private:

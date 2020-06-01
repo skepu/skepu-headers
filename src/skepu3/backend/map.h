@@ -199,9 +199,6 @@ struct MapImpl : public SeqSkeletonBase
 		typename... CallArgs,
 		REQUIRES_VALUE(is_skepu_iterator<Iterator, Ret>)>
 	Iterator operator()(Iterator res, Iterator res_end, CallArgs&&... args);
-
-	template<template<class> class Container = Vector, typename... CallArgs>
-	Container<Ret> operator()(CallArgs&&... args);
 };
 
 template<int arity = 1, typename Ret, typename... Args>
