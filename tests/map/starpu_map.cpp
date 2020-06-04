@@ -1,6 +1,6 @@
 #include <catch2/catch.hpp>
 
-#include <skepu3/cluster/skeletons/map.hpp>
+#include <skepu3/cluster/skeletons/map/map.hpp>
 #include <skepu3/cluster/containers/matrix/matrix.hpp>
 #include <skepu3/cluster/containers/tensor3/tensor3.hpp>
 #include <skepu3/cluster/containers/vector/vector.hpp>
@@ -193,9 +193,9 @@ TEST_CASE("Index and elwise Map.")
 
 struct vector_copy_fn
 {
-	constexpr static size_t totalArity = 2;
+	constexpr static size_t totalArity = 1;
 	constexpr static size_t outArity = 1;
-	constexpr static bool indexed = 1;
+	constexpr static bool indexed = 0;
 	using ElwiseArgs = std::tuple<>;
 	using ContainerArgs = std::tuple<skepu::Vec<int>>;
 	using UniformArgs = std::tuple<>;
@@ -206,32 +206,87 @@ struct vector_copy_fn
 	constexpr static bool prefersMatrix = 0;
 
 	static inline auto
-	OMP(skepu::Index1D idx, skepu::Vec<int> v) noexcept
+	OMP(skepu::Vec<int> v) noexcept
 	-> int
-	{ return v(idx.i); }
+	{
+		int sum(0);
+		for(size_t i(0); i < v.size; ++i)
+			sum += v(i);
+		return sum;
+	}
 
 	static inline auto
-	CPU(skepu::Index1D idx, skepu::Vec<int> v) noexcept
+	CPU(skepu::Vec<int> v) noexcept
 	-> int
-	{	return v(idx.i); }
+	{
+		int sum(0);
+		for(size_t i(0); i < v.size; ++i)
+			sum += v(i);
+		return sum;
+	}
 };
 
 TEST_CASE("Map with container argument")
 {
 	REQUIRE_NOTHROW(skepu::backend::Map<0, vector_copy_fn, bool, void>(false));
-
-	skepu::Vector<int> v(100000);
-	v.flush();
-	for(size_t i(0); i < v.size(); ++i)
-		v(i) = i*i;
-	skepu::Vector<int> res(v.size());
 	skepu::backend::Map<0, vector_copy_fn, bool, void> copy(false);
-	REQUIRE_NOTHROW(copy(res, v));
 
-	res.flush();
-	v.flush();
-	for(size_t i(0); i < v.size(); ++i)
-		CHECK(res(i) == v(i));
+	SECTION("size 1")
+	{
+		size_t constexpr N{1};
+		int constexpr expected{((N -1)*N)/2};
+		skepu::Vector<int> v(N);
+		skepu::Vector<int> res(v.size());
+
+		v.flush();
+		for(size_t i(0); i < v.size(); ++i)
+			v(i) = i;
+		skepu::cont::getParent(v).partition();
+
+		REQUIRE_NOTHROW(copy(res, v));
+
+		res.flush();
+		for(size_t i(0); i < v.size(); ++i)
+			CHECK(res(i) == expected);
+	}
+
+	SECTION("size 4")
+	{
+		size_t constexpr N{4};
+		int constexpr expected{((N -1)*N)/2};
+		skepu::Vector<int> v(N);
+		skepu::Vector<int> res(v.size());
+
+		v.flush();
+		for(size_t i(0); i < v.size(); ++i)
+			v(i) = i;
+		skepu::cont::getParent(v).partition();
+
+		REQUIRE_NOTHROW(copy(res, v));
+
+		res.flush();
+		for(size_t i(0); i < v.size(); ++i)
+			CHECK(res(i) == expected);
+	}
+
+	SECTION("size 10000")
+	{
+		size_t constexpr N{10000};
+		int constexpr expected{((N -1)*N)/2};
+		skepu::Vector<int> v(N);
+		skepu::Vector<int> res(v.size());
+
+		v.flush();
+		for(size_t i(0); i < v.size(); ++i)
+			v(i) = i;
+		skepu::cont::getParent(v).partition();
+
+		REQUIRE_NOTHROW(copy(res, v));
+
+		res.flush();
+		for(size_t i(0); i < v.size(); ++i)
+			CHECK(res(i) == expected);
+	}
 }
 
 struct vector_scale_fn

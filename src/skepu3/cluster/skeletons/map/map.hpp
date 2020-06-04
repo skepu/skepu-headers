@@ -6,10 +6,11 @@
 #include <tuple>
 #include <starpu_mpi.h>
 
-#include "../cluster.hpp"
-#include "../common.hpp"
-#include "skeleton_task.hpp"
-#include "skeleton_base.hpp"
+#include "../../cluster.hpp"
+#include "../../common.hpp"
+#include "../skeleton_base.hpp"
+#include "../skeleton_task.hpp"
+#include "../skeleton_utils.hpp"
 
 namespace skepu {
 namespace backend {
@@ -20,36 +21,6 @@ struct map_omp
 {
 	typedef ConditionalIndexForwarder<MapFunc::indexed, decltype(&MapFunc::CPU)>
 		F;
-
-	template<typename Container>
-	auto static
-	advance(Container & c, size_t) noexcept
-	-> Container &
-	{
-		return c;
-	}
-
-	template<typename T>
-	auto static
-	advance(skepu::MatRow<T> & mr, size_t rows) noexcept
-	-> skepu::MatRow<T>
-	{
-		skepu::MatRow<T> advanced;
-		advanced.data = mr.data + (rows * mr.cols);
-		advanced.cols = mr.cols;
-		return advanced;
-	}
-
-	template<typename T>
-	auto static
-	advance(skepu::MatRow<T> const & mr, size_t rows) noexcept
-	-> skepu::MatRow<T>
-	{
-		skepu::MatRow<T> advanced;
-		advanced.data = mr.data + (rows * mr.cols);
-		advanced.cols = mr.cols;
-		return advanced;
-	}
 
 	template<
 		typename Buffers,
@@ -83,10 +54,9 @@ struct map_omp
 					// Elwise elements are also raw pointers.
 					std::get<EI>(buffers)[i]...,
 					// Set MatRow to correct position. Does nothing for others.
-					advance(std::get<CI>(buffers), i)...,
+					cluster::advance(std::get<CI>(buffers), i)...,
 					args...);
 		}
-		return;
 	}
 };
 
@@ -119,9 +89,6 @@ class Map
 
 	CUDAKernel m_cuda_kernel;
 
-	size_t default_size_x;
-	size_t default_size_y;
-
 public:
 	static constexpr auto skeletonType = SkeletonType::Map;
 	using ResultArg = std::tuple<T>;
@@ -140,14 +107,6 @@ public:
 	typename make_pack_indices<numArgs, arity + anyArity>::type const_indices{};
 
 	Map(CUDAKernel kernel) : skeleton_task("SkePU Map"), m_cuda_kernel(kernel) {}
-
-	auto
-	setDefaultSize(size_t x, size_t y = 0) noexcept
-	-> void
-	{
-		this->default_size_x = x;
-		this->default_size_y = y;
-	}
 
 	template<typename... Args>
 	auto tune(Args&&...) noexcept -> void {}
@@ -278,7 +237,7 @@ private:
 	{
 		/* TODO:
 		 * This should be more involved with possible backend selection. We only
-		 * have OMP at this point, så we just redirect the call.
+		 * have OMP at this point, so we just redirect the call.
 		 */
 		STARPU(
 			ei,

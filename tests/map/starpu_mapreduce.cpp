@@ -1,7 +1,7 @@
 #include <catch2/catch.hpp>
 
 #include <skepu3/cluster/containers/vector/vector.hpp>
-#include <skepu3/cluster/skeletons/mapreduce.hpp>
+#include <skepu3/cluster/skeletons/map/mapreduce.hpp>
 
 struct scalar_fn
 {

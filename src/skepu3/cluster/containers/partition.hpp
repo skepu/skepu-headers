@@ -259,7 +259,7 @@ public:
 				size_t end = m_size / m_part_size;
 				if(!rank)
 					starpu_data_acquire(m_data_handle, STARPU_W);
-				
+
 				auto data_it = m_data;
 				if(!rank)
 				{
@@ -286,7 +286,7 @@ public:
 						starpu_mpi_cache_flush(MPI_COMM_WORLD, m_handles[i]);
 					}
 				}
-		
+
 				if(!rank)
 					starpu_data_release(m_data_handle);
 			}

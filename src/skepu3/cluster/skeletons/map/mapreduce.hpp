@@ -8,8 +8,9 @@
 
 #include <skepu3/cluster/common.hpp>
 #include <skepu3/cluster/cluster.hpp>
-#include "skeleton_base.hpp"
-#include "skeleton_task.hpp"
+#include "../skeleton_base.hpp"
+#include "../skeleton_task.hpp"
+#include "../skeleton_utils.hpp"
 
 namespace skepu {
 namespace backend {
@@ -57,7 +58,7 @@ struct map_reduce
 				// Elwise elements are also raw pointers.
 				std::get<EI>(buffers)[0]...,
 				// Set MatRow to correct position. Does nothing for others.
-				advance(std::get<CI>(buffers),begin.offset())...,
+				cluster::advance(std::get<CI>(buffers),begin.offset())...,
 				args...);
 
 		auto offset = begin.offset();
@@ -73,7 +74,7 @@ struct map_reduce
 						// Elwise elements are also raw pointers.
 						std::get<EI>(buffers)[i]...,
 						// Set MatRow to correct iition. Does nothing for others.
-						advance(std::get<CI>(buffers),i)...,
+						cluster::advance(std::get<CI>(buffers),i)...,
 						args...));
 		}
 	}
@@ -107,7 +108,7 @@ struct map_reduce
 				MapFunc::OMP,
 				make_index(defaultDim{}, offset, size_j, size_k, size_l),
 				// Set MatRow to correct position. Does nothing for others.
-				advance(std::get<CI>(buffers), offset)...,
+				cluster::advance(std::get<CI>(buffers), offset)...,
 				args...);
 		#pragma omp parallel for reduction(mapred:res)
 		for(size_t i = 1; i < count; ++i)
@@ -119,7 +120,7 @@ struct map_reduce
 						MapFunc::OMP,
 						make_index(defaultDim{}, offset +i, size_j, size_k, size_l),
 						// Set MatRow to correct position. Does nothing for others.
-						advance(std::get<CI>(buffers), i)...,
+						cluster::advance(std::get<CI>(buffers), i)...,
 						args...));
 		}
 	}

@@ -179,7 +179,7 @@ TEST_CASE("Move assignment")
 	CHECK(n(0,2) == 5);
 }
 
-TEST_CASE("Swapping two vectors")
+TEST_CASE("Swapping two Matrices")
 {
 	skepu::Matrix<int> m{1,2,3,4};
 	skepu::Matrix<int> u{2,2,5,7,11,13};

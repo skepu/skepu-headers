@@ -265,7 +265,7 @@ public:
 		auto cpy_i = std::min(i, m_partition.size_i());
 		auto cpy_j = std::min(j, m_partition.size_j());
 		auto cpy_k = std::min(k, m_partition.size_k());
-		
+
 		for(size_t ii(0); ii < cpy_i; ++ii)
 		{
 			for(size_t ij(0); ij < cpy_j; ++ij)
