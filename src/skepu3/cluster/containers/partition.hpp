@@ -190,13 +190,6 @@ public:
 
 		if(m_capacity)
 		{
-			/* Waiting for tasks.
-			 * We don't need to wait for all tasks, only those who are working on
-			 * the handle that we own. Once those tasks are complete, it should be
-			 * quite safe to allocate local storage.
-			 */
-			//starpu_data_acquire(m_handles[cluster::mpi_rank()], STARPU_W);
-			//starpu_data_release(m_handles[cluster::mpi_rank()]);
 			if(!m_data)
 				alloc_local_storage();
 
@@ -205,7 +198,7 @@ public:
 				auto part_end_idx = (m_size -1) / m_part_size;
 				starpu_data_acquire(m_data_handle, STARPU_W);
 				auto data_it = m_data;
-				for(int i(0); i < part_end_idx; ++i)
+				for(size_t i(0); i < part_end_idx; ++i)
 					data_it = gather(m_handles[i], m_part_size, data_it);
 				auto last_part_count = m_size - (part_end_idx * m_part_size);
 				gather(m_handles[part_end_idx], last_part_count, data_it);
@@ -245,11 +238,55 @@ public:
 	}
 
 	auto
-	local_storage_handle() noexcept
-	-> starpu_data_handle_t
+	gather_to_root() noexcept
+	-> void
 	{
-		m_part_valid = false;
-		return m_data_handle;
+		if(m_data_valid)
+			return;
+
+		if(m_capacity)
+		{
+			if(!m_data)
+				alloc_local_storage();
+
+			if(m_size)
+			{
+				auto rank = cluster::mpi_rank();
+				size_t end = m_size / m_part_size;
+				if(!rank)
+					starpu_data_acquire(m_data_handle, STARPU_W);
+				
+				auto data_it = m_data;
+				if(!rank)
+				{
+					starpu_data_acquire(m_handles.front(), STARPU_R);
+					size_t count = std::min(m_part_size, m_size);
+					data_it = std::copy(m_part_data, m_part_data + count, data_it);
+					starpu_data_release(m_handles.front());
+				}
+				for(size_t i(1); i < end; ++i)
+				{
+					MPI_Status recv_stat;
+					auto tag = cluster::mpi_tag();
+					if(i == rank)
+						starpu_mpi_send(m_handles[i], 0, tag, MPI_COMM_WORLD);
+					else if(!rank)
+					{
+						starpu_mpi_recv(m_handles[i], i, tag, MPI_COMM_WORLD, &recv_stat);
+						size_t count = std::min(m_part_size, m_size - (m_part_size * i));
+						starpu_data_acquire(m_handles[i], STARPU_R);
+						auto part_it = get_ptr(m_handles[i]);
+						data_it =
+							std::copy(part_it, part_it + count, data_it);
+						starpu_data_release(m_handles[i]);
+						starpu_mpi_cache_flush(MPI_COMM_WORLD, m_handles[i]);
+					}
+				}
+		
+				if(!rank)
+					starpu_data_release(m_data_handle);
+			}
+		}
 	}
 
 	auto
@@ -258,6 +295,14 @@ public:
 	{
 		m_data_valid = false;
 		return m_handles[pos/m_part_size];
+	}
+
+	auto
+	local_storage_handle() noexcept
+	-> starpu_data_handle_t
+	{
+		m_part_valid = false;
+		return m_data_handle;
 	}
 
 	auto
@@ -290,6 +335,55 @@ public:
 		}
 
 		m_part_valid = true;
+	}
+
+	auto
+	scatter_from_root() noexcept
+	-> void
+	{
+		if(m_data_valid)
+			return;
+
+		if(m_size && m_data)
+		{
+			auto rank = cluster::mpi_rank();
+			auto end = m_size / m_part_size;
+			auto data_it = m_data;
+
+			if(!rank)
+			{
+				starpu_data_acquire(m_data_handle, STARPU_R);
+				starpu_data_acquire(m_handles.front(), STARPU_W);
+				auto count = std::min(m_part_size, m_size);
+				std::copy(data_it, data_it + count, m_part_data);
+				starpu_data_release(m_handles.front());
+				data_it += count;
+			}
+			for(size_t i(1); i < end; ++i)
+			{
+				auto tag = cluster::mpi_tag();
+				MPI_Status status;
+				starpu_data_acquire(m_handles[i], STARPU_W);
+				auto count = std::min(m_part_size, m_size - (i * m_part_size));
+				auto out_it = get_ptr(m_handles[i]);
+				std::copy(data_it, data_it + count, out_it);
+				starpu_data_release(m_handles[i]);
+				data_it += count;
+
+				if(i == rank)
+					starpu_mpi_recv(m_handles[i], 0, tag, MPI_COMM_WORLD, &status);
+				else if(!rank)
+					starpu_mpi_send(m_handles[i], i, tag, MPI_COMM_WORLD);
+
+				starpu_mpi_cache_flush(MPI_COMM_WORLD, m_handles[i]);
+			}
+
+			if(!rank)
+				starpu_data_release(m_data_handle);
+		}
+
+		m_part_valid = true;
+		m_data_valid = false;
 	}
 
 	template<typename U,
@@ -361,7 +455,7 @@ private:
 		{
 			//starpu_data_acquire(m_data_handle, STARPU_W);
 			//starpu_data_release(m_data_handle);
-			starpu_data_unregister(m_data_handle);
+			starpu_data_unregister_no_coherency(m_data_handle);
 			delete[] m_data;
 			m_data = 0;
 		}

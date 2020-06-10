@@ -329,6 +329,20 @@ struct cont
 			is_skepu_tensor3<typename std::remove_cv<typename std::remove_reference<T>::type>::type>::value ||
 			is_skepu_tensor4<typename std::remove_cv<typename std::remove_reference<T>::type>::type>::value> {};
 
+	/** Check that all types in a parameter pack are SkePU containers. */
+	template<typename ...> struct are_skepu_containers;
+
+	/* Empty pack is true. */
+	template<> struct are_skepu_containers<> : public std::true_type {};
+
+	/* Check that first is a SkePU container and recurse the rest. */
+	template<typename CAR, typename ... CDR>
+	struct are_skepu_containers<CAR, CDR...>
+	: std::integral_constant<bool,
+			is_skepu_container<CAR>::value
+			&& are_skepu_containers<CDR...>::value>
+	{};
+
 	template<typename T>
 	struct is_skepu_vector_proxy: std::false_type {};
 

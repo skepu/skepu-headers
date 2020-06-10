@@ -22,6 +22,7 @@
 #ifdef SKEPU_MPI_STARPU
 
 #include "skepu3/cluster/cluster.hpp"
+#include "skepu3/cluster/external.hpp"
 #include "skepu3/cluster/containers/matrix/matrix.hpp"
 #include "skepu3/cluster/containers/vector/vector.hpp"
 #include "skepu3/cluster/containers/tensor3/tensor3.hpp"
@@ -35,6 +36,7 @@
 #include "skepu3/impl/backend.hpp"
 #include "skepu3/backend/helper_methods.h"
 #include "skepu3/impl/common.hpp"
+#include "skepu3/impl/external.hpp"
 #include "skepu3/impl/timer.hpp"
 #include "skepu3/backend/tuner.h"
 #include "skepu3/backend/hybrid_tuner.h"

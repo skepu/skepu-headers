@@ -381,9 +381,21 @@ namespace skepu
 			is_skepu_matrix<typename std::remove_cv<typename std::remove_reference<T>::type>::type>::value ||
 			is_skepu_tensor3<typename std::remove_cv<typename std::remove_reference<T>::type>::type>::value ||
 			is_skepu_tensor4<typename std::remove_cv<typename std::remove_reference<T>::type>::type>::value> {};
-		
-		
-		
+
+	/** Check that all parameters in a pack are SkePU containers. */
+	template<typename ...> struct are_skepu_containers;
+
+	/* The empty pack is true. */
+	template<> struct are_skepu_containers<> : std::true_type {};
+
+	/* Check that first in pack is container and recurse the rest. */
+	template<typename CAR, typename ... CDR>
+	struct are_skepu_containers<CAR, CDR...>
+	: std::integral_constant<bool,
+			is_skepu_container<CAR>::value
+			&& are_skepu_containers<CDR...>::value>
+	{};
+
 	template<typename T>
 	struct is_skepu_vector_proxy: std::false_type {};
 	

@@ -69,10 +69,12 @@ public:
 	using base::capacity;
 	using base::data;
 	using base::fill;
+	using base::gather_to_root;
 	using base::local_storage_handle;
 	using base::handle_for;
 	using base::partition;
 	using base::randomize;
+	using base::scatter_from_root;
 	using base::set;
 	using base::size;
 
@@ -91,7 +93,7 @@ private:
 		starpu_mpi_data_register(
 			base::m_data_handle,
 			cluster::mpi_tag(),
-			STARPU_MAIN_RAM);
+			0);
 	}
 
 	auto

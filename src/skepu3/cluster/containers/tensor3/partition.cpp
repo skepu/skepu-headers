@@ -107,9 +107,11 @@ public:
 	using base::capacity;
 	using base::data;
 	using base::fill;
+	using base::gather_to_root;
 	using base::local_storage_handle;
 	using base::handle_for;
 	using base::partition;
+	using base::scatter_from_root;
 	using base::set;
 	using base::size;
 
@@ -180,7 +182,7 @@ private:
 		{
 			auto ranks = skepu::cluster::mpi_size();
 			m_part_i = m_size_i / ranks;
-			if(base::m_size - (m_part_i * ranks))
+			if(m_size_i - (m_part_i * ranks))
 				++m_part_i;
 			base::m_part_size = m_part_i * m_size_j * m_size_k;
 			base::m_capacity = base::m_part_size * ranks;

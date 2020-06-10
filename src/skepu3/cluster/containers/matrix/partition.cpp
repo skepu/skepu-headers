@@ -155,10 +155,12 @@ public:
 	using base::capacity;
 	using base::data;
 	using base::fill;
+	using base::gather_to_root;
 	using base::local_storage_handle;
 	using base::handle_for;
 	using base::partition;
 	using base::randomize;
+	using base::scatter_from_root;
 	using base::size;
 
 private:

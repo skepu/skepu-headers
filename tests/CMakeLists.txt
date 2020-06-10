@@ -22,6 +22,8 @@ endmacro()
 ####################
 # Add tests below. #
 ####################
+# Utilities
+add_subdirectory(external)
 
 # Containers
 add_subdirectory(matrix)
