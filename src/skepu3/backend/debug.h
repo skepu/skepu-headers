@@ -6,7 +6,7 @@
 #define DEBUG_H
 
 #include <assert.h>
-
+#include <sstream>
 
 #ifndef SKEPU_DEBUG
 #define SKEPU_DEBUG 0
@@ -57,7 +57,7 @@
 #endif // SKEPU_ASSERT
 
 #ifdef SKEPU_ENABLE_EXCEPTIONS
-#define SKEPU_ERROR(text) { std::cerr << "[SKEPU_ERROR " << __FILE__ << ":" << __LINE__ << "] " << text << "\n"; throw(text); }
+#define SKEPU_ERROR(text) { std::cerr << "[SKEPU_ERROR " << __FILE__ << ":" << __LINE__ << "] " << text << "\n"; std::stringstream msg; msg << text; throw(msg.str()); }
 #else
 #define SKEPU_ERROR(text) { std::cerr << "[SKEPU_ERROR " << __FILE__ << ":" << __LINE__ << "] " << text << "\n"; exit(0); }
 #endif // SKEPU_ENABLE_EXCEPTIONS
