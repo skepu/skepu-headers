@@ -305,7 +305,7 @@ namespace skepu
 		
 		// OpenMP parameters
 #ifdef SKEPU_OPENMP
-		size_t m_CPUThreads {(size_t)omp_get_num_procs()};
+		size_t m_CPUThreads {(size_t)omp_get_max_threads()};
 #else
 		size_t m_CPUThreads {defaultCPUThreads};
 #endif
