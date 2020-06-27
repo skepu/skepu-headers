@@ -104,18 +104,22 @@ namespace skepu
 			void backendDispatch(pack_indices<VEI...> vei, pack_indices<HEI...> hei, pack_indices<AI...> ai, pack_indices<CI...> ci, size_t size, Result &&res, CallArgs&&... args)
 			{
 			//	assert(this->m_execPlan != NULL && this->m_execPlan->isCalibrated());
-			
-				size_t Vsize = get_noref<0>(get_noref<VEI>(args...).size()..., this->default_size_j);
-				size_t Hsize = get_noref<0>(get_noref<HEI>(args...).size()..., this->default_size_i);
-				
+
+				size_t Vsize = get_noref<0>(get_noref<VEI>(args...).size()..., this->default_size_i);
+				size_t Hsize = get_noref<0>(get_noref<HEI>(args...).size()..., this->default_size_j);
+
 				if (disjunction((get<VEI, CallArgs...>(args...).size() < Vsize)...))
-					SKEPU_ERROR("Non-matching container sizes");
-			
+					SKEPU_ERROR("Non-matching input container sizes");
+
 				if (disjunction((get<HEI, CallArgs...>(args...).size() < Hsize)...))
-					SKEPU_ERROR("Non-matching container sizes");
-				
+					SKEPU_ERROR("Non-matching input container sizes");
+
+				if ((this->m_mode == ReduceMode::ColWise && res.size() < Hsize) ||
+					  (this->m_mode == ReduceMode::RowWise && res.size() < Vsize))
+					SKEPU_ERROR("Non-matching output container size");
+
 				this->selectBackend(Vsize + Hsize);
-				
+
 				switch (this->m_selected_spec->activateBackend())
 				{
 				case Backend::Type::Hybrid:
