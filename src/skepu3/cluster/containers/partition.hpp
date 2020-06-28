@@ -26,6 +26,8 @@ protected:
 	starpu_data_handle_t m_data_handle;
 	std::vector<starpu_data_handle_t> m_handles;
 
+	bool m_external;
+
 	partition_base() noexcept
 	: m_data(0),
 		m_part_data(0),
@@ -35,7 +37,8 @@ protected:
 		m_part_size(0),
 		m_capacity(0),
 		m_data_handle(0),
-		m_handles(cluster::mpi_size(), 0)
+		m_handles(cluster::mpi_size(), 0),
+		m_external(false)
 	{}
 
 	partition_base(partition_base && other) noexcept
@@ -47,7 +50,8 @@ protected:
 		m_part_size(std::move(other.m_part_size)),
 		m_capacity(std::move(other.m_capacity)),
 		m_data_handle(std::move(other.m_data_handle)),
-		m_handles(std::move(other.m_handles))
+		m_handles(std::move(other.m_handles)),
+		m_external(false)
 	{
 		other.m_data = 0;
 		other.m_part_data = 0;
@@ -306,6 +310,15 @@ public:
 	}
 
 	auto
+	make_ext_w() noexcept
+	-> void
+	{
+		m_external = true;
+		if(m_size)
+			alloc_local_storage();
+	}
+
+	auto
 	partition() noexcept
 	-> void
 	{
@@ -341,13 +354,11 @@ public:
 	scatter_from_root() noexcept
 	-> void
 	{
-		if(m_data_valid)
-			return;
+		update_sizes();
 
 		if(m_size && m_data)
 		{
 			auto rank = cluster::mpi_rank();
-			auto end = m_size / m_part_size;
 			auto data_it = m_data;
 
 			if(!rank)
@@ -359,7 +370,7 @@ public:
 				starpu_data_release(m_handles.front());
 				data_it += count;
 			}
-			for(size_t i(1); i < end; ++i)
+			for(size_t i(1); i < cluster::mpi_size(); ++i)
 			{
 				auto tag = cluster::mpi_tag();
 				MPI_Status status;
@@ -382,6 +393,7 @@ public:
 				starpu_data_release(m_data_handle);
 		}
 
+		m_external = false;
 		m_part_valid = true;
 		m_data_valid = false;
 	}
@@ -446,6 +458,7 @@ private:
 	virtual auto alloc_local_storage() noexcept -> void = 0;
 	virtual auto alloc_partitions() noexcept -> void = 0;
 	virtual auto get_ptr(starpu_data_handle_t & handle) noexcept -> T * = 0;
+	virtual auto update_sizes() noexcept -> void = 0;
 
 	auto
 	dealloc_local_storage()
@@ -453,8 +466,6 @@ private:
 	{
 		if(m_data)
 		{
-			//starpu_data_acquire(m_data_handle, STARPU_W);
-			//starpu_data_release(m_data_handle);
 			starpu_data_unregister_no_coherency(m_data_handle);
 			delete[] m_data;
 			m_data = 0;
@@ -469,8 +480,6 @@ private:
 		{
 			for(auto & handle : m_handles)
 			{
-				//starpu_data_acquire(handle, STARPU_W);
-				//starpu_data_release(handle);
 				starpu_data_unregister_no_coherency(handle);
 			}
 			delete[] m_part_data;

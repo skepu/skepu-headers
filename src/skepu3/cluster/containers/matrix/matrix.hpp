@@ -35,17 +35,15 @@ public:
 	Matrix(Matrix && other) noexcept : m_data(std::move(other.m_data)) {}
 
 	Matrix(size_type rows, size_type cols) noexcept
-	: m_data(rows, cols)
 	{
-		if(m_data.size())
-			m_data.fill(m_data.size(), T());
+		if(rows && cols)
+			init(rows, cols, T());
 	}
 
 	Matrix(size_type rows, size_type cols, const_reference val) noexcept
-	: m_data(rows, cols)
 	{
-		if(m_data.size())
-			m_data.fill(m_data.size(), val);
+		if(rows && cols)
+			init(rows, cols, val);
 	}
 
 	Matrix(std::initializer_list<T> const & l)
@@ -67,6 +65,37 @@ public:
 	*/
 
 	~Matrix() noexcept = default;
+
+	auto
+	init(size_type rows, size_type cols) noexcept
+	-> void
+	{
+		init(rows, cols, T());
+	}
+
+	auto
+	init(size_type rows, size_type cols, const_reference val) noexcept
+	-> void
+	{
+		auto size = rows * cols;
+		if(m_data.size())
+		{
+			if(!cluster::mpi_rank())
+				std::cerr << "[SkePU][Vector] Error: "
+					"Can only be initialized once!\n";
+			std::abort();
+		}
+		if(!(size))
+		{
+			if(!cluster::mpi_rank())
+				std::cerr << "[SkePU][Vector] Error: "
+					"Can not initialize without size\n";
+			std::abort();
+		}
+
+		m_data.init(rows, cols);
+		m_data.fill(size, val);
+	}
 
 	auto
 	getAddress() noexcept

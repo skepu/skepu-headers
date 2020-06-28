@@ -21,11 +21,9 @@ public:
 	{}
 
 	matrix_partition(size_t rows, size_t cols) noexcept
-	: base(), m_rows(rows), m_cols(cols), m_part_rows(0)
+	: base(), m_part_rows(0)
 	{
-		set_sizes();
-		if(base::m_size)
-			alloc_partitions();
+		init(rows, cols);
 	}
 
 	matrix_partition(matrix_partition const & other) noexcept
@@ -50,6 +48,20 @@ public:
 	{}
 
 	~matrix_partition() noexcept = default;
+
+	auto
+	init(size_t rows, size_t cols) noexcept
+	-> void
+	{
+		m_rows = rows;
+		m_cols = cols;
+
+		set_sizes();
+		if(base::m_size)
+			alloc_partitions();
+		if(base::m_external)
+			alloc_local_storage();
+	}
 
 	auto
 	operator=(matrix_partition const & other) noexcept
@@ -158,6 +170,7 @@ public:
 	using base::gather_to_root;
 	using base::local_storage_handle;
 	using base::handle_for;
+	using base::make_ext_w;
 	using base::partition;
 	using base::randomize;
 	using base::scatter_from_root;
@@ -168,6 +181,9 @@ private:
 	alloc_local_storage() noexcept
 	-> void override
 	{
+		if(base::m_data)
+			return;
+
 		base::m_data = new T[base::m_size];
 		starpu_matrix_data_register(
 			&(base::m_data_handle),
@@ -217,6 +233,26 @@ private:
 	-> T * override
 	{
 		return (T *)starpu_matrix_get_local_ptr(handle);
+	}
+
+	auto
+	update_sizes() noexcept
+	-> void override
+	{
+		size_t rows{m_rows};
+		size_t cols{m_cols};
+		MPI_Bcast(&rows, sizeof(size_t), MPI_CHAR, 0, MPI_COMM_WORLD);
+		MPI_Bcast(&cols, sizeof(size_t), MPI_CHAR, 0, MPI_COMM_WORLD);
+
+		if(rows != m_rows || cols != m_cols)
+		{
+			m_rows = rows;
+			m_cols = cols;
+			set_sizes();
+
+			alloc_partitions();
+			alloc_local_storage();
+		}
 	}
 
 	auto

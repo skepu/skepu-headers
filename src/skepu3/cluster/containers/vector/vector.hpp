@@ -54,29 +54,66 @@ public:
 	}
 
 	Vector(size_type count) noexcept
-	: m_data(count)
 	{
 		if(count)
-			m_data.fill(count, T());
+			init(count, T());
 	}
 
 	Vector(size_type count, const_reference val) noexcept
-	: m_data(count)
 	{
 		if(count)
-			m_data.fill(count, val);
+			init(count, val);
 	}
 
 	Vector(pointer p, size_type count, bool deallocEnabled)
-	: m_data(count)
 	{
-		m_data.set(p, p + count);
+		// TODO: p shoudl realy live as long as the container lives.
+		init(p, count);
 		if(deallocEnabled)
 			delete[] p;
 	}
 
 	~Vector() noexcept
 	{}
+
+	auto
+	init(size_type count) noexcept
+	-> void
+	{
+		init(count, T());
+	}
+
+	auto
+	init(size_type count, const_reference val) noexcept
+	-> void
+	{
+		if(m_data.size())
+		{
+			if(!cluster::mpi_rank())
+				std::cerr << "[SkePU][Vector] Error: "
+					"Can only be initialized once!\n";
+			std::abort();
+		}
+		if(!count)
+		{
+			if(!cluster::mpi_rank())
+				std::cerr << "[SkePU][Vector] Error: "
+					"Can not initialize without size\n";
+			std::abort();
+		}
+
+		m_data.init(count);
+		m_data.fill(count, val);
+	}
+
+	auto
+	init(pointer p, size_type count) noexcept
+	-> void
+	{
+		m_data = partition_type(count);
+		m_data.set(p, p + count);
+
+	}
 
 	auto
 	operator=(Vector const & v) noexcept

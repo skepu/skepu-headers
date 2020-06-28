@@ -149,7 +149,7 @@ public:
 
 	auto inline
 	operator++(int) noexcept
-	-> MatrixIterator &
+	-> MatrixIterator
 	{
 		auto tmp = *this;
 		++m_data;
@@ -165,7 +165,7 @@ public:
 
 	auto inline
 	operator--(int) noexcept
-	-> MatrixIterator &
+	-> MatrixIterator
 	{
 		auto tmp = *this;
 		--m_data;

@@ -183,6 +183,9 @@ namespace skepu
 		Matrix(size_type _rows, size_type _cols, std::vector<T>&& vals);
 		Matrix(const Matrix<T>& copy);
 		
+		void init(size_type _rows, size_type _cols);
+		void init(size_type _rows, size_type _cols, const T& val);
+		
 		const Matrix<T>& getParent() const
 		{
 			return *this;

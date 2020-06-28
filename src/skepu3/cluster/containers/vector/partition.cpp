@@ -13,6 +13,7 @@ template<typename T>
 class vector_partition : private partition_base<T>
 {
 	typedef partition_base<T> base;
+
 public:
 	vector_partition() noexcept
 	: base()
@@ -21,9 +22,7 @@ public:
 	vector_partition(size_t count) noexcept
 	: base()
 	{
-		set_sizes(count);
-		if(count)
-			alloc_partitions();
+		init(count);
 	}
 
 	vector_partition(vector_partition const & other) noexcept
@@ -39,11 +38,23 @@ public:
 	~vector_partition() noexcept = default;
 
 	auto
+	init(size_t count) noexcept
+	-> void
+	{
+		set_sizes(count);
+		if(count)
+			alloc_partitions();
+		if(base::m_external)
+			alloc_local_storage();
+	}
+
+	auto
 	operator=(vector_partition const & other) noexcept
 	-> vector_partition &
 	{
 		this->~vector_partition();
 		new(this) vector_partition(other);
+
 		return *this;
 	}
 
@@ -53,6 +64,7 @@ public:
 	{
 		this->~vector_partition();
 		new(this) vector_partition(std::move(other));
+
 		return *this;
 	}
 
@@ -72,6 +84,7 @@ public:
 	using base::gather_to_root;
 	using base::local_storage_handle;
 	using base::handle_for;
+	using base::make_ext_w;
 	using base::partition;
 	using base::randomize;
 	using base::scatter_from_root;
@@ -83,6 +96,9 @@ private:
 	alloc_local_storage() noexcept
 	-> void override
 	{
+		if(base::m_data || !base::m_size)
+			return;
+
 		base::m_data = new T[base::m_size];
 		starpu_vector_data_register(
 			&(base::m_data_handle),
@@ -126,6 +142,21 @@ private:
 	-> T * override
 	{
 		return (T *)starpu_vector_get_local_ptr(handle);
+	}
+
+	auto
+	update_sizes() noexcept
+	-> void override
+	{
+		size_t size = base::m_size;
+		MPI_Bcast(&size, sizeof(size_t), MPI_CHAR, 0, MPI_COMM_WORLD);
+
+		if(size != base::m_size)
+		{
+			set_sizes(size);
+			alloc_partitions();
+			alloc_local_storage();
+		}
 	}
 
 	auto

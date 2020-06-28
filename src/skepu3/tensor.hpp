@@ -72,10 +72,29 @@ namespace skepu
 		
 		friend class Tensor3Iterator<T>;
 		
-		explicit Tensor3(size_type si, size_type sj, size_type sk, const T& val = T())
-		: m_size_i(si), m_size_j(sj), m_size_k(sk),
-		Vector<T>(si * sj * sk, val)
+		explicit Tensor3()
+		: m_size_i(0), m_size_j(0), m_size_k(0), Vector<T>{}
 		{}
+			
+		explicit Tensor3(size_type si, size_type sj, size_type sk, const T& val = T())
+		: m_size_i(si), m_size_j(sj), m_size_k(sk), Vector<T>(si * sj * sk, val)
+		{}
+	
+		void init(size_type si, size_type sj, size_type sk)
+		{
+			Vector<T>::init(si * sj * sk);
+			this->m_size_i = si;
+			this->m_size_j = sj;
+			this->m_size_k = sk;
+		}
+		
+		void init(size_type si, size_type sj, size_type sk, const T& val)
+		{
+			Vector<T>::init(si * sj * sk, val);
+			this->m_size_i = si;
+			this->m_size_j = sj;
+			this->m_size_k = sk;
+		}
 		
 		iterator begin()
 		{
@@ -301,11 +320,32 @@ namespace skepu
 		
 		friend class Tensor4Iterator<T>;
 		
+		explicit Tensor4()
+		: m_size_i(0), m_size_j(0), m_size_k(0), m_size_l(0), Vector<T>()
+		{}
+		
 		explicit Tensor4(size_type si, size_type sj, size_type sk, size_type sl, const T& val = T())
 		: m_size_i(si), m_size_j(sj), m_size_k(sk), m_size_l(sl),
 		Vector<T>(si * sj * sk * sl, val)
 		{}
 		
+		void init(size_type si, size_type sj, size_type sk, size_type sl)
+		{
+			Vector<T>::init(si * sj * sk * sl);
+			this->m_size_i = si;
+			this->m_size_j = sj;
+			this->m_size_k = sk;
+			this->m_size_l = sl;
+		}
+		
+		void init(size_type si, size_type sj, size_type sk, size_type sl, const T& val)
+		{
+			Vector<T>::init(si * sj * sk * sl, val);
+			this->m_size_i = si;
+			this->m_size_j = sj;
+			this->m_size_k = sk;
+			this->m_size_l = sl;
+		}
 		
 		iterator begin()
 		{

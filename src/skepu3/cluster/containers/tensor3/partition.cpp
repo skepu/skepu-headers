@@ -29,12 +29,9 @@ public:
 	{}
 
 	tensor3_partition(size_t i, size_t j, size_t k) noexcept
-	: base(), m_size_i(i), m_size_j(j), m_size_k(k), m_size_jk(j*k)
+	: base()
 	{
-		auto count = i * j * k;
-		set_sizes();
-		if(count)
-			alloc_partitions();
+		init(i, j, k);
 	}
 
 	tensor3_partition(tensor3_partition const & other) noexcept
@@ -48,6 +45,22 @@ public:
 	{}
 
 	~tensor3_partition() noexcept = default;
+
+	auto
+	init(size_t i, size_t j, size_t k) noexcept
+	-> void
+	{
+		m_size_i = i;
+		m_size_j = j;
+		m_size_k = k;
+		m_size_jk = j*k;
+		set_sizes();
+
+		if(base::m_size)
+			alloc_partitions();
+		if(base::m_external)
+			alloc_local_storage();
+	}
 
 	auto
 	operator=(tensor3_partition const & other) noexcept
@@ -101,6 +114,27 @@ public:
 		return idx;
 	}
 
+	auto
+	size_i() const noexcept
+	-> size_t
+	{
+		return m_size_i;
+	}
+
+	auto
+	size_j() const noexcept
+	-> size_t
+	{
+		return m_size_j;
+	}
+
+	auto
+	size_k() const noexcept
+	-> size_t
+	{
+		return m_size_k;
+	}
+
 	using base::operator();
 	using base::allgather;
 	using base::block_count_from;
@@ -110,6 +144,7 @@ public:
 	using base::gather_to_root;
 	using base::local_storage_handle;
 	using base::handle_for;
+	using base::make_ext_w;
 	using base::partition;
 	using base::scatter_from_root;
 	using base::set;
@@ -120,6 +155,9 @@ private:
 	alloc_local_storage() noexcept
 	-> void override
 	{
+		if(base::m_data)
+			return;
+
 		base::m_data = new T[base::m_size];
 		starpu_block_data_register(
 			&(base::m_data_handle),
@@ -171,6 +209,29 @@ private:
 	-> T * override
 	{
 		return (T *)starpu_block_get_local_ptr(handle);
+	}
+
+	auto
+	update_sizes() noexcept
+	-> void override
+	{
+		size_t i{m_size_i};
+		size_t j{m_size_j};
+		size_t k{m_size_k};
+		MPI_Bcast(&i, sizeof(size_t), MPI_CHAR, 0, MPI_COMM_WORLD);
+		MPI_Bcast(&j, sizeof(size_t), MPI_CHAR, 0, MPI_COMM_WORLD);
+		MPI_Bcast(&k, sizeof(size_t), MPI_CHAR, 0, MPI_COMM_WORLD);
+
+		if(i != m_size_i || j != m_size_j || k != m_size_k)
+		{
+			m_size_i = i;
+			m_size_j = j;
+			m_size_k = k;
+			set_sizes();
+
+			alloc_partitions();
+			alloc_local_storage();
+		}
 	}
 
 	auto

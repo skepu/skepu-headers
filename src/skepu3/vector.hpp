@@ -136,6 +136,9 @@ namespace skepu
 		
 		~Vector();
 		
+		void init(size_type size);
+		void init(size_type size, const T& val);
+		
 	public: //-- Member classes --//
 		
 		class proxy_elem;
@@ -255,9 +258,9 @@ namespace skepu
 		}
 		
 	protected: //-- Data --//
-		T *m_data;
+		T *m_data = nullptr;
 		mutable bool m_valid; /*! to keep track of whether the main copy is valid or not */
-		size_type m_size;
+		size_type m_size = 0;
 		bool m_deallocEnabled;
 		mutable bool m_noValidDeviceCopy;
 

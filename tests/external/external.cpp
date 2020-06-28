@@ -41,7 +41,11 @@ TEST_CASE("One container is flushed")
 	container_stub c{false};
 
 	REQUIRE_FALSE(c.flushed);
-	REQUIRE_NOTHROW(skepu::external(c, [&]{}));
+	REQUIRE_NOTHROW(
+		skepu::external(
+			skepu::read(c),
+			[&]{}
+	));
 	CHECK(c.flushed);
 }
 
@@ -52,7 +56,28 @@ TEST_CASE("Two containers are flushed")
 
 	REQUIRE_FALSE(c1.flushed);
 	REQUIRE_FALSE(c2.flushed);
-	REQUIRE_NOTHROW(skepu::external(c1, c2, [&]{}));
+	REQUIRE_NOTHROW(
+		skepu::external(
+			skepu::read(c1, c2),
+			[&]{}
+	));
 	CHECK(c1.flushed);
 	CHECK(c2.flushed);
+}
+
+TEST_CASE("Write only containers are not flushed")
+{
+	container_stub c1{false};
+	container_stub c2{false};
+
+	REQUIRE_FALSE(c1.flushed);
+	REQUIRE_FALSE(c2.flushed);
+	REQUIRE_NOTHROW(
+		skepu::external(
+			[&]{},
+			skepu::write(c1, c2)
+	));
+
+	CHECK_FALSE(c1.flushed);
+	CHECK_FALSE(c2.flushed);
 }

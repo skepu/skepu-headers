@@ -152,7 +152,7 @@ public:
 
 	auto
 	operator++(int) noexcept
-	-> Iterator &
+	-> Iterator
 	{
 		auto tmp = *this;
 		++m_data;
@@ -168,7 +168,7 @@ public:
 
 	auto
 	operator--(int) noexcept
-	-> Iterator &
+	-> Iterator
 	{
 		auto tmp = *this;
 		--m_data;

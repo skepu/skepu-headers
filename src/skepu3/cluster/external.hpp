@@ -6,60 +6,140 @@
 #include "common.hpp"
 
 namespace skepu {
-namespace {
+namespace label {
+
+struct read {};
+struct write {};
+
+} // namespace label
+
+template<
+	typename ... Containers,
+	REQUIRES_VALUE(are_skepu_containers<Containers...>)>
+auto inline constexpr
+read(Containers && ... cs) noexcept
+-> std::tuple<label::read, Containers...>
+{
+	return std::tuple<label::read, Containers...>(label::read{}, cs...);
+}
+
+template<
+	typename ... Containers,
+	REQUIRES_VALUE(are_skepu_containers<Containers...>)>
+auto inline constexpr
+write(
+	Containers && ... cs) noexcept
+-> std::tuple<label::write, Containers...>
+{
+	return std::tuple<label::write, Containers...>(label::write{}, cs...);
+}
 
 template<
 	size_t ... CI,
-	typename OP,
-	typename ... Containers,
-	REQUIRES_VALUE(are_skepu_containers<Containers...>)>
+	typename ... Containers>
 auto inline
-external_impl(
+gather_to_root(
 	pack_indices<CI...>,
-	OP && op,
-	Containers && ... args) noexcept
+	std::tuple<Containers...> & cs) noexcept
 -> void
 {
-	pack_expand((cont::getParent(get<CI>(args...)).gather_to_root(),0)...);
+	pack_expand((cont::getParent(std::get<CI>(cs)).gather_to_root(),0)...);
+}
+
+template<
+	size_t ... CI,
+	typename ... Containers>
+auto inline
+make_writeable(
+	pack_indices<CI...>,
+	std::tuple<Containers...> & cs) noexcept
+-> void
+{
+	pack_expand((cont::getParent(std::get<CI>(cs)).make_ext_w(),0)...);
+}
+
+template<
+	size_t ... CI,
+	typename ... Containers>
+auto inline
+scatter_from_root(
+	pack_indices<CI...>,
+	std::tuple<Containers...> & cs)
+-> void
+{
+	pack_expand((cont::getParent(std::get<CI>(cs)).scatter_from_root(),0)...);
+}
+
+template<typename OP>
+auto inline
+external(OP && op) noexcept(noexcept(op))
+-> void
+{
+	if(!cluster::mpi_rank())
+		op();
+}
+
+template<
+	typename ... ContR,
+	typename OP>
+auto inline
+external(
+	std::tuple<label::read, ContR...> cr,
+	OP && op) noexcept(noexcept(op))
+-> void
+{
+	auto static constexpr read_indices =
+		typename make_pack_indices<sizeof...(ContR) +1, 1>::type{};
+
+	gather_to_root(read_indices, cr);
+
+	if(!cluster::mpi_rank())
+		op();
+}
+
+template<
+	typename OP,
+	typename ... ContW>
+auto inline
+external(
+	OP && op,
+	std::tuple<label::write, ContW...> cw) noexcept(noexcept(op))
+-> void
+{
+	auto static constexpr write_indices =
+		typename make_pack_indices<sizeof...(ContW) +1, 1>::type{};
+
+	make_writeable(write_indices, cw);
 
 	if(!cluster::mpi_rank())
 		op();
 
-	pack_expand((cont::getParent(get<CI>(args...)).scatter_from_root(),0)...);
+	scatter_from_root(write_indices, cw);
 }
 
 template<
-	size_t ... CI,
+	typename ... ContR,
 	typename OP,
-	typename ... Args>
+	typename ... ContW>
 auto inline
-external_fwd(
-	pack_indices<CI...> ci,
+external(
+	std::tuple<label::read, ContR...> cr,
 	OP && op,
-	Args && ... args) noexcept
+	std::tuple<label::write, ContW...> cw) noexcept(noexcept(op))
 -> void
 {
-	external_impl(
-		ci,
-		op,
-		std::forward<decltype(get<CI>(args...))>(get<CI>(args...))...);
-}
+	auto static constexpr read_indices =
+		typename make_pack_indices<sizeof...(ContR) +1, 1>::type{};
+	auto static constexpr write_indices =
+		typename make_pack_indices<sizeof...(ContW) +1, 1>::type{};
 
-} // unnamed namespace
+	gather_to_root(read_indices, cr);
+	make_writeable(write_indices, cw);
 
-template<typename ... Args>
-auto inline
-external(Args && ... args) noexcept
--> void
-{
-	size_t static constexpr last_index = sizeof...(Args) -1;
-	auto static constexpr container_indices =
-		typename make_pack_indices<last_index>::type{};
+	if(!cluster::mpi_rank())
+		op();
 
-	external_fwd(
-		container_indices,
-		get<last_index, Args...>(args...),
-		std::forward<Args>(args)...);
+	scatter_from_root(write_indices, cw);
 }
 
 } // namespace skepu

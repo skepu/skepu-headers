@@ -167,7 +167,7 @@ Matrix<T>::Matrix(typename Matrix<T>::size_type _rows, typename Matrix<T>::size_
  */
 template<typename T>
 Matrix<T>::Matrix(typename Matrix<T>::size_type _rows, typename Matrix<T>::size_type _cols, const T& val)
-: m_rows(_rows), m_cols(_cols),m_data(m_rows * m_cols, val), m_dataChanged(false), m_transpose_matrix(0), m_noValidDeviceCopy(true), m_valid(true)
+: m_rows(_rows), m_cols(_cols), m_data(m_rows * m_cols, val), m_dataChanged(false), m_transpose_matrix(0), m_noValidDeviceCopy(true), m_valid(true)
 {
 #ifdef SKEPU_OPENCL
    m_transposeKernels_CL = &(backend::Environment<T>::getInstance()->m_transposeKernels_CL);
@@ -242,6 +242,36 @@ Matrix<T>::Matrix(const Matrix<T>& copy): m_noValidDeviceCopy(true), m_valid(tru
 #ifdef SKEPU_OPENCL
    this->m_transposeKernels_CL = copy.m_transposeKernels_CL;
 #endif
+}
+
+// Initializers
+
+template<typename T>
+void Matrix<T>::init(size_type _rows, size_type _cols)
+{
+  if (!this->m_data.size())
+  {
+    if (_rows * _cols < 1)
+      SKEPU_ERROR("The container size must be positive.");
+    this->m_rows = _rows;
+    this->m_cols = _cols;
+    this->m_data = std::vector<T>(this->m_rows * this->m_cols, T{});
+  }
+  else SKEPU_ERROR("Container is already initialized");
+}
+
+template<typename T>
+void Matrix<T>::init(size_type _rows, size_type _cols, const T& val)
+{
+  if (!this->m_data.size())
+  {
+    if (_rows * _cols < 1)
+      SKEPU_ERROR("The container size must be positive.");
+    this->m_rows = _rows;
+    this->m_cols = _cols;
+    this->m_data = std::vector<T>(this->m_rows * this->m_cols, val);
+  }
+  else SKEPU_ERROR("Container is already initialized");
 }
 
 

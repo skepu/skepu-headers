@@ -44,19 +44,51 @@ public:
 	: m_partition(std::move(other))
 	{}
 
-	~Tensor3() noexcept = default;
-
 	explicit
 	Tensor3(size_type i, size_type j, size_type k)
-	: Tensor3(i, j, k, T())
-	{}
+	{
+		if(i && j && k)
+			init(i, j, k, T());
+	}
 
 	explicit
 	Tensor3(size_type i, size_type j, size_type k, const_reference val)
-	: m_partition(i,j,k)
 	{
+		if(i && j && k)
+			init(i, j, k, val);
+	}
+
+	~Tensor3() noexcept = default;
+
+	auto
+	init(size_type i, size_type j, size_type k) noexcept
+	-> void
+	{
+		init(i, j, k, T());
+	}
+
+	auto
+	init(size_type i, size_type j, size_type k, const_reference val) noexcept
+	-> void
+	{
+		auto size = i * j * k;
 		if(m_partition.size())
-			m_partition.fill(m_partition.size(), val);
+		{
+			if(!cluster::mpi_rank())
+				std::cerr << "[SkePU][Vector] Error: "
+					"Can only be initialized once!\n";
+			std::abort();
+		}
+		if(!(size))
+		{
+			if(!cluster::mpi_rank())
+				std::cerr << "[SkePU][Vector] Error: "
+					"Can not initialize without size\n";
+			std::abort();
+		}
+
+		m_partition.init(i, j, k);
+		m_partition.fill(m_partition.size(), val);
 	}
 
 	auto

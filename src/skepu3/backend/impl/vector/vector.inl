@@ -114,10 +114,9 @@ namespace skepu
 	{
 		if (m_size < 1)
 			SKEPU_ERROR("The vector size should be positive.");
-		
-		backend::allocateHostMemory<T>(m_data, m_size);
+		this->init(this->m_size);
 		c.updateHost();
-		std::copy(c.m_data, c.m_data + m_size, m_data);
+		std::copy(c.m_data, c.m_data + this->m_size, this->m_data);
 	}
 	
 	
@@ -136,11 +135,11 @@ namespace skepu
 	template <typename T>
 	inline Vector<T>::Vector(std::initializer_list<T> l): m_size(l.size()), m_deallocEnabled(true), m_valid(true), m_noValidDeviceCopy(true)
 	{
-		backend::allocateHostMemory<T>(m_data, m_size);
+		this->init(this->m_size);
 		
 		int i = 0;
 		for (const T& elem : l)
-			m_data[i++] = elem;
+			this->m_data[i++] = elem;
 	}
 	
 	
@@ -151,8 +150,8 @@ namespace skepu
 	template <typename T>
 	inline Vector<T>::Vector(T * const ptr, size_type size, bool deallocEnabled): m_size (size), m_deallocEnabled(deallocEnabled), m_valid(true), m_noValidDeviceCopy(true)
 	{
-		if (m_size < 1)
-			SKEPU_ERROR("The vector size should be positive.");
+		if (this->m_size < 1)
+			SKEPU_ERROR("The vector size must be positive.");
 		
 		if (!ptr)
 		{
@@ -160,7 +159,7 @@ namespace skepu
 			return;
 		}
 		
-		m_data = ptr;
+		this->m_data = ptr;
 	}
 	
 	
@@ -170,12 +169,30 @@ namespace skepu
 	template <typename T>
 	inline Vector<T>::Vector(size_type num, const T& val): m_size(num), m_deallocEnabled(true), m_valid(true), m_noValidDeviceCopy(true)
 	{
-	//	if (m_size < 1)
-		//	SKEPU_ERROR("The vector size should be positive.");
-		
-		backend::allocateHostMemory<T>(m_data, m_size);
-		
-		std::fill(m_data, m_data + m_size, val);
+		this->init(num, val);
+	}
+
+
+	// Init
+	
+	template <typename T>
+	void Vector<T>::init(size_type size)
+	{
+		if (!this->m_data)
+		{
+			if (size < 1)
+				SKEPU_ERROR("The container size must be positive.");
+			this->m_size = size;
+			backend::allocateHostMemory<T>(this->m_data, this->m_size);
+		}
+		else SKEPU_ERROR("Container is already initialized");
+	}
+	
+	template <typename T>
+	void Vector<T>::init(size_type size, const T& val)
+	{
+		this->init(size);
+		std::fill(this->m_data, this->m_data + m_size, val);
 	}
 	
 ///////////////////////////////////////////////
