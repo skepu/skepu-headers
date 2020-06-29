@@ -133,7 +133,7 @@ namespace skepu
 		
 		using Callback = std::function<void(TimeSpan duration)>;
 		
-		void nullCallbackFn(TimeSpan duration) {}
+		inline void nullCallbackFn(TimeSpan duration) {}
 		
 		template<typename BF>
 		inline std::vector<TimeSpan> measureForEachBackend(size_t repeats, size_t size, std::vector<BackendSpec> backends, BF f, Callback callback = nullCallbackFn)

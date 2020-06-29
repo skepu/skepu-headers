@@ -347,12 +347,12 @@ namespace skepu
 	static const BackendSpec m_defaultGlobalBackendSpec{};
 	static BackendSpec m_globalBackendSpec = m_defaultGlobalBackendSpec;
 	
-	void setGlobalBackendSpec(BackendSpec &spec)
+	inline void setGlobalBackendSpec(BackendSpec &spec)
 	{
 		m_globalBackendSpec = spec;
 	}
 	
-	void restoreDefaultGlobalBackendSpec()
+	inline void restoreDefaultGlobalBackendSpec()
 	{
 		m_globalBackendSpec = m_defaultGlobalBackendSpec;
 	}

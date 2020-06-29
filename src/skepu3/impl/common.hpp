@@ -51,17 +51,17 @@ namespace skepu
 		struct MatRow {};
 	};
 	
-	Index1D make_index(std::integral_constant<int, 1>, size_t index, size_t, size_t, size_t)
+	inline Index1D make_index(std::integral_constant<int, 1>, size_t index, size_t, size_t, size_t)
 	{
 		return Index1D{index};
 	}
 	
-	Index2D make_index(std::integral_constant<int, 2>, size_t index, size_t size_j, size_t, size_t)
+	inline Index2D make_index(std::integral_constant<int, 2>, size_t index, size_t size_j, size_t, size_t)
 	{
 		return Index2D{ index / size_j, index % size_j };
 	}
 	
-	Index3D make_index(std::integral_constant<int, 3>, size_t index, size_t size_j, size_t size_k, size_t)
+	inline Index3D make_index(std::integral_constant<int, 3>, size_t index, size_t size_j, size_t size_k, size_t)
 	{
 		size_t ci = index / (size_j * size_k);
 		index = index % (size_j * size_k);
@@ -70,7 +70,7 @@ namespace skepu
 		return Index3D{ ci, cj, index };
 	}
 	
-	Index4D make_index(std::integral_constant<int, 4>, size_t index, size_t size_j, size_t size_k, size_t size_l)
+	inline Index4D make_index(std::integral_constant<int, 4>, size_t index, size_t size_j, size_t size_k, size_t size_l)
 	{
 		size_t ci = index / (size_j * size_k * size_l);
 		index = index % (size_j * size_k * size_l);
@@ -81,22 +81,22 @@ namespace skepu
 		return Index4D{ ci, cj, ck, index };
 	}
 	
-	std::ostream & operator<<(std::ostream &o, Index1D idx)
+	inline std::ostream & operator<<(std::ostream &o, Index1D idx)
 	{
 		return o << "Index1D(" << idx.i << ")";
 	}
 	
-	std::ostream & operator<<(std::ostream &o, Index2D idx)
+	inline std::ostream & operator<<(std::ostream &o, Index2D idx)
 	{
 		return o << "Index2D(" << idx.row << ", " << idx.col << ")";
 	}
 	
-	std::ostream & operator<<(std::ostream &o, Index3D idx)
+	inline std::ostream & operator<<(std::ostream &o, Index3D idx)
 	{
 		return o << "Index3D(" << idx.i << ", "  << idx.j << ", " << idx.k << ")";
 	}
 	
-	std::ostream & operator<<(std::ostream &o, Index4D idx)
+	inline std::ostream & operator<<(std::ostream &o, Index4D idx)
 	{
 		return o << "Index4D(" << idx.i << ", "  << idx.j << ", " << idx.k << ", " << idx.l << ")";
 	}
