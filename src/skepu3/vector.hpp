@@ -100,10 +100,11 @@ namespace skepu
 		
 		friend std::ostream& operator<< (std::ostream& output, Vector<T>& vec)
 		{
+			vec.flush();
 			output << vec.size() << ".... ";
 			for (typename Vector<T>::size_type i = 0; i < vec.size(); ++i)
 			{
-				output<<vec.at(i) <<" ";
+				output<<vec(i) <<" ";
 			}
 			return output;
 		}

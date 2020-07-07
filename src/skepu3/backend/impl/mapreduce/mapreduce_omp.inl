@@ -22,16 +22,23 @@ namespace skepu
 			pack_expand((get<AI, CallArgs...>(args...).getParent().updateHost(hasReadAccess(MapFunc::anyAccessMode[AI-arity])), 0)...);
 			pack_expand((get<AI, CallArgs...>(args...).getParent().invalidateDeviceData(hasWriteAccess(MapFunc::anyAccessMode[AI-arity])), 0)...);
 			
-			std::vector<Ret> parsums(this->m_selected_spec->CPUThreads(), this->m_start);
+			std::vector<Ret> parsums(this->m_selected_spec->CPUThreads());
+			bool first = true;
 			
 			// Perform Map and partial Reduce with OpenMP
-#pragma omp parallel for schedule(runtime)
+#pragma omp parallel for schedule(runtime) firstprivate(first)
 			for (size_t i = 0; i < size; ++i)
 			{
 				size_t myid = omp_get_thread_num();
 				auto index = (get<0, CallArgs...>(args...) + i).getIndex();
 				Temp tempMap = F::forward(MapFunc::OMP, index, get<EI, CallArgs...>(args...)(i)..., get<AI, CallArgs...>(args...).hostProxy()..., get<CI, CallArgs...>(args...)...);
-				parsums[myid] = ReduceFunc::OMP(parsums[myid], tempMap);
+				if (first) 
+				{
+					parsums[myid] = tempMap;
+					first = false;
+				}
+				else
+					parsums[myid] = ReduceFunc::OMP(parsums[myid], tempMap);
 			}
 			
 			// Final Reduce sequentially
@@ -52,16 +59,23 @@ namespace skepu
 			pack_expand((get<AI, CallArgs...>(args...).getParent().updateHost(hasReadAccess(MapFunc::anyAccessMode[AI-arity])), 0)...);
 			pack_expand((get<AI, CallArgs...>(args...).getParent().invalidateDeviceData(hasWriteAccess(MapFunc::anyAccessMode[AI-arity])), 0)...);
 			
-			std::vector<Ret> parsums(this->m_selected_spec->CPUThreads(), this->m_start);
+			std::vector<Ret> parsums(this->m_selected_spec->CPUThreads());
+			bool first = true;
 			
 			// Perform Map and partial Reduce with OpenMP
-#pragma omp parallel for schedule(runtime)
+#pragma omp parallel for schedule(runtime) firstprivate(first)
 			for (size_t i = 0; i < size; ++i)
 			{
 				size_t myid = omp_get_thread_num();
 				auto index = make_index(defaultDim{}, i, this->default_size_j, this->default_size_k, this->default_size_l);
 				Temp tempMap = F::forward(MapFunc::OMP, index, get<AI, CallArgs...>(args...).hostProxy()..., get<CI, CallArgs...>(args...)...);
-				parsums[myid] = ReduceFunc::OMP(parsums[myid], tempMap);
+				if (first) 
+				{
+					parsums[myid] = tempMap;
+					first = false;
+				}
+				else
+					parsums[myid] = ReduceFunc::OMP(parsums[myid], tempMap);
 			}
 			
 			// Final Reduce sequentially

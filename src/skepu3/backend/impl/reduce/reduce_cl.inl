@@ -212,8 +212,9 @@ namespace skepu
 			std::tie(numThreads, numBlocks) = getNumBlocksAndThreads(size, this->m_selected_spec->GPUBlocks(), this->m_selected_spec->GPUThreads());
 			
 			// Copy the elements to the device; create the output memory.
+			T partialRes;
 			DeviceMemPointer_CL<T> *inMemP = arg.getParent().updateDevice_CL(arg.getAddress(), size, device, true);
-			DeviceMemPointer_CL<T> outMemP(&res, numBlocks, device);
+			DeviceMemPointer_CL<T> outMemP(&partialRes, numBlocks, device);
 			
 			ExecuteReduceOnADevice<T>(deviceID, CLKernel::reduce, size, numThreads, numBlocks, inMemP->getDeviceDataPointer(), outMemP.getDeviceDataPointer());
 			
@@ -221,6 +222,7 @@ namespace skepu
 			outMemP.changeDeviceData();
 			outMemP.copyDeviceToHost(1);
 			
+			res = ReduceFunc::CPU(res, partialRes);
 			return res;
 		}
 		

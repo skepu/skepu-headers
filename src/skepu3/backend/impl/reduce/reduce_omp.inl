@@ -54,13 +54,20 @@ namespace skepu
 			// Make sure we are properly synched with device data
 			arg.getParent().updateHost();
 			
-			std::vector<T> parsums(omp_get_max_threads(), this->m_start);
+			std::vector<T> parsums(omp_get_max_threads());
+			bool first = true;
 			
-#pragma omp parallel for schedule(runtime)
+#pragma omp parallel for schedule(runtime) firstprivate(first)
 			for (size_t i = 0; i < size; ++i)
 			{
 				size_t myid = omp_get_thread_num();
-				parsums[myid] = ReduceFunc::OMP(parsums[myid], arg(i));
+				if (first) 
+				{
+					parsums[myid] = arg(i);
+					first = false;
+				}
+				else
+					parsums[myid] = ReduceFunc::OMP(parsums[myid], arg(i));
 			}
 			
 			for (auto& el : parsums)

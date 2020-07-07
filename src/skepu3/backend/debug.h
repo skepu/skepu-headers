@@ -18,15 +18,15 @@
 #endif
 
 #if SKEPU_TUNING_DEBUG > 1
-#define DEBUG_TUNING_LEVEL2(text) std::cerr << "[SKEPU_TUNING_L1 " << __FILE__ << ":" << __LINE__ << "] " << text << "\n";
+#define DEBUG_TUNING_LEVEL2(skepu_macro_text) std::cerr << "[SKEPU_TUNING_L1 " << __FILE__ << ":" << __LINE__ << "] " << skepu_macro_text << "\n";
 #else
-#define DEBUG_TUNING_LEVEL2(text)
+#define DEBUG_TUNING_LEVEL2(skepu_macro_text)
 #endif
 
 #if SKEPU_TUNING_DEBUG > 2
-#define DEBUG_TUNING_LEVEL3(text) std::cerr << "[SKEPU_TUNING_L2 " << __FILE__ << ":" << __LINE__ << "] " << text << "\n";
+#define DEBUG_TUNING_LEVEL3(skepu_macro_text) std::cerr << "[SKEPU_TUNING_L2 " << __FILE__ << ":" << __LINE__ << "] " << skepu_macro_text << "\n";
 #else
-#define DEBUG_TUNING_LEVEL3(text)
+#define DEBUG_TUNING_LEVEL3(skepu_macro_text)
 #endif
 
 #if SKEPU_DEBUG > 0
@@ -34,21 +34,21 @@
 #endif
 
 #if SKEPU_DEBUG > 0
-#define DEBUG_TEXT_LEVEL1(text) std::cerr << "[SKEPU_DEBUG_L1 " << __FILE__ << ":" << __LINE__ << "] " << text << "\n";
+#define DEBUG_TEXT_LEVEL1(skepu_macro_text) std::cerr << "[SKEPU_DEBUG_L1 " << __FILE__ << ":" << __LINE__ << "] " << skepu_macro_text << "\n";
 #else
-#define DEBUG_TEXT_LEVEL1(text)
+#define DEBUG_TEXT_LEVEL1(skepu_macro_text)
 #endif
 
 #if SKEPU_DEBUG > 1
-#define DEBUG_TEXT_LEVEL2(text) std::cerr << "[SKEPU_DEBUG_L2 " << __FILE__ << ":" << __LINE__ << "] " << text << "\n";
+#define DEBUG_TEXT_LEVEL2(skepu_macro_text) std::cerr << "[SKEPU_DEBUG_L2 " << __FILE__ << ":" << __LINE__ << "] " << skepu_macro_text << "\n";
 #else
-#define DEBUG_TEXT_LEVEL2(text)
+#define DEBUG_TEXT_LEVEL2(skepu_macro_text)
 #endif
 
 #if SKEPU_DEBUG > 2
-#define DEBUG_TEXT_LEVEL3(text) std::cerr << "[SKEPU_DEBUG_L3 " << __FILE__ << ":" << __LINE__ << "] " << text << "\n";
+#define DEBUG_TEXT_LEVEL3(skepu_macro_text) std::cerr << "[SKEPU_DEBUG_L3 " << __FILE__ << ":" << __LINE__ << "] " << skepu_macro_text << "\n";
 #else
-#define DEBUG_TEXT_LEVEL3(text)
+#define DEBUG_TEXT_LEVEL3(skepu_macro_text)
 #endif
 
 
@@ -57,12 +57,12 @@
 #endif // SKEPU_ASSERT
 
 #ifdef SKEPU_ENABLE_EXCEPTIONS
-#define SKEPU_ERROR(text) { std::cerr << "[SKEPU_ERROR " << __FILE__ << ":" << __LINE__ << "] " << text << "\n"; std::stringstream msg; msg << text; throw(msg.str()); }
+#define SKEPU_ERROR(skepu_macro_text) { std::stringstream skepu_macro_msg; skepu_macro_msg << skepu_macro_text; throw(skepu_macro_msg.str()); }
 #else
-#define SKEPU_ERROR(text) { std::cerr << "[SKEPU_ERROR " << __FILE__ << ":" << __LINE__ << "] " << text << "\n"; exit(0); }
+#define SKEPU_ERROR(skepu_macro_text) { std::cerr << "[SKEPU_ERROR " << __FILE__ << ":" << __LINE__ << "] " << skepu_macro_text << "\n"; exit(1); }
 #endif // SKEPU_ENABLE_EXCEPTIONS
 
-#define SKEPU_WARNING(text) { std::cerr << "[SKEPU_WARNING " << __FILE__ << ":" << __LINE__ << "] " << text << "\n"; }
+#define SKEPU_WARNING(skepu_macro_text) { std::cerr << "[SKEPU_WARNING " << __FILE__ << ":" << __LINE__ << "] " << skepu_macro_text << "\n"; }
 
 #define SKEPU_EXIT() exit(0)
 
