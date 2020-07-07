@@ -194,7 +194,8 @@ namespace skepu
 			
 			// Copies "all" elements to the device at once, better?
 			typename Iterator::device_pointer_type_cu in_mem_p = arg.getParent().updateDevice_CU(arg.getAddress(), size, deviceID, AccessMode::Read);
-			DeviceMemPointer_CU<T> out_mem_p(&res, numBlocks, device);
+			T partialRes;
+			DeviceMemPointer_CU<T> out_mem_p(&partialRes, numBlocks, device);
 			
 #ifdef USE_PINNED_MEMORY
 			ExecuteReduceOnADevice(this->m_cuda_kernel, size, numThreads, numBlocks, maxThreads, maxBlocks, in_mem_p->getDeviceDataPointer(), out_mem_p.getDeviceDataPointer(), deviceID, device->m_streams[0]);
@@ -208,6 +209,7 @@ namespace skepu
 			cutilDeviceSynchronize(); //Do CUTIL way, more safe approach, if result is incorrect could move it up.....
 #endif
 			
+			res = ReduceFunc::CPU(res, partialRes);
 			return res;
 		}
 		
