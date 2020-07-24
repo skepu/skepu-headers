@@ -49,6 +49,7 @@ namespace skepu
 	{
 		struct Default {};
 		struct MatRow {};
+		struct MatCol {};
 	};
 	
 	inline Index1D make_index(std::integral_constant<int, 1>, size_t index, size_t, size_t, size_t)
@@ -412,6 +413,9 @@ namespace skepu
 	struct is_skepu_matrix_proxy<skepu::MatRow<T>>: std::true_type {};
 	
 	template<typename T>
+	struct is_skepu_matrix_proxy<skepu::MatCol<T>>: std::true_type {};
+	
+	template<typename T>
 	struct is_skepu_matrix_proxy<skepu::SparseMat<T>>: std::true_type {};
 	
 	template<typename T>
@@ -492,6 +496,11 @@ namespace skepu
 	template<typename T>
 	struct proxy_tag<MatRow<T>> {
 		using type = ProxyTag::MatRow;
+	};
+	
+	template<typename T>
+	struct proxy_tag<MatCol<T>> {
+		using type = ProxyTag::MatCol;
 	};
 	
 	// ----------------------------------------------------------------

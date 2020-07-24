@@ -69,8 +69,9 @@ namespace skepu
 				{
 					auto index = Index2D { i, j };
 					auto res = F::forward(mapPairsFunc, index,
-						std::get<VEI-OutArity>(HelwiseIterators)(i)..., std::get<HEI-Varity-OutArity>(VelwiseIterators)(j)...,
-						get<AI>(args...).hostProxy()..., get<CI>(args...)...);
+						std::get<VEI-OutArity>(VelwiseIterators)(i)..., std::get<HEI-Varity-OutArity>(HelwiseIterators)(j)...,
+						get<AI>(args...).hostProxy(typename pack_element<AI-OutArity+(indexed ? 1 : 0), typename proxy_tag<Args>::type...>::type{}, index)...,
+						get<CI>(args...)...);
 					std::tie(std::get<OI>(out)(i, j)...) = res;
 				}
 			}

@@ -24,9 +24,12 @@ namespace skepu
 			{
 				for (size_t j = 0; j < Hsize; ++j)
 				{
-					auto res = F::forward(MapPairsFunc::CPU, Index2D { i, j },
-						get<VEI, CallArgs...>(args...)(i)..., get<HEI, CallArgs...>(args...)(j)...,
-						get<AI, CallArgs...>(args...).hostProxy()..., get<CI, CallArgs...>(args...)...);
+					Index2D index{ i, j };
+					auto res = F::forward(MapPairsFunc::CPU, index,
+						get<VEI, CallArgs...>(args...)(i)...,
+						get<HEI, CallArgs...>(args...)(j)...,
+						get<AI, CallArgs...>(args...).hostProxy(std::get<AI-Varity-Harity-outArity>(typename MapPairsFunc::ProxyTags{}), index)...,
+						get<CI, CallArgs...>(args...)...);
 					std::tie(get<OI, CallArgs...>(args...)(i, j)...) = res;
 				}
 			}

@@ -74,6 +74,44 @@ namespace skepu
 		__host__ __device__
 #endif
 		T  operator[](size_t index) const { return this->data[index]; }
+		
+		#ifdef SKEPU_CUDA
+				__host__ __device__
+		#endif
+				T &operator()(size_t index)       { return this->data[index]; }
+		#ifdef SKEPU_CUDA
+				__host__ __device__
+		#endif
+				T  operator()(size_t index) const { return this->data[index]; }
+	};
+	
+	
+	// Proxy matrix for user functions
+	template<typename T>
+	struct MatCol
+	{
+		using ContainerType = Matrix<T>;
+		
+		T *data;
+		size_t rows, cols;
+		
+#ifdef SKEPU_CUDA
+		__host__ __device__
+#endif
+		T &operator[](size_t index)       { return this->data[index * this->cols]; }
+#ifdef SKEPU_CUDA
+		__host__ __device__
+#endif
+		T  operator[](size_t index) const { return this->data[index * this->cols]; }
+		
+		#ifdef SKEPU_CUDA
+				__host__ __device__
+		#endif
+				T &operator()(size_t index)       { return this->data[index * this->cols]; }
+		#ifdef SKEPU_CUDA
+				__host__ __device__
+		#endif
+				T  operator()(size_t index) const { return this->data[index * this->cols]; }
 	};
 	
 	
@@ -255,13 +293,50 @@ namespace skepu
 			return this->hostProxy(ProxyTag::Default{}, 0);
 		}
 		
-		MatRow<T> hostProxy(ProxyTag::MatRow, Index1D row)
+		// Matrix row
+		
+		MatRow<T> hostProxy(ProxyTag::MatRow, size_t r)
 		{
 			MatRow<T> proxy;
-			proxy.data = this->m_data.data() + row.i * this->m_cols;
+			proxy.data = this->m_data.data() + r * this->m_cols;
 			proxy.cols = this->m_cols;
 			return proxy;
 		}
+		
+		MatRow<T> hostProxy(ProxyTag::MatRow, Index1D row)
+		{
+			return this->hostProxy(ProxyTag::MatRow{}, row.i);
+		}
+		
+		MatRow<T> hostProxy(ProxyTag::MatRow, Index2D coord)
+		{
+			return this->hostProxy(ProxyTag::MatRow{}, coord.row);
+		}
+		
+		
+		// Matrix column
+		
+		MatCol<T> hostProxy(ProxyTag::MatCol, size_t c)
+		{
+			MatCol<T> proxy;
+			proxy.data = this->m_data.data() + c;
+			proxy.rows = this->m_rows;
+			proxy.cols = this->m_cols;
+			return proxy;
+		}
+		
+		MatCol<T> hostProxy(ProxyTag::MatCol, Index1D col)
+		{
+			return this->hostProxy(ProxyTag::MatCol{}, col.i);
+		}
+		
+		MatCol<T> hostProxy(ProxyTag::MatCol, Index2D coord)
+		{
+			return this->hostProxy(ProxyTag::MatCol{}, coord.col);
+		}
+		
+		
+		
 		
 		/*!
 		 *  A small utility to change rows and columns numbers with each other. A Matrix (4x7) will become (7x4) after this function call without

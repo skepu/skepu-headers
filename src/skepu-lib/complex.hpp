@@ -83,7 +83,7 @@ C mul(C lhs, C rhs)
 }
 
 template<typename C>
-C real_div(C z, C div)
+C real_div(C z, typename value_type<C>::type div)
 {
   C res;
   res.re = z.re / div;
