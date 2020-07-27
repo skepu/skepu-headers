@@ -9,13 +9,15 @@ build:
   stage: build
   artifacts:
     paths:
-      - build
+      - build/tests
+      - build/CTestTestfile.cmake
   script:
     - mkdir build
     - cd build
     - cmake ..
     - make
   only:
+    - web
     - merge_requests
 
 test:
@@ -26,6 +28,7 @@ test:
     - cd build
     - ctest
   only:
+    - web
     - merge_requests
 
 # vi:ts=2 sw=2 et
