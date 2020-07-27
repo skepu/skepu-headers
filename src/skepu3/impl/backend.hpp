@@ -274,14 +274,18 @@ namespace skepu
 			this->m_cpuPartitionRatio = percentage;
 		}
 		
-		Backend::Type backend() const
+		Backend::Type type() const
 		{
 			return (this->m_backend != Backend::Type::Auto) ? this->m_backend : defaultType;
 		}
 		
 		Backend::Type activateBackend() const
 		{
-			auto type = this->backend();
+			auto type = this->type();
+			
+#ifndef SKEPU_SILENCE_UNAVAILABLE_BACKEND
+			if (!Backend::isTypeAvailable(type)) SKEPU_ERROR("Requested backend is not enabled in executable: " << type);
+#endif
 			
 #ifdef SKEPU_OPENMP
 			if (type == Backend::Type::OpenMP)
@@ -345,16 +349,22 @@ namespace skepu
 	}
 	
 	static const BackendSpec m_defaultGlobalBackendSpec{};
-	static BackendSpec m_globalBackendSpec = m_defaultGlobalBackendSpec;
+	
+	// Enables global backendspec across multiple translation units
+	inline BackendSpec &internalGlobalBackendSpecAccessor()
+	{
+		static BackendSpec m_globalBackendSpec = m_defaultGlobalBackendSpec;
+		return m_globalBackendSpec;
+	}
 	
 	inline void setGlobalBackendSpec(BackendSpec &spec)
 	{
-		m_globalBackendSpec = spec;
+		internalGlobalBackendSpecAccessor() = spec;
 	}
 	
 	inline void restoreDefaultGlobalBackendSpec()
 	{
-		m_globalBackendSpec = m_defaultGlobalBackendSpec;
+		internalGlobalBackendSpecAccessor() = m_defaultGlobalBackendSpec;
 	}
 	
 	

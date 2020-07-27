@@ -1,32 +1,33 @@
 #pragma once
 
-#include <utility>
-
 #include "skepu3/impl/common.hpp"
 
 namespace skepu
 {
-	template<int, typename, typename...>
+	template<int, int, typename, typename, typename...>
 	class MapReduceImpl;
 	
-	template<int arity = 1, typename Ret, typename... Args>
-	MapReduceImpl<arity, Ret, Args...> MapReduceWrapper(std::function<Ret(Args...)> map, std::function<Ret(Ret, Ret)> red)
+	template<int GivenArity, typename RetType, typename RedType, typename... Args>
+	MapReduceImpl<resolve_map_arity<GivenArity, Args...>::value, GivenArity, RetType, RedType, Args...>
+	MapReduceWrapper(std::function<RetType(Args...)> map, std::function<RedType(RedType, RedType)> red)
 	{
-		return MapReduceImpl<arity, Ret, Args...>(map, red);
+		return MapReduceImpl<resolve_map_arity<GivenArity, Args...>::value, GivenArity, RetType, RedType, Args...>(map, red);
 	}
 	
 	// For function pointers
-	template<int arity = 1, typename Ret, typename... Args>
-	MapReduceImpl<arity, Ret, Args...> MapReduce(Ret(*map)(Args...), Ret(*red)(Ret, Ret))
+	template<int GivenArity = SKEPU_UNSET_ARITY, typename RetType, typename RedType, typename... Args>
+	auto MapReduce(RetType(*map)(Args...), RedType(*red)(RedType, RedType))
+		-> decltype(MapReduceWrapper<GivenArity>((std::function<RetType(Args...)>)map, (std::function<RedType(RedType, RedType)>)red))
 	{
-		return MapReduceWrapper<arity>((std::function<Ret(Args...)>)map, (std::function<Ret(Ret, Ret)>)red);
+		return MapReduceWrapper<GivenArity>((std::function<RetType(Args...)>)map, (std::function<RedType(RedType, RedType)>)red);
 	}
 	
 	// For lambdas and functors
-	template<int arity = 1, typename T1, typename T2>
-	auto MapReduce(T1 map, T2 red) -> decltype(MapReduceWrapper<arity>(lambda_cast(map), lambda_cast(red)))
+	template<int GivenArity = SKEPU_UNSET_ARITY, typename T1, typename T2>
+	auto MapReduce(T1 map, T2 red)
+		-> decltype(MapReduceWrapper<GivenArity>(lambda_cast(map), lambda_cast(red)))
 	{
-		return MapReduceWrapper<arity>(lambda_cast(map), lambda_cast(red));
+		return MapReduceWrapper<GivenArity>(lambda_cast(map), lambda_cast(red));
 	}
 	
 	
@@ -35,13 +36,14 @@ namespace skepu
 	 * Works with any number of variable arguments > 0.
 	 * Works with any number of constant arguments >= 0.
 	 */
-	template<int arity, typename Ret, typename... Args>
+	template<int InArity, int GivenArity, typename RetType, typename RedType, typename... Args>
 	class MapReduceImpl: public SeqSkeletonBase
 	{
-		using MapFunc = std::function<Ret(Args...)>;
-		using RedFunc = std::function<Ret(Ret, Ret)>;
+		using MapFunc = std::function<RetType(Args...)>;
+		using RedFunc = std::function<RedType(RedType, RedType)>;
 		
 		static constexpr bool indexed = is_indexed<Args...>::value;
+		static constexpr size_t OutArity = out_size<RetType>::value;
 		static constexpr size_t numArgs = sizeof...(Args) - (indexed ? 1 : 0);
 		static constexpr size_t anyCont = trait_count_all<is_skepu_container_proxy, Args...>::value;
 		
@@ -49,48 +51,54 @@ namespace skepu
 		using First = typename pack_element<indexed ? 1 : 0, Args...>::type;
 		
 		// Supports the "index trick": using a variant of tag dispatching to index template parameter packs
-		static constexpr typename make_pack_indices<arity, 0>::type elwise_indices{};
-		static constexpr typename make_pack_indices<arity + anyCont, arity>::type any_indices{};
-		static constexpr typename make_pack_indices<numArgs, arity + anyCont>::type const_indices{};
+		static constexpr typename make_pack_indices<OutArity, 0>::type out_indices{};
+		static constexpr typename make_pack_indices<InArity, 0>::type elwise_indices{};
+		static constexpr typename make_pack_indices<InArity + anyCont, InArity>::type any_indices{};
+		static constexpr typename make_pack_indices<numArgs, InArity + anyCont>::type const_indices{};
 		
 		using F = ConditionalIndexForwarder<indexed, MapFunc>;
 		
 		
-		template<size_t... EI, size_t... AI, size_t... CI, typename... CallArgs>
-		Ret apply(pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, size_t size, CallArgs&&... args)
+		template<size_t... OI, size_t... EI, size_t... AI, size_t... CI, typename... CallArgs>
+		RetType apply(pack_indices<OI...>, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, size_t size, CallArgs&&... args)
 		{
 			if (disjunction((get<EI>(args...).size() < size)...))
 				SKEPU_ERROR("MapReduce: Non-matching container sizes");
 			
-			Ret res = this->m_start;
+			RetType res = this->m_start;
 			auto elwiseIterators = std::make_tuple(get<EI>(args...).begin()...);
 			
 			while (size --> 0)
 			{
 				auto index = std::get<0>(elwiseIterators).getIndex();
-				Ret temp = F::forward(mapFunc, index, *std::get<EI>(elwiseIterators)++..., get<AI>(args...).hostProxy()..., get<CI>(args...)...);
-				res = redFunc(res, temp);
+				RetType temp = F::forward(mapFunc, index,
+					*std::get<EI>(elwiseIterators)++...,
+					get<AI>(args...).hostProxy()...,
+					get<CI>(args...)...
+				);
+				pack_expand((get_or_return<OI>(res) = redFunc(get_or_return<OI>(res), get_or_return<OI>(temp)), 0)...);
 			}
 			
 			return res;
 		}
 		
-		template<size_t... AI, size_t... CI, typename... CallArgs>
-		Ret zero_apply(pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args)
+		template<size_t... OI, size_t... AI, size_t... CI, typename... CallArgs>
+		RetType zero_apply(pack_indices<OI...>, pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args)
 		{
 			size_t size = this->default_size_i;
 			if (defaultDim::value >= 2) size *= this->default_size_j;
 			if (defaultDim::value >= 3) size *= this->default_size_k;
 			if (defaultDim::value >= 4) size *= this->default_size_l;
 			
-			Ret res = this->m_start;
+			RetType res = this->m_start;
 			for (size_t i = 0; i < size; ++i)
 			{
-				Ret temp = F::forward(mapFunc,
+				RetType temp = F::forward(mapFunc,
 					make_index(defaultDim{}, i, this->default_size_j, this->default_size_k, this->default_size_l),
-					get<AI>(args...).hostProxy()..., get<CI>(args...)...
+					get<AI>(args...).hostProxy()...,
+					get<CI>(args...)...
 				);
-				res = redFunc(res, temp);
+				pack_expand((get<OI>(res) = redFunc(get<OI>(res), get_or_return<OI>(temp)), 0)...);
 			}
 			return res;
 		}
@@ -98,7 +106,7 @@ namespace skepu
 		
 	public:
 		
-		void setStartValue(Ret val)
+		void setStartValue(RetType val)
 		{
 			this->m_start = val;
 		}
@@ -112,32 +120,25 @@ namespace skepu
 		}
 		
 		template<template<class> class Container, typename... CallArgs, REQUIRES_VALUE(is_skepu_container<Container<First>>)>
-		Ret operator()(Container<First>& arg1, CallArgs&&... args)
+		RetType operator()(Container<First>& arg1, CallArgs&&... args)
 		{
 			static_assert(sizeof...(CallArgs) + 1 == numArgs, "Number of arguments not matching Map function");
-			return apply(elwise_indices, any_indices, const_indices, arg1.size(), arg1.begin(), std::forward<CallArgs>(args)...);
-		}
-		
-		template<template<class> class Container, typename... CallArgs, REQUIRES_VALUE(is_skepu_container<Container<First>>)>
-		Ret operator()(const Container<First>& arg1, CallArgs&&... args)
-		{
-			static_assert(sizeof...(CallArgs) + 1 == numArgs, "Number of arguments not matching Map function");
-			return apply(elwise_indices, any_indices, const_indices, arg1.size(), arg1.begin(), std::forward<CallArgs>(args)...);
+			return apply(out_indices, elwise_indices, any_indices, const_indices, arg1.size(), arg1.begin(), std::forward<CallArgs>(args)...);
 		}
 		
 		
 		template<typename Iterator, typename... CallArgs, REQUIRES_VALUE(is_skepu_iterator<Iterator, First>)>
-		Ret operator()(Iterator arg1, Iterator arg1_end, CallArgs&&... args)
+		RetType operator()(Iterator arg1, Iterator arg1_end, CallArgs&&... args)
 		{
 			static_assert(sizeof...(CallArgs) + 1 == numArgs, "Number of arguments not matching Map function");
-			return apply(elwise_indices, any_indices, const_indices, arg1_end - arg1, arg1, std::forward<CallArgs>(args)...);
+			return apply(out_indices, elwise_indices, any_indices, const_indices, arg1_end - arg1, arg1, std::forward<CallArgs>(args)...);
 		}
 		
 		template<template<class> class Container = Vector, typename... CallArgs>
-		Ret operator()(CallArgs&&... args)
+		RetType operator()(CallArgs&&... args)
 		{
 			static_assert(sizeof...(CallArgs) == numArgs, "Number of arguments not matching Map function");
-			return this->zero_apply(any_indices, const_indices, std::forward<CallArgs>(args)...);
+			return this->zero_apply(out_indices, any_indices, const_indices, std::forward<CallArgs>(args)...);
 		}
 		
 	private:
@@ -145,13 +146,13 @@ namespace skepu
 		RedFunc redFunc;
 		MapReduceImpl(MapFunc map, RedFunc red): mapFunc(map), redFunc(red) {}
 		
-		Ret m_start{};
+		RetType m_start{};
 		size_t default_size_i = 0;
 		size_t default_size_j = 0;
 		size_t default_size_k = 0;
 		size_t default_size_l = 0;
 		
-		friend MapReduceImpl<arity, Ret, Args...> MapReduceWrapper<arity, Ret, Args...>(MapFunc, RedFunc);
+		friend MapReduceImpl<InArity, GivenArity, RetType, RedType, Args...> MapReduceWrapper<GivenArity, RetType, RedType, Args...>(MapFunc, RedFunc);
 		
 	}; // end class MapReduce
 	

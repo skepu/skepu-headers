@@ -13,9 +13,9 @@ namespace skepu
 	namespace backend
 	{
 		template<size_t Varity, size_t Harity, typename MapPairsFunc, typename ReduceFunc, typename CUDAKernel, typename CUDAReduceKernel, typename CLKernel>
-		template<size_t... VEI, size_t... HEI, size_t... AI, size_t... CI, typename Result, typename... CallArgs>
+		template<size_t... OI, size_t... VEI, size_t... HEI, size_t... AI, size_t... CI, typename... CallArgs>
 		void MapPairsReduce<Varity, Harity, MapPairsFunc, ReduceFunc, CUDAKernel, CUDAReduceKernel, CLKernel>
-		::OMP(size_t Vsize, size_t Hsize, pack_indices<VEI...>, pack_indices<HEI...>, pack_indices<AI...>, pack_indices<CI...>, Result &&res, CallArgs&&... args)
+		::OMP(size_t Vsize, size_t Hsize, pack_indices<OI...>, pack_indices<VEI...>, pack_indices<HEI...>, pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args)
 		{
 			DEBUG_TEXT_LEVEL1("OpenMP MapPairsReduce: hsize = " << Hsize << ", vsize = " << Vsize);
 			
@@ -29,24 +29,34 @@ namespace skepu
 #pragma omp parallel for schedule(runtime)
 				for (size_t i = 0; i < Vsize; ++i)
 				{
-					res(i) = this->m_start;
+					pack_expand((get<OI>(args...)(i) = get_or_return<OI>(this->m_start), 0)...);
 					for (size_t j = 0; j < Hsize; ++j)
 					{
 						auto index = Index2D { i, j };
-						Ret temp = F::forward(MapPairsFunc::OMP, Index2D { i, j }, get<VEI, CallArgs...>(args...)(i)..., get<HEI, CallArgs...>(args...)(j)..., get<AI, CallArgs...>(args...).hostProxy()..., get<CI, CallArgs...>(args...)...);
-						res(i) = ReduceFunc::OMP(res(i), temp);
+						auto temp = F::forward(MapPairsFunc::OMP, Index2D { i, j },
+							get<VEI, CallArgs...>(args...)(i)...,
+							get<HEI, CallArgs...>(args...)(j)...,
+							get<AI, CallArgs...>(args...).hostProxy()...,
+							get<CI, CallArgs...>(args...)...
+						);
+						pack_expand((get<OI>(args...)(i) = ReduceFunc::CPU(get<OI>(args...)(i), get_or_return<OI>(temp)), 0)...);
 					}
 				}
 			else if (this->m_mode == ReduceMode::ColWise)
 #pragma omp parallel for schedule(runtime)
 				for (size_t j = 0; j < Hsize; ++j) // TODO: optimize?
 				{
-					res(j) = this->m_start;
+					pack_expand((get<OI>(args...)(j) = get_or_return<OI>(this->m_start), 0)...);
 					for (size_t i = 0; i < Vsize; ++i)
 					{
 						auto index = Index2D { i, j };
-						Ret temp = F::forward(MapPairsFunc::OMP, Index2D { i, j }, get<VEI, CallArgs...>(args...)(i)..., get<HEI, CallArgs...>(args...)(j)..., get<AI, CallArgs...>(args...).hostProxy()..., get<CI, CallArgs...>(args...)...);
-						res(j) = ReduceFunc::OMP(res(j), temp);
+						auto temp = F::forward(MapPairsFunc::OMP, Index2D { i, j },
+							get<VEI, CallArgs...>(args...)(i)...,
+							get<HEI, CallArgs...>(args...)(j)...,
+							get<AI, CallArgs...>(args...).hostProxy()...,
+							get<CI, CallArgs...>(args...)...
+						);
+						pack_expand((get<OI>(args...)(j) = ReduceFunc::CPU(get<OI>(args...)(j), get_or_return<OI>(temp)), 0)...);
 					}
 				}
 		}

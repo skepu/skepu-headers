@@ -415,3 +415,14 @@ struct select_if<false, T, F> { using type = F; };
 
 
 
+template<size_t Index, typename T>
+auto get_or_return(T &&arg) -> decltype(arg)
+{
+	return arg; 
+}
+
+template<size_t Index, typename... Args>
+auto get_or_return(std::tuple<Args...> arg) -> decltype(std::get<Index>(arg))
+{
+	return std::get<Index>(arg);
+}

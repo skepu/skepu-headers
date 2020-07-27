@@ -4,20 +4,20 @@
 
 namespace skepu
 {
-	template<int, int, typename, typename...>
+	template<int, int, typename, typename, typename...>
 	class MapPairsReduceImpl;
 	
-	template<int Varity = 1, int Harity = 1, typename Ret, typename... Args>
-	MapPairsReduceImpl<Varity, Harity, Ret, Args...> MapPairsReduceWrapper(std::function<Ret(Args...)> mapPairs, std::function<Ret(Ret, Ret)> red)
+	template<int Varity = 1, int Harity = 1, typename RetType, typename RedType, typename... Args>
+	MapPairsReduceImpl<Varity, Harity, RetType, RedType, Args...> MapPairsReduceWrapper(std::function<RetType(Args...)> mapPairs, std::function<RedType(RedType, RedType)> red)
 	{
-		return MapPairsReduceImpl<Varity, Harity, Ret, Args...>(mapPairs, red);
+		return MapPairsReduceImpl<Varity, Harity, RetType, RedType, Args...>(mapPairs, red);
 	}
 	
 	// For function pointers
-	template<int Varity = 1, int Harity = 1, typename Ret, typename... Args>
-	MapPairsReduceImpl<Varity, Harity, Ret, Args...> MapPairsReduce(Ret(*mapPairs)(Args...), Ret(*red)(Ret, Ret))
+	template<int Varity = 1, int Harity = 1, typename RetType, typename RedType, typename... Args>
+	MapPairsReduceImpl<Varity, Harity, RetType, RedType, Args...> MapPairsReduce(RetType(*mapPairs)(Args...), RedType(*red)(RedType, RedType))
 	{
-		return MapPairsReduceWrapper<Varity, Harity>((std::function<Ret(Args...)>)mapPairs, (std::function<Ret(Ret, Ret)>)red);
+		return MapPairsReduceWrapper<Varity, Harity>((std::function<RetType(Args...)>)mapPairs, (std::function<RedType(RedType, RedType)>)red);
 	}
 	
 	// For lambdas and functors
@@ -27,26 +27,28 @@ namespace skepu
 		return MapPairsReduceWrapper<Varity, Harity>(lambda_cast(mapPairs), lambda_cast(red));
 	}
 	
-	template<int Varity, int Harity, typename Ret, typename... Args>
+	template<int Varity, int Harity, typename RetType, typename RedType, typename... Args>
 	class MapPairsReduceImpl: public SeqSkeletonBase
 	{
 		static constexpr bool indexed = is_indexed<Args...>::value;
-		static constexpr size_t numArgs = sizeof...(Args) - (indexed ? 1 : 0);
+		static constexpr size_t OutArity = out_size<RetType>::value;
+		static constexpr size_t numArgs = sizeof...(Args) - (indexed ? 1 : 0) + OutArity;
 		static constexpr size_t anyCont = trait_count_all<is_skepu_container_proxy, Args...>::value;
 		
 		// Supports the "index trick": using a variant of tag dispatching to index template parameter packs
-		static constexpr typename make_pack_indices<Varity, 0>::type Helwise_indices{};
-		static constexpr typename make_pack_indices<Harity + Varity, Varity>::type Velwise_indices{};
-		static constexpr typename make_pack_indices<Varity + Harity + anyCont, Varity + Harity>::type any_indices{};
-		static constexpr typename make_pack_indices<numArgs, Varity + Harity + anyCont>::type const_indices{};
+		static constexpr typename make_pack_indices<OutArity, 0>::type out_indices{};
+		static constexpr typename make_pack_indices<OutArity + Varity, OutArity>::type Velwise_indices{};
+		static constexpr typename make_pack_indices<OutArity + Varity + Harity, OutArity + Varity>::type Helwise_indices{};
+		static constexpr typename make_pack_indices<OutArity + Varity + Harity + anyCont, OutArity + Varity + Harity>::type any_indices{};
+		static constexpr typename make_pack_indices<numArgs, OutArity + Varity + Harity + anyCont>::type const_indices{};
 		
-		using MapPairsFunc = std::function<Ret(Args...)>;
-		using RedFunc = std::function<Ret(Ret, Ret)>;
+		using MapPairsFunc = std::function<RetType(Args...)>;
+		using RedFunc = std::function<RedType(RedType, RedType)>;
 		using F = ConditionalIndexForwarder<indexed, MapPairsFunc>;
 		
 		// For iterators
-		template<size_t... VEI, size_t... HEI, size_t... AI, size_t... CI, typename Iterator, typename... CallArgs>
-		void apply(pack_indices<VEI...>, pack_indices<HEI...>, pack_indices<AI...>, pack_indices<CI...>, size_t size, Iterator res, CallArgs&&... args)
+		template<size_t... OI, size_t... VEI, size_t... HEI, size_t... AI, size_t... CI, typename... CallArgs>
+		void apply(pack_indices<OI...>, pack_indices<VEI...>, pack_indices<HEI...>, pack_indices<AI...>, pack_indices<CI...>, size_t size, CallArgs&&... args)
 		{
 			size_t Vsize = get_noref<0>(get_noref<VEI>(args...).size()..., this->default_size_y);
 			size_t Hsize = get_noref<0>(get_noref<HEI>(args...).size()..., this->default_size_x);
@@ -56,33 +58,44 @@ namespace skepu
 			
 			if (disjunction((get<HEI>(args...).size() < Hsize)...))
 				SKEPU_ERROR("Non-matching input container sizes");
-			
-			if ((this->m_mode == ReduceMode::RowWise && size < Vsize) || (this->m_mode == ReduceMode::ColWise && size < Hsize))
+				
+			if  ((this->m_mode == ReduceMode::RowWise && disjunction((get<OI>(args...).size() < Vsize)...))
+				|| (this->m_mode == ReduceMode::ColWise && disjunction((get<OI>(args...).size() < Hsize)...)))
 				SKEPU_ERROR("Non-matching output container size");
 			
-			auto HelwiseIterators = std::make_tuple(get<VEI>(args...).begin()...);
-			auto VelwiseIterators = std::make_tuple(get<HEI>(args...).begin()...);
+			auto VelwiseIterators = std::make_tuple(get<VEI>(args...).begin()...);
+			auto HelwiseIterators = std::make_tuple(get<HEI>(args...).begin()...);
 			
 			if (this->m_mode == ReduceMode::RowWise)
 				for (size_t i = 0; i < Vsize; ++i)
 				{
-					res(i) = this->m_start;
+					pack_expand((get<OI>(args...)(i) = get_or_return<OI>(this->m_start), 0)...);
 					for (size_t j = 0; j < Hsize; ++j)
 					{
-						auto index = Index2D { i, j };
-						Ret temp = F::forward(mapPairsFunc, index, std::get<VEI>(HelwiseIterators)(i)..., std::get<HEI-Varity>(VelwiseIterators)(j)..., get<AI>(args...).hostProxy()..., get<CI>(args...)...);
-						res(i) = redFunc(res(i), temp);
+						Index2D index{ i, j };
+						RetType temp = F::forward(mapPairsFunc, index,
+							std::get<VEI-OutArity>(VelwiseIterators)(i)...,
+							std::get<HEI-OutArity-Varity>(HelwiseIterators)(j)...,
+							get<AI>(args...).hostProxy()...,
+							get<CI>(args...)...
+						);
+						pack_expand((get<OI>(args...)(i) = redFunc(get<OI>(args...)(i), get_or_return<OI>(temp)), 0)...);
 					}
 				}
 			else if (this->m_mode == ReduceMode::ColWise)
 				for (size_t j = 0; j < Hsize; ++j)
 				{
-					res(j) = this->m_start;
+					pack_expand((get<OI>(args...)(j) = get_or_return<OI>(this->m_start), 0)...);
 					for (size_t i = 0; i < Vsize; ++i)
 					{
-						auto index = Index2D { i, j };
-						Ret temp = F::forward(mapPairsFunc, index, std::get<VEI>(HelwiseIterators)(i)..., std::get<HEI-Varity>(VelwiseIterators)(j)..., get<AI>(args...).hostProxy()..., get<CI>(args...)...);
-						res(j) = redFunc(res(j), temp);
+						Index2D index{ i, j };
+						RetType temp = F::forward(mapPairsFunc, index,
+							std::get<VEI-OutArity>(VelwiseIterators)(i)...,
+							std::get<HEI-OutArity-Varity>(HelwiseIterators)(j)...,
+							get<AI>(args...).hostProxy()...,
+							get<CI>(args...)...
+						);
+						pack_expand((get<OI>(args...)(j) = redFunc(get<OI>(args...)(j), get_or_return<OI>(temp)), 0)...);
 					}
 				}
 			
@@ -91,7 +104,7 @@ namespace skepu
 		
 	public:
 		
-		void setStartValue(Ret val)
+		void setStartValue(RetType val)
 		{
 			this->m_start = val;
 		}
@@ -101,26 +114,18 @@ namespace skepu
 			this->m_mode = mode;
 		}
 		
-		void setDefaultSize(size_t x, size_t y = 0)
+		void setDefaultSize(size_t y, size_t x)
 		{
 			this->default_size_x = x;
 			this->default_size_y = y;
 		}
 		
 		template<typename... CallArgs>
-		Vector<Ret> &operator()(Vector<Ret> &res, CallArgs&&... args)
+		auto operator()(CallArgs&&... args) -> typename std::add_lvalue_reference<decltype(get<0>(args...))>::type
 		{
 			static_assert(sizeof...(CallArgs) == numArgs, "Number of arguments not matching Map function");
-			this->apply(Helwise_indices, Velwise_indices, any_indices, const_indices, res.size(), res.begin(), std::forward<CallArgs>(args)...);
-			return res;
-		}
-		
-		template<typename Iterator, typename... CallArgs, REQUIRES(is_skepu_iterator<Iterator, Ret>())>
-		Iterator operator()(Iterator res, Iterator res_end, CallArgs&&... args)
-		{
-			static_assert(sizeof...(CallArgs) == numArgs, "Number of arguments not matching Map function");
-			this->apply(Helwise_indices, Velwise_indices, any_indices, const_indices, res_end - res, res, std::forward<CallArgs>(args)...);
-			return res;
+			this->apply(out_indices, Velwise_indices, Helwise_indices, any_indices, const_indices, get<0>(args...).size(), std::forward<CallArgs>(args)...);
+			return get<0>(args...);
 		}
 		
 	private:
@@ -129,11 +134,11 @@ namespace skepu
 		MapPairsReduceImpl(MapPairsFunc mapPairs, RedFunc red): mapPairsFunc(mapPairs), redFunc(red) {}
 		
 		ReduceMode m_mode = ReduceMode::RowWise;
-		Ret m_start{};
+		RetType m_start{};
 		size_t default_size_x = 1;
 		size_t default_size_y = 1;
 		
-		friend MapPairsReduceImpl<Varity, Harity, Ret, Args...> MapPairsReduceWrapper<Varity, Harity, Ret, Args...>(MapPairsFunc, RedFunc);
+		friend MapPairsReduceImpl<Varity, Harity, RetType, RedType, Args...> MapPairsReduceWrapper<Varity, Harity, RetType, RedType, Args...>(MapPairsFunc, RedFunc);
 		
 	}; // end class MapImpl
 	

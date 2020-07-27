@@ -13,9 +13,9 @@ namespace skepu
 	namespace backend
 	{
 		template<size_t arity, typename MapFunc, typename ReduceFunc, typename CUDAKernel, typename CUDAReduceKernel, typename CLKernel>
-		template<size_t... EI, size_t... AI, size_t... CI, typename ...CallArgs>
-		typename ReduceFunc::Ret MapReduce<arity, MapFunc, ReduceFunc, CUDAKernel, CUDAReduceKernel, CLKernel>
-		::Hybrid(size_t size, pack_indices<EI...> ei, pack_indices<AI...> ai, pack_indices<CI...> ci, Ret &res, CallArgs&&... args)
+		template<size_t... OI, size_t... EI, size_t... AI, size_t... CI, typename... CallArgs>
+		typename MapFunc::Ret MapReduce<arity, MapFunc, ReduceFunc, CUDAKernel, CUDAReduceKernel, CLKernel>
+		::Hybrid(size_t size, pack_indices<OI...> oi, pack_indices<EI...> ei, pack_indices<AI...> ai, pack_indices<CI...> ci, Ret &res, CallArgs&&... args)
 		{
 			const float cpuPartitionSize = this->m_selected_spec->CPUPartitionRatio();
 			const size_t cpuSize = cpuPartitionSize*size;
@@ -26,7 +26,7 @@ namespace skepu
 			// If one partition is considered too small, fall back to GPU-only or CPU-only
 			if(gpuSize == 0) {
 				DEBUG_TEXT_LEVEL1("Hybrid MapReduce: Too small GPU size, fall back to CPU-only.");
-				return this->OMP(size, ei, ai, ci, res, args...);
+				return this->OMP(size, oi, ei, ai, ci, res, args...);
 			}
 			else if(cpuSize < 2) {
 				DEBUG_TEXT_LEVEL1("Hybrid MapReduce: Too small CPU size, fall back to GPU-only.");
@@ -74,12 +74,22 @@ namespace skepu
 					const size_t first = myId * q;
 					const size_t last = (myId + 1) * q + (myId == numCPUThreads - 1 ? rest : 0);
 					
-					Ret psum = F::forward(MapFunc::OMP, (get<0, CallArgs...>(args...) + first).getIndex(), get<EI, CallArgs...>(args...)(first)..., get<AI, CallArgs...>(args...).hostProxy()..., get<CI, CallArgs...>(args...)...);
+					Ret psum = F::forward(MapFunc::OMP,
+						(get<0, CallArgs...>(args...) + first).getIndex(),
+						get<EI, CallArgs...>(args...)(first)...,
+						get<AI, CallArgs...>(args...).hostProxy()...,
+						get<CI, CallArgs...>(args...)...
+					);
 					
 					for (size_t i = first+1; i < last; ++i)
 					{
-						Temp tempMap = F::forward(MapFunc::OMP, (get<0, CallArgs...>(args...) + i).getIndex(), get<EI, CallArgs...>(args...)(i)..., get<AI, CallArgs...>(args...).hostProxy()..., get<CI, CallArgs...>(args...)...);
-						psum = ReduceFunc::OMP(psum, tempMap);
+						Ret tempMap = F::forward(MapFunc::OMP,
+							(get<0, CallArgs...>(args...) + i).getIndex(),
+							get<EI, CallArgs...>(args...)(i)...,
+							get<AI, CallArgs...>(args...).hostProxy()...,
+							get<CI, CallArgs...>(args...)...
+						);
+						pack_expand((get_or_return<OI>(psum) = ReduceFunc::OMP(get_or_return<OI>(psum), get_or_return<OI>(tempMap)), 0)...);
 					}
 					parsums[myId] = psum;
 				}
@@ -87,16 +97,16 @@ namespace skepu
 			
 			// Final Reduce sequentially
 			for (Ret &parsum : parsums)
-				res = ReduceFunc::OMP(res, parsum);
+				pack_expand((get_or_return<OI>(res) = ReduceFunc::OMP(get_or_return<OI>(res), get_or_return<OI>(parsum)), 0)...);
 			
 			return res;
 		}
 		
 		
 		template<size_t arity, typename MapFunc, typename ReduceFunc, typename CUDAKernel, typename CUDAReduceKernel, typename CLKernel>
-		template<size_t... AI, size_t... CI, typename ...CallArgs>
-		typename ReduceFunc::Ret MapReduce<arity, MapFunc, ReduceFunc, CUDAKernel, CUDAReduceKernel, CLKernel>
-		::Hybrid(size_t size, pack_indices<> ei, pack_indices<AI...> ai, pack_indices<CI...> ci, Ret &res, CallArgs&&... args)
+		template<size_t... OI, size_t... AI, size_t... CI, typename... CallArgs>
+		typename MapFunc::Ret MapReduce<arity, MapFunc, ReduceFunc, CUDAKernel, CUDAReduceKernel, CLKernel>
+		::Hybrid(size_t size, pack_indices<OI...> oi, pack_indices<> ei, pack_indices<AI...> ai, pack_indices<CI...> ci, Ret &res, CallArgs&&... args)
 		{
 			const float cpuPartitionSize = this->m_selected_spec->CPUPartitionRatio();
 			const size_t cpuSize = cpuPartitionSize*size;
@@ -107,7 +117,7 @@ namespace skepu
 			// If one partition is considered too small, fall back to GPU-only or CPU-only
 			if(gpuSize == 0) {
 				DEBUG_TEXT_LEVEL1("Hybrid MapReduce: Too small GPU size, fall back to CPU-only.");
-				return this->OMP(size, ei, ai, ci, res, args...);
+				return this->OMP(size, oi, ei, ai, ci, res, args...);
 			}
 			else if(cpuSize < 2) {
 				DEBUG_TEXT_LEVEL1("Hybrid MapReduce: Too small CPU size, fall back to GPU-only.");
@@ -154,13 +164,21 @@ namespace skepu
 					const size_t last = (myId + 1) * q + (myId == numCPUThreads - 1 ? rest : 0);
 					
 					auto index = make_index(defaultDim{}, first, this->default_size_j, this->default_size_k, this->default_size_l);
-					Ret psum = F::forward(MapFunc::OMP, index, get<AI, CallArgs...>(args...).hostProxy()..., get<CI, CallArgs...>(args...)...);
+					Ret psum = F::forward(MapFunc::OMP,
+						index,
+						get<AI, CallArgs...>(args...).hostProxy()...,
+						get<CI, CallArgs...>(args...)...
+					);
 					
 					for (size_t i = first+1; i < last; ++i)
 					{
 						auto index = make_index(defaultDim{}, i, this->default_size_j, this->default_size_k, this->default_size_l);
-						Temp tempMap = F::forward(MapFunc::OMP, index, get<AI, CallArgs...>(args...).hostProxy()..., get<CI, CallArgs...>(args...)...);
-						psum = ReduceFunc::OMP(psum, tempMap);
+						Ret tempMap = F::forward(MapFunc::OMP,
+							index,
+							get<AI, CallArgs...>(args...).hostProxy()...,
+							get<CI, CallArgs...>(args...)...
+						);
+						pack_expand((get_or_return<OI>(psum) = ReduceFunc::OMP(get_or_return<OI>(psum), get_or_return<OI>(tempMap)), 0)...);
 					}
 					parsums[myId] = psum;
 				}
@@ -168,7 +186,7 @@ namespace skepu
 			
 			// Final Reduce sequentially
 			for (Ret &parsum : parsums)
-				res = ReduceFunc::OMP(res, parsum);
+				pack_expand((get_or_return<OI>(res) = ReduceFunc::OMP(get_or_return<OI>(res), get_or_return<OI>(parsum)), 0)...);
 			
 			return res;
 		}

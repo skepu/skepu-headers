@@ -534,7 +534,7 @@ namespace skepu
 			if (this->m_transpose_matrix && this->m_transpose_matrix->m_rows == this->m_cols && this->m_transpose_matrix->m_cols == this->m_rows && !this->m_dataChanged)
 				return *this->m_transpose_matrix;
 				
-			switch (spec.backend())
+			switch (spec.type())
 			{
 			case Backend::Type::CUDA:
 #ifdef SKEPU_CUDA

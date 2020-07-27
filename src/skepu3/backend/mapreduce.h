@@ -52,8 +52,10 @@ namespace skepu
 			size_t default_size_k;
 			size_t default_size_l;
 			
+			static constexpr size_t outArity = MapFunc::outArity;
 			static constexpr size_t numArgs = MapFunc::totalArity - (MapFunc::indexed ? 1 : 0);
 			static constexpr size_t anyArity = std::tuple_size<typename MapFunc::ContainerArgs>::value;
+			static constexpr typename make_pack_indices<outArity, 0>::type out_indices{};
 			static constexpr typename make_pack_indices<arity, 0>::type elwise_indices{};
 			static constexpr typename make_pack_indices<arity + anyArity, arity>::type any_indices{};
 			static constexpr typename make_pack_indices<numArgs, arity + anyArity>::type const_indices{};
@@ -62,8 +64,8 @@ namespace skepu
 			using First = typename parameter_type<MapFunc::indexed ? 1 : 0, decltype(&MapFunc::CPU)>::type;
 			
 			using F = ConditionalIndexForwarder<MapFunc::indexed, decltype(&MapFunc::CPU)>;
-			using Temp = typename MapFunc::Ret;
-			using Ret = typename ReduceFunc::Ret;
+			using Ret = typename MapFunc::Ret;
+			using RedType = typename ReduceFunc::Ret;
 			
 			Ret m_start{};
 			
@@ -92,19 +94,19 @@ namespace skepu
 			template<template<class> class Container, typename... CallArgs, REQUIRES(is_skepu_container<Container<First>>::value)>
 			Ret operator()(const Container<First> &arg1, CallArgs&&... args)
 			{
-				return backendDispatch(elwise_indices, any_indices, const_indices, arg1.size(), arg1, std::forward<CallArgs>(args)...);
+				return backendDispatch(out_indices, elwise_indices, any_indices, const_indices, arg1.size(), arg1, std::forward<CallArgs>(args)...);
 			}
 			
 			template<template<class> class Container, typename... CallArgs, REQUIRES(is_skepu_container<Container<First>>::value)>
 			Ret operator()(Container<First> &arg1, CallArgs&&... args)
 			{
-				return backendDispatch(elwise_indices, any_indices, const_indices, arg1.size(), arg1, std::forward<CallArgs>(args)...);
+				return backendDispatch(out_indices, elwise_indices, any_indices, const_indices, arg1.size(), arg1, std::forward<CallArgs>(args)...);
 			}
 			
 			template<typename Iterator, typename... CallArgs, REQUIRES(is_skepu_iterator<Iterator, First>::value)>
 			Ret operator()(Iterator arg1, Iterator arg1_end, CallArgs&&... args)
 			{
-				return backendDispatch(elwise_indices, any_indices, const_indices, arg1_end - arg1, arg1, std::forward<CallArgs>(args)...);
+				return backendDispatch(out_indices, elwise_indices, any_indices, const_indices, arg1_end - arg1, arg1, std::forward<CallArgs>(args)...);
 			}
 			
 			template<template<class> class Container = Vector, typename... CallArgs>
@@ -117,12 +119,12 @@ namespace skepu
 				if (defaultDim::value >= 3) size *= this->default_size_k;
 				if (defaultDim::value >= 4) size *= this->default_size_l;
 				
-				return this->backendDispatch(elwise_indices, any_indices, const_indices, size, std::forward<CallArgs>(args)...);
+				return this->backendDispatch(out_indices, elwise_indices, any_indices, const_indices, size, std::forward<CallArgs>(args)...);
 			}
 			
 		private:
-			template<size_t... EI, size_t... AI, size_t... CI, typename... CallArgs>
-			Ret backendDispatch(pack_indices<EI...> ei, pack_indices<AI...> ai, pack_indices<CI...> ci, size_t size, CallArgs&&... args)
+			template<size_t... OI, size_t... EI, size_t... AI, size_t... CI, typename... CallArgs>
+			Ret backendDispatch(pack_indices<OI...> oi, pack_indices<EI...> ei, pack_indices<AI...> ai, pack_indices<CI...> ci, size_t size, CallArgs&&... args)
 			{
 			//	assert(this->m_execPlan != NULL && this->m_execPlan->isCalibrated());
 				
@@ -137,7 +139,7 @@ namespace skepu
 				{
 				case Backend::Type::Hybrid:
 #ifdef SKEPU_HYBRID
-					return  Hybrid(size, ei, ai, ci, res, get<EI, CallArgs...>(args...).begin()..., get<AI, CallArgs...>(args...)..., get<CI, CallArgs...>(args...)...);
+					return  Hybrid(size, oi, ei, ai, ci, res, get<EI, CallArgs...>(args...).begin()..., get<AI, CallArgs...>(args...)..., get<CI, CallArgs...>(args...)...);
 #endif
 				case Backend::Type::CUDA:
 #ifdef SKEPU_CUDA
@@ -149,28 +151,28 @@ namespace skepu
 #endif
 				case Backend::Type::OpenMP:
 #ifdef SKEPU_OPENMP
-					return  OMP(size, ei, ai, ci, res, get<EI, CallArgs...>(args...).begin()..., get<AI, CallArgs...>(args...)..., get<CI, CallArgs...>(args...)...);
+					return  OMP(size, oi, ei, ai, ci, res, get<EI, CallArgs...>(args...).begin()..., get<AI, CallArgs...>(args...)..., get<CI, CallArgs...>(args...)...);
 #endif
 				default:
-					return  CPU(size, ei, ai, ci, res, get<EI, CallArgs...>(args...).begin()..., get<AI, CallArgs...>(args...)..., get<CI, CallArgs...>(args...)...);
+					return  CPU(size, oi, ei, ai, ci, res, get<EI, CallArgs...>(args...).begin()..., get<AI, CallArgs...>(args...)..., get<CI, CallArgs...>(args...)...);
 				}
 			}
 			
 			
-			template<size_t... EI, size_t... AI, size_t... CI, typename... CallArgs>
-			Ret CPU(size_t size, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, Ret &res, CallArgs&&... args);
+			template<size_t... OI, size_t... EI, size_t... AI, size_t... CI, typename... CallArgs>
+			Ret CPU(size_t size, pack_indices<OI...>, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, Ret &res, CallArgs&&... args);
 			
-			template<size_t... AI, size_t... CI, typename... CallArgs>
-			Ret CPU(size_t size, pack_indices<>, pack_indices<AI...>, pack_indices<CI...>, Ret &res, CallArgs&&... args);
+			template<size_t... OI, size_t... AI, size_t... CI, typename... CallArgs>
+			Ret CPU(size_t size, pack_indices<OI...>, pack_indices<>, pack_indices<AI...>, pack_indices<CI...>, Ret &res, CallArgs&&... args);
 			
 			
 #ifdef SKEPU_OPENMP
 			
-			template<size_t... EI, size_t... AI, size_t... CI, typename ...CallArgs>
-			Ret OMP(size_t size, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, Ret &res, CallArgs&&... args);
+			template<size_t... OI, size_t... EI, size_t... AI, size_t... CI, typename ...CallArgs>
+			Ret OMP(size_t size, pack_indices<OI...>, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, Ret &res, CallArgs&&... args);
 			
-			template<size_t... AI, size_t... CI, typename ...CallArgs>
-			Ret OMP(size_t size, pack_indices<>, pack_indices<AI...>, pack_indices<CI...>, Ret &res, CallArgs&&... args);
+			template<size_t... OI, size_t... AI, size_t... CI, typename ...CallArgs>
+			Ret OMP(size_t size, pack_indices<OI...>, pack_indices<>, pack_indices<AI...>, pack_indices<CI...>, Ret &res, CallArgs&&... args);
 			
 #endif // SKEPU_OPENMP
 			
@@ -210,11 +212,11 @@ namespace skepu
 			
 #ifdef SKEPU_HYBRID
 			
-			template<size_t... EI, size_t... AI, size_t... CI, typename ...CallArgs>
-			Ret Hybrid(size_t size, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, Ret &res, CallArgs&&... args);
+			template<size_t... OI, size_t... EI, size_t... AI, size_t... CI, typename... CallArgs>
+			Ret Hybrid(size_t size, pack_indices<OI...>, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, Ret &res, CallArgs&&... args);
 			
-			template<size_t... AI, size_t... CI, typename ...CallArgs>
-			Ret Hybrid(size_t size, pack_indices<>, pack_indices<AI...>, pack_indices<CI...>, Ret &res, CallArgs&&... args);
+			template<size_t... OI, size_t... AI, size_t... CI, typename... CallArgs>
+			Ret Hybrid(size_t size, pack_indices<OI...>, pack_indices<>, pack_indices<AI...>, pack_indices<CI...>, Ret &res, CallArgs&&... args);
 			
 #endif // SKEPU_HYBRID
 			

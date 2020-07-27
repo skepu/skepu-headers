@@ -4,30 +4,33 @@
 
 namespace skepu
 {
-	template<int, typename, typename...>
+	template<int, int, typename, typename...>
 	class MapImpl;
 	
-	template<int arity = 1, typename Ret, typename... Args>
-	MapImpl<arity, Ret, Args...> MapWrapper(std::function<Ret(Args...)> map)
+	template<int GivenArity, typename Ret, typename... Args>
+	MapImpl<resolve_map_arity<GivenArity, Args...>::value, GivenArity, Ret, Args...>
+	MapWrapper(std::function<Ret(Args...)> map)
 	{
-		return MapImpl<arity, Ret, Args...>(map);
+		return MapImpl<resolve_map_arity<GivenArity, Args...>::value, GivenArity, Ret, Args...>(map);
 	}
 	
 	// For function pointers
-	template<int arity = 1, typename Ret, typename... Args>
-	MapImpl<arity, Ret, Args...> Map(Ret(*map)(Args...))
+	template<int GivenArity = SKEPU_UNSET_ARITY, typename Ret, typename... Args>
+	auto Map(Ret(*map)(Args...))
+		-> decltype(MapWrapper<GivenArity>((std::function<Ret(Args...)>)map))
 	{
-		return MapWrapper<arity>((std::function<Ret(Args...)>)map);
+		return MapWrapper<GivenArity>((std::function<Ret(Args...)>)map);
 	}
 	
 	// For lambdas and functors
-	template<int arity = 1, typename T>
-	auto Map(T map) -> decltype(MapWrapper<arity>(lambda_cast(map)))
+	template<int GivenArity = SKEPU_UNSET_ARITY, typename T>
+	auto Map(T map)
+		-> decltype(MapWrapper<GivenArity>(lambda_cast(map)))
 	{
-		return MapWrapper<arity>(lambda_cast(map));
+		return MapWrapper<GivenArity>(lambda_cast(map));
 	}
 	
-	template<int InArity, typename Ret, typename... Args>
+	template<int InArity, int GivenArity, typename Ret, typename... Args>
 	class MapImpl: public SeqSkeletonBase
 	{
 		static constexpr bool indexed = is_indexed<Args...>::value;
@@ -92,7 +95,7 @@ namespace skepu
 		MapFunc mapFunc;
 		MapImpl(MapFunc map): mapFunc(map) {}
 		
-		friend MapImpl<InArity, Ret, Args...> MapWrapper<InArity, Ret, Args...>(MapFunc);
+		friend MapImpl<InArity, GivenArity, Ret, Args...> MapWrapper<GivenArity, Ret, Args...>(MapFunc);
 		
 	}; // end class MapImpl
 	

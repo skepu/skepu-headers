@@ -534,6 +534,23 @@ namespace skepu
 	}
 	
 	
+	
+	// ----------------------------------------------------------------
+	// Arity deducer for Map user functions
+	// ----------------------------------------------------------------
+	
+	#define SKEPU_UNSET_ARITY -1
+
+	template<int DA, typename... Args>
+	struct resolve_map_arity: index_constant<
+		DA != SKEPU_UNSET_ARITY
+		? DA
+		: trait_count_first_not<is_skepu_container_proxy, Args...>::value
+			- (is_indexed<Args...>::value ? 1 : 0)
+	> {};
+
+	
+	
 	// ----------------------------------------------------------------
 	// Smart Container Coherency Helpers
 	// ----------------------------------------------------------------

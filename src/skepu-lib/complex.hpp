@@ -56,6 +56,7 @@ constexpr FComplex FOne = {1.0, 0.0};
 // Functions
 
 template<typename C>
+inline
 C add(C lhs, C rhs)
 {
   C res;
@@ -65,6 +66,7 @@ C add(C lhs, C rhs)
 }
 
 template<typename C>
+inline
 C sub(C lhs, C rhs)
 {
   C res;
@@ -74,6 +76,7 @@ C sub(C lhs, C rhs)
 }
 
 template<typename C>
+inline
 C mul(C lhs, C rhs)
 {
   C res;
@@ -83,6 +86,7 @@ C mul(C lhs, C rhs)
 }
 
 template<typename C>
+inline
 C real_div(C z, typename value_type<C>::type div)
 {
   C res;
@@ -92,6 +96,7 @@ C real_div(C z, typename value_type<C>::type div)
 }
 
 template<typename C>
+inline
 C conj(C z)
 {
   C res;
@@ -101,6 +106,7 @@ C conj(C z)
 }
 
 template<typename C>
+inline
 typename value_type<C>::type sq_norm(C z)
 {
   return z.re * z.re + z.im * z.im;

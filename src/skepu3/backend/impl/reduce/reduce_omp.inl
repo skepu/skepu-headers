@@ -30,9 +30,9 @@ namespace skepu
 #pragma omp parallel for schedule(runtime)
 			for (size_t row = 0; row < rows; ++row)
 			{
-				T parsum = this->m_start;
 				size_t base = row * cols;
-				for (size_t col = 0; col < cols; ++col)
+				T parsum = data[base];
+				for (size_t col = 1; col < cols; ++col)
 					parsum = ReduceFunc::OMP(parsum, data[base + col]);
 				res(row) = parsum;
 			}
@@ -49,12 +49,12 @@ namespace skepu
 		typename ReduceFunc::Ret Reduce1D<ReduceFunc, CUDAKernel, CLKernel>
 		::OMP(size_t size, T &res, Iterator arg)
 		{
-			DEBUG_TEXT_LEVEL1("OpenMP Reduce (Vector): size= " << size << "\n");
+			DEBUG_TEXT_LEVEL1("OpenMP Reduce (Vector): size = " << size << "\n");
 			
 			// Make sure we are properly synched with device data
 			arg.getParent().updateHost();
 			
-			std::vector<T> parsums(omp_get_max_threads());
+			std::vector<T> parsums(std::min<size_t>(size, omp_get_max_threads()));
 			bool first = true;
 			
 #pragma omp parallel for schedule(runtime) firstprivate(first)
@@ -95,30 +95,38 @@ namespace skepu
 			// Make sure we are properly synched with device data
 			arg.updateHost();
 			T *data = arg.getAddress();
-			std::vector<T> parsums(rows);
+			std::vector<T> rowsums(rows);
 			
 			// First row-wise
 #pragma omp parallel for schedule(runtime)
 			for (size_t row = 0; row < rows; ++row)
 			{
-				T parsum = this->m_start;
 				size_t base = row * cols;
-				for (size_t col = 0; col < cols; ++col)
-					parsum = ReduceFuncRowWise::OMP(parsum, data[base + col]);
-				parsums[row] = parsum;
+				T rowsum = data[base];
+				for (size_t col = 1; col < cols; ++col)
+					rowsum = ReduceFuncRowWise::OMP(rowsum, data[base + col]);
+				rowsums[row] = rowsum;
 			}
 			
 			// Then partial col-wise
-#pragma omp parallel for schedule(runtime)
+			std::vector<T> parsums(std::min<size_t>(rows, omp_get_max_threads()));
+			bool first = true;
+#pragma omp parallel for schedule(runtime) firstprivate(first)
 			for (size_t i = 0; i < rows; ++i)
 			{
 				size_t myid = omp_get_thread_num();
-				parsums[myid] = ReduceFuncColWise::OMP(parsums[myid], arg(i));
+				if (first) 
+				{
+					parsums[myid] = rowsums[i];
+					first = false;
+				}
+				else
+					parsums[myid] = ReduceFuncColWise::OMP(parsums[myid], rowsums[i]);
 			}
 			
 			// Final col-wise sequential reduction
-			for (size_t i = 0; i < omp_get_max_threads(); ++i)
-				res = ReduceFuncColWise::OMP(res, parsums[i]);
+			for (auto& el : parsums)
+				res = ReduceFuncColWise::OMP(res, el);
 			
 			return res;
 		}

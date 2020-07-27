@@ -48,7 +48,7 @@ namespace skepu
 				else if (this->m_execPlan)
 					this->m_selected_spec = &this->m_execPlan->find(size);
 				else
-					this->m_selected_spec = &m_globalBackendSpec;
+					this->m_selected_spec = &internalGlobalBackendSpecAccessor();
 				
 			//	this->m_selected_spec = (this->m_user_spec != nullptr)
 			//		? this->m_user_spec

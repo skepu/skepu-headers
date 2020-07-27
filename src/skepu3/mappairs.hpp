@@ -60,8 +60,8 @@ namespace skepu
 				SKEPU_ERROR("Non-matching horizontal container sizes");
 			
 			auto out = std::forward_as_tuple(get<OI>(args...)...);
-			auto HelwiseIterators = std::make_tuple(get<VEI>(args...).begin()...);
-			auto VelwiseIterators = std::make_tuple(get<HEI>(args...).begin()...);
+			auto VelwiseIterators = std::make_tuple(get<VEI>(args...).begin()...);
+			auto HelwiseIterators = std::make_tuple(get<HEI>(args...).begin()...);
 			
 			for (size_t i = 0; i < Vsize; ++i)
 			{
@@ -69,7 +69,8 @@ namespace skepu
 				{
 					auto index = Index2D { i, j };
 					auto res = F::forward(mapPairsFunc, index,
-						std::get<VEI-OutArity>(VelwiseIterators)(i)..., std::get<HEI-Varity-OutArity>(HelwiseIterators)(j)...,
+						std::get<VEI-OutArity>(VelwiseIterators)(i)...,
+						std::get<HEI-Varity-OutArity>(HelwiseIterators)(j)...,
 						get<AI>(args...).hostProxy(typename pack_element<AI-OutArity+(indexed ? 1 : 0), typename proxy_tag<Args>::type...>::type{}, index)...,
 						get<CI>(args...)...);
 					std::tie(std::get<OI>(out)(i, j)...) = res;
