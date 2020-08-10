@@ -1,6 +1,6 @@
 #pragma once
-#ifndef SKEPU_CLUSTER_MAP_INTERFACE_H
-#define SKEPU_CLUSTER_MAP_INTERFACE_H 1
+#ifndef SKEPU_CLUSTER_MAP_HPP
+#define SKEPU_CLUSTER_MAP_HPP 1
 
 #include <omp.h>
 #include <tuple>
@@ -40,14 +40,10 @@ struct map_omp
 		CallArgs &&... args) noexcept
 	-> void
 	{
-		// We use the pointer from the buffers here since its handle is already
-		// locked by StarPU.
-		auto & res = std::get<0>(buffers);
-
 		#pragma omp parallel for num_threads(starpu_combined_worker_get_size())
 		for(size_t i = 0; i < count; ++i)
 		{
-			res[i] =
+			auto res =
 				F::forward(
 					MapFunc::OMP,
 					(begin +i).index(),
@@ -56,6 +52,7 @@ struct map_omp
 					// Set MatRow to correct position. Does nothing for others.
 					cluster::advance(std::get<CI>(buffers), i)...,
 					args...);
+			std::tie(std::get<RI>(buffers)[i]...) = res;
 		}
 	}
 };
@@ -67,7 +64,7 @@ class Map
 : public SkeletonBase,
 	private cluster::skeleton_task<
 		_starpu::map_omp<MapFunc>,
-		std::tuple<typename MapFunc::Ret>,
+		typename cluster::result_tuple<typename MapFunc::Ret>::type,
 		typename MapFunc::ElwiseArgs,
 		typename MapFunc::ContainerArgs,
 		typename MapFunc::UniformArgs>
@@ -76,51 +73,54 @@ class Map
 
 	typedef cluster::skeleton_task<
 			_starpu::map_omp<MapFunc>,
-			std::tuple<T>,
+			typename cluster::result_tuple<typename MapFunc::Ret>::type,
 			typename MapFunc::ElwiseArgs,
 			typename MapFunc::ContainerArgs,
 			typename MapFunc::UniformArgs>
 		skeleton_task;
 
-	static constexpr size_t numArgs =
+	static constexpr size_t inArgs =
 		MapFunc::totalArity - (MapFunc::indexed ? 1 : 0);
+	static constexpr size_t outArgs =
+		MapFunc::outArity;
+	static constexpr size_t numArgs =
+		inArgs + outArgs;
 	static constexpr size_t anyArity =
 		std::tuple_size<typename MapFunc::ContainerArgs>::value;
 
 	CUDAKernel m_cuda_kernel;
 
+	static constexpr typename make_pack_indices<outArgs>::type out_indices{};
+	static constexpr
+		typename make_pack_indices<arity + outArgs, outArgs>::type elwise_indices{};
+	static constexpr
+			typename
+				make_pack_indices<arity + anyArity + outArgs, arity + outArgs>::type
+		any_indices{};
+	static constexpr
+		typename make_pack_indices<anyArity, 0>::type ptag_indices{};
+	static constexpr
+			typename make_pack_indices<numArgs, arity + anyArity + outArgs>::type
+		const_indices{};
+
 public:
-	static constexpr auto skeletonType = SkeletonType::Map;
-	using ResultArg = std::tuple<T>;
-	using ElwiseArgs = typename MapFunc::ElwiseArgs;
-	using ContainerArgs = typename MapFunc::ContainerArgs;
-	using UniformArgs = typename MapFunc::UniformArgs;
-	static constexpr bool prefers_matrix = MapFunc::prefersMatrix;
-
-	static constexpr
-	typename make_pack_indices<arity, 0>::type elwise_indices{};
-	static constexpr
-	typename make_pack_indices<arity + anyArity, arity>::type any_indices{};
-	static constexpr
-	typename make_pack_indices<anyArity, 0>::type ptag_indices{};
-	static constexpr
-	typename make_pack_indices<numArgs, arity + anyArity>::type const_indices{};
-
 	Map(CUDAKernel kernel) : skeleton_task("SkePU Map"), m_cuda_kernel(kernel) {}
 
 	template<typename... Args>
 	auto tune(Args&&...) noexcept -> void {}
 
-	template<template<class> class Container, typename... CallArgs,
-		REQUIRES(is_skepu_container<Container<T>>::value)>
+	template<typename... CallArgs>
 	auto
-	operator()(Container<T> &res, CallArgs&&... args) noexcept
-	-> Container<T> &
+	operator()(CallArgs&&... args) noexcept
+	-> decltype(get<0>(args...))
 	{
 		static_assert(sizeof...(CallArgs) == numArgs,
 			"Number of arguments not matching Map function");
 
+		auto & res = get<0>(args...);
+
 		backendDispatch(
+			out_indices,
 			elwise_indices,
 			any_indices,
 			const_indices,
@@ -128,6 +128,7 @@ public:
 			res.begin(),
 			res.end(),
 			std::forward<CallArgs>(args)...);
+
 		return res;
 	}
 
@@ -137,10 +138,11 @@ public:
 	operator()(Iterator begin, Iterator end, CallArgs&&... args) noexcept
 	-> Iterator
 	{
-		static_assert(sizeof...(CallArgs) == numArgs,
+		static_assert(sizeof...(CallArgs) == numArgs -1,
 			"Number of arguments not matching Map function");
 
 		backendDispatch(
+			out_indices,
 			elwise_indices,
 			any_indices,
 			const_indices,
@@ -153,6 +155,7 @@ public:
 
 private:
 	template<
+		size_t ... OI,
 		size_t ... EI,
 		size_t ... AI,
 		size_t ... CI,
@@ -161,6 +164,7 @@ private:
 		typename ... CallArgs>
 	auto
 	STARPU(
+		pack_indices<OI...>,
 		pack_indices<EI...>,
 		pack_indices<AI...>,
 		pack_indices<CI...> ci,
@@ -170,18 +174,18 @@ private:
 		CallArgs && ... args) noexcept
 	-> void
 	{
-		// The proxy elements require the data to be gathered on all nodes.
-		// Except for MatRow, which will be partitioned.
 		auto constexpr static pt = typename MapFunc::ProxyTags{};
 		auto static constexpr cbai = make_pack_indices<2>::type{};
 
+		// The proxy elements require the data to be gathered on all nodes.
+		// Except for MatRow, which will be partitioned.
 		pack_expand((
 			skeleton_task::handle_container_arg(
 				cont::getParent(get<AI>(args...)),
 				std::get<PI>(pt)),0)...);
 
-		// The result will be partitioned so that every rank can do some work.
-		begin.getParent().partition();
+		// The result will be partitioned.
+		pack_expand((cont::getParent(get<OI>(args...)).partition(),0)...);
 
 		// And the same goes for the elwise arguments.
 		// TODO: They should be realinged so that element i in the elwise is on the
@@ -198,7 +202,7 @@ private:
 				cont::getParent(get<EI>(args...)).block_count_from(pos)...});
 			auto handles =
 				std::make_tuple(
-					begin.getParent().handle_for(pos),
+					cont::getParent(get<OI>(args...)).handle_for(pos)...,
 					cont::getParent(get<EI>(args...)).handle_for(pos)...,
 					skeleton_task::container_handle(
 						cont::getParent(get<AI>(args...)),
@@ -218,6 +222,7 @@ private:
 	}
 
 	template<
+		size_t ... OI,
 		size_t ... EI,
 		size_t ... AI,
 		size_t ... CI,
@@ -226,6 +231,7 @@ private:
 		typename ... CallArgs>
 	auto
 	backendDispatch(
+		pack_indices<OI...> oi,
 		pack_indices<EI...> ei,
 		pack_indices<AI...> ai,
 		pack_indices<CI...> ci,
@@ -240,6 +246,7 @@ private:
 		 * have OMP at this point, so we just redirect the call.
 		 */
 		STARPU(
+			oi,
 			ei,
 			ai,
 			ci,
@@ -253,4 +260,4 @@ private:
 } // namespace backend
 } // namespace skepu
 
-#endif // SKEPU_CLUSTER_MAP_INTERFACE_H
+#endif // SKEPU_CLUSTER_MAP_HPP

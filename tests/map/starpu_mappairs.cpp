@@ -7,7 +7,7 @@
 #include <skepu3/cluster/skeletons/map/mappairs.hpp>
 
 std::mt19937 gen(1234);
-std::uniform_int_distribution<int> dist(0,100);
+std::uniform_int_distribution<int> dist(0,10);
 
 struct mapp_index
 {
@@ -151,5 +151,82 @@ TEST_CASE("Maping two vectors to matrix")
 		auto ex_it = expected.begin();
 		for(auto it = mat.begin(); it != mat.end(); ++it, ++ex_it)
 			REQUIRE(*it == *ex_it);
+	}
+}
+
+struct elwise_multireturn_fn
+{
+	constexpr static size_t totalArity = 2;
+	constexpr static size_t outArity = 2;
+	constexpr static bool indexed = 0;
+	using IndexType = void;
+	using ElwiseArgs = std::tuple<int, int>;
+	using ContainerArgs = std::tuple<>;
+	using UniformArgs = std::tuple<>;
+	typedef std::tuple<> ProxyTags;
+	constexpr static skepu::AccessMode anyAccessMode[] = {};
+	using Ret = std::tuple<int,int>;
+	constexpr static bool prefersMatrix = 1;
+
+	static inline
+	std::tuple<int, int>
+	CPU(int a, int b)
+	{
+		return std::tuple<int,int>{a, a*b};
+	}
+
+	static inline
+	std::tuple<int, int>
+	OMP(int a, int b)
+	{
+		return std::tuple<int,int>{a, a*b};
+	}
+};
+
+TEST_CASE("Multireturn user function")
+{
+	REQUIRE_NOTHROW(
+		skepu::backend::MapPairs<1,1,elwise_multireturn_fn, bool, void>(false));
+	auto mapp =
+		skepu::backend::MapPairs<1,1,elwise_multireturn_fn, bool, void>(false);
+
+	size_t constexpr N{100};
+	auto v1 = skepu::Vector<int>(N);
+	auto v2 = skepu::Vector<int>(N);
+	auto res1 = skepu::Matrix<int>(N,N);
+	auto res2 = skepu::Matrix<int>(N,N);
+	auto expected1 = skepu::Matrix<int>(N,N);
+	auto expected2 = skepu::Matrix<int>(N,N);
+
+	v1.flush();
+	v2.flush();
+	for(size_t i(0); i < N; ++i)
+	{
+		v1(i) = dist(gen);
+		v2(i) = dist(gen);
+	}
+
+	expected1.flush();
+	expected2.flush();
+	for(size_t i(0); i < N; ++i)
+	{
+		for(size_t j(0); j < N; ++j)
+		{
+			expected1(i,j) = v1(i);
+			expected2(i,j) = v1(i) * v2(j);
+		}
+	}
+
+	mapp(res1, res2, v1, v2);
+
+	res1.flush();
+	res2.flush();
+	for(size_t i(0); i < N; ++i)
+	{
+		for(size_t j(0); j < N; ++j)
+		{
+			REQUIRE(res1(i,j) == expected1(i,j));
+			REQUIRE(res2(i,j) == expected2(i,j));
+		}
 	}
 }

@@ -21,18 +21,17 @@ struct map_reduce
 {
 	typedef ConditionalIndexForwarder<MapFunc::indexed, decltype(&MapFunc::CPU)>
 		F;
-	typedef typename ReduceFunc::Ret T;
+	typedef typename MapFunc::Ret T;
 	typedef index_dimension<
 			typename std::conditional<MapFunc::indexed, typename MapFunc::IndexType,
 			skepu::Index1D>::type>
 		defaultDim;
-	#pragma omp declare reduction(\
-		mapred:T:omp_out=ReduceFunc::OMP(omp_out, omp_in))
 
 	template<
-		size_t... RI,
-		size_t... EI,
-		size_t... CI,
+		size_t ... RI,
+		size_t ... EI,
+		size_t ... CI,
+		size_t ... OI,
 		typename Buffers,
 		typename Iterator,
 		typename ... CallArgs>
@@ -42,47 +41,63 @@ struct map_reduce
 		pack_indices<EI...>,
 		pack_indices<CI...>,
 		Buffers && buffers,
+		pack_indices<OI...>,
 		Iterator begin,
 		size_t count,
 		CallArgs && ... args) noexcept
 	-> void
 	{
-		auto threads = starpu_combined_worker_get_size();
+		auto threads = std::min<size_t>(count, starpu_combined_worker_get_size());
 		omp_set_num_threads(threads);
 
-		auto & res = std::get<0>(buffers)[0];
-		res =
-			F::forward(
-				MapFunc::OMP,
-				begin.index(),
-				// Elwise elements are also raw pointers.
-				std::get<EI>(buffers)[0]...,
-				// Set MatRow to correct position. Does nothing for others.
-				cluster::advance(std::get<CI>(buffers),begin.offset())...,
-				args...);
-
-		auto offset = begin.offset();
-		#pragma omp parallel for reduction(mapred:res)
-		for(size_t i = 1; i < count; ++i)
+		std::vector<T> res_v(threads);
+		#pragma omp parallel
 		{
-			res =
-				ReduceFunc::OMP(
-					res,
+			size_t tid = omp_get_thread_num();
+			res_v[tid] =
+				F::forward(
+					MapFunc::OMP,
+					(begin + tid).index(),
+					// Elwise elements are also raw pointers.
+					std::get<EI>(buffers)[tid]...,
+					// Set MatRow to correct position. Does nothing for others.
+					cluster::advance(std::get<CI>(buffers), tid)...,
+					args...);
+			#pragma omp for
+			for(size_t i = threads; i < count; ++i)
+			{
+				auto res =
 					F::forward(
 						MapFunc::OMP,
 						(begin +i).index(),
 						// Elwise elements are also raw pointers.
 						std::get<EI>(buffers)[i]...,
-						// Set MatRow to correct iition. Does nothing for others.
+						// Set MatRow to correct position. Does nothing for others.
 						cluster::advance(std::get<CI>(buffers),i)...,
-						args...));
+						args...);
+				pack_expand((
+					get_or_return<OI>(res_v[tid]) =
+						ReduceFunc::OMP(
+							get_or_return<OI>(res_v[tid]),
+							get_or_return<OI>(res)), 0)...);
+			}
 		}
+
+		auto & res = std::get<0>(buffers)[0];
+		res = res_v[0];
+		for(size_t i(1); i < threads; ++i)
+			pack_expand((
+				get_or_return<OI>(res) =
+					ReduceFunc::OMP(
+						get_or_return<OI>(res),
+						get_or_return<OI>(res_v[i])), 0)...);
 	}
 
 	template<
-		size_t... RI,
-		size_t... EI,
-		size_t... CI,
+		size_t ... RI,
+		size_t ... EI,
+		size_t ... CI,
+		size_t ... OI,
 		typename Buffers,
 		typename ... CallArgs>
 	auto static
@@ -91,6 +106,7 @@ struct map_reduce
 		pack_indices<EI...>,
 		pack_indices<CI...>,
 		Buffers && buffers,
+		pack_indices<OI...>,
 		size_t offset,
 		size_t count,
 		size_t size_j,
@@ -99,30 +115,49 @@ struct map_reduce
 		CallArgs && ... args) noexcept
 	-> void
 	{
-		auto threads = starpu_combined_worker_get_size();
+		auto threads =
+			std::min<size_t>(count, starpu_combined_worker_get_size());
 		omp_set_num_threads(threads);
 
-		auto & res = std::get<0>(buffers)[0];
-		res =
-			F::forward(
-				MapFunc::OMP,
-				make_index(defaultDim{}, offset, size_j, size_k, size_l),
-				// Set MatRow to correct position. Does nothing for others.
-				cluster::advance(std::get<CI>(buffers), offset)...,
-				args...);
-		#pragma omp parallel for reduction(mapred:res)
-		for(size_t i = 1; i < count; ++i)
+		std::vector<T> res_v(threads);
+		#pragma omp parallel
 		{
-			res =
-				ReduceFunc::OMP(
-					res,
-					F::forward(
-						MapFunc::OMP,
-						make_index(defaultDim{}, offset +i, size_j, size_k, size_l),
-						// Set MatRow to correct position. Does nothing for others.
-						cluster::advance(std::get<CI>(buffers), i)...,
-						args...));
+			size_t tid = omp_get_thread_num();
+			//auto res =
+			res_v[tid] =
+				F::forward(
+					MapFunc::OMP,
+					make_index(defaultDim{}, offset + tid, size_j, size_k, size_l),
+					// Set MatRow to correct position. Does nothing for others.
+					cluster::advance(std::get<CI>(buffers), tid)...,
+					args...);
+
+			#pragma omp for
+			for(size_t i = threads; i < count; ++i)
+			{
+				auto res =
+						F::forward(
+							MapFunc::OMP,
+							make_index(defaultDim{}, offset +i, size_j, size_k, size_l),
+							// Set MatRow to correct position. Does nothing for others.
+							cluster::advance(std::get<CI>(buffers), i)...,
+							args...);
+				pack_expand((
+					get_or_return<OI>(res_v[tid]) =
+						ReduceFunc::OMP(
+							get_or_return<OI>(res_v[tid]),
+							get_or_return<OI>(res)), 0)...);
+			}
 		}
+
+		auto & res = std::get<0>(buffers)[0];
+		res = res_v[0];
+		for(size_t i(1); i < threads; ++i)
+			pack_expand((
+				get_or_return<OI>(res) =
+					ReduceFunc::OMP(
+						get_or_return<OI>(res),
+						get_or_return<OI>(res_v[i])), 0)...);
 	}
 };
 
@@ -145,20 +180,14 @@ class MapReduce
 		typename MapFunc::UniformArgs>
 {
 	static constexpr auto skeletonType = SkeletonType::MapReduce;
-
-	typedef typename ReduceFunc::Ret Ret;
-	typedef typename MapFunc::Ret MapRes;
-	typedef std::tuple<Ret> ResultArg;
-	typedef typename MapFunc::ElwiseArgs ElwiseArgs;
-	typedef typename MapFunc::ContainerArgs ContainerArgs;
-	typedef typename MapFunc::UniformArgs UniformArgs;
+	typedef typename MapFunc::Ret Ret;
 
 	typedef cluster::skeleton_task<
 			_starpu::map_reduce<MapFunc, ReduceFunc>,
-			ResultArg,
-			ElwiseArgs,
-			ContainerArgs,
-			UniformArgs>
+			std::tuple<typename MapFunc::Ret>,
+			typename MapFunc::ElwiseArgs,
+			typename MapFunc::ContainerArgs,
+			typename MapFunc::UniformArgs>
 		skeleton_task;
 
 	static constexpr bool prefers_matrix = MapFunc::prefersMatrix;
@@ -168,10 +197,15 @@ class MapReduce
 	static constexpr size_t anyArity =
 		std::tuple_size<typename MapFunc::ContainerArgs>::value;
 
-	static constexpr typename make_pack_indices<arity, 0>::type elwise_indices{};
-	static constexpr typename make_pack_indices<arity + anyArity, arity>::type
+	static constexpr typename make_pack_indices<MapFunc::outArity>::type
+		out_indices{};
+	static constexpr typename make_pack_indices<arity, 0>::type
+		elwise_indices{};
+	static constexpr typename
+			make_pack_indices<arity + anyArity, arity>::type
 		any_indices{};
-	static constexpr typename make_pack_indices<numArgs, arity + anyArity>::type
+	static constexpr typename
+			make_pack_indices<numArgs, arity + anyArity>::type
 		const_indices{};
 	auto static constexpr ptag_indices =
 		typename make_pack_indices<anyArity>::type{};
@@ -180,11 +214,6 @@ class MapReduce
 			typename std::conditional<MapFunc::indexed, typename MapFunc::IndexType,
 			skepu::Index1D>::type>
 		defaultDim;
-	typedef typename parameter_type<
-			MapFunc::indexed ? 1 : 0,
-			decltype(&MapFunc::CPU)>::type
-		First;
-
 
 	size_t default_size_i;
 	size_t default_size_j;
@@ -237,13 +266,17 @@ public:
 	}
 
 	template<
+		typename T,
 		template<class> class Container,
 		typename ... CallArgs,
-		REQUIRES(is_skepu_container<Container<First>>::value)>
+		REQUIRES(is_skepu_container<Container<T>>::value)>
 	auto
-	operator()(Container<First> const & arg1, CallArgs && ... args)
+	operator()(Container<T> & arg1, CallArgs && ... args) noexcept
 	-> Ret
 	{
+		static_assert(sizeof...(CallArgs) == numArgs -1,
+			"Number of arguments not matching Map function");
+
 		return
 			backendDispatch(
 				elwise_indices,
@@ -256,32 +289,17 @@ public:
 	}
 
 	template<
-		template<class> class Container,
+		typename T,
+		template<typename>class Iterator,
 		typename ... CallArgs,
-		REQUIRES(is_skepu_container<Container<First>>::value)>
+		REQUIRES(is_skepu_iterator<Iterator<T>, T>::value)>
 	auto
-	operator()(Container<First> & arg1, CallArgs && ... args) noexcept
+	operator()(Iterator<T> begin, Iterator<T> end, CallArgs && ... args) noexcept
 	-> Ret
 	{
-		return
-			backendDispatch(
-				elwise_indices,
-				any_indices,
-				const_indices,
-				arg1.begin(),
-				arg1.end(),
-				arg1,
-				std::forward<CallArgs>(args)...);
-	}
+		static_assert(sizeof...(CallArgs) == numArgs -1,
+			"Number of arguments not matching Map function");
 
-	template<
-		typename Iterator,
-		typename ... CallArgs,
-		REQUIRES(is_skepu_iterator<Iterator, First>::value)>
-	auto
-	operator()(Iterator begin, Iterator end, CallArgs && ... args) noexcept
-	-> Ret
-	{
 		return
 			backendDispatch(
 				elwise_indices,
@@ -289,11 +307,11 @@ public:
 				const_indices,
 				begin,
 				end,
-				begin.getParent(),
+				begin,
 				std::forward<CallArgs>(args)...);
 	}
 
-	template<typename T = void, typename ... CallArgs>
+	template<typename ... CallArgs>
 	auto
 	operator()(CallArgs && ... args) noexcept
 	-> Ret
@@ -334,11 +352,13 @@ private:
 		CallArgs && ... args) noexcept
 	-> Ret
 	{
-		if(disjunction((get<EI, CallArgs...>(args...).size() < (end - begin))...))
+		if(disjunction((
+				cont::getParent(get<EI>(args...)).size() < (end - begin))...))
 			SKEPU_ERROR("Non-matching container sizes");
 
 		return
 			STARPU(
+				out_indices,
 				ei,
 				ai,
 				ci,
@@ -362,6 +382,7 @@ private:
 	{
 		return
 			STARPU(
+				out_indices,
 				ai,
 				ci,
 				ptag_indices,
@@ -370,6 +391,7 @@ private:
 	}
 
 	template<
+		size_t ... OI,
 		size_t ... EI,
 		size_t ... AI,
 		size_t ... CI,
@@ -378,6 +400,7 @@ private:
 		typename ... CallArgs>
 	auto
 	STARPU(
+		pack_indices<OI...> oi,
 		pack_indices<EI...>,
 		pack_indices<AI...>,
 		pack_indices<CI...> ci,
@@ -388,7 +411,7 @@ private:
 	-> Ret
 	{
 		auto static constexpr pt = typename MapFunc::ProxyTags{};
-		auto static constexpr cbai = make_pack_indices<2>::type{};
+		auto static constexpr cbai = make_pack_indices<3>::type{};
 		pack_expand(
 			skeleton_task::handle_container_arg(
 				cont::getParent(get<AI>(args...)),
@@ -411,7 +434,11 @@ private:
 						cont::getParent(get<AI>(args...)),
 						std::get<PI>(pt),
 						pos)...);
-			auto call_back_args = std::make_tuple(begin, task_size);
+			auto call_back_args =
+				std::make_tuple(
+					oi,
+					begin,
+					task_size);
 
 			skeleton_task::schedule(
 				ci,
@@ -430,7 +457,12 @@ private:
 			auto & handle = m_result_handles[rank];
 			starpu_mpi_get_data_on_all_nodes_detached(MPI_COMM_WORLD, handle);
 			starpu_data_acquire(handle, STARPU_R);
-			res = ReduceFunc::CPU(res, *(Ret *)starpu_data_get_local_ptr(handle));
+			pack_expand((
+				get_or_return<OI>(res) =
+					ReduceFunc::CPU(
+						get_or_return<OI>(res),
+						get_or_return<OI>(
+							*(Ret *)starpu_data_get_local_ptr(handle))),0)...);
 			starpu_data_release(handle);
 			starpu_mpi_cache_flush(MPI_COMM_WORLD, handle);
 		}
@@ -439,12 +471,14 @@ private:
 	}
 
 	template<
+		size_t ... OI,
 		size_t ... AI,
 		size_t ... CI,
 		size_t ... PI,
 		typename ... CallArgs>
 	auto
 	STARPU(
+		pack_indices<OI...> oi,
 		pack_indices<AI...>,
 		pack_indices<CI...> ci,
 		pack_indices<PI...>,
@@ -453,7 +487,7 @@ private:
 	-> Ret
 	{
 		auto static constexpr pt = typename MapFunc::ProxyTags{};
-		auto static constexpr cbai = make_pack_indices<5>::type{};
+		auto static constexpr cbai = make_pack_indices<6>::type{};
 		pack_expand(
 			skeleton_task::handle_container_arg(
 				cont::getParent(get<AI>(args...)),
@@ -470,12 +504,13 @@ private:
 				std::make_tuple(
 					m_result_handles[rank],
 					skeleton_task::container_handle(
-						cont::getParent(get<AI>(args...)).handle_for(pos),
+						cont::getParent(get<AI>(args...)),
 						std::get<PI>(pt),
 						pos)...);
 			size_t count = std::min(task_size, size - (rank * task_size));
 			auto call_back_args =
 				std::make_tuple(
+					oi,
 					pos,
 					count,
 					default_size_j,
@@ -491,11 +526,17 @@ private:
 		}
 
 		Ret res = m_start;
-		for(auto handle : m_result_handles)
+		for(rank = 0; rank * task_size < size; ++rank)
 		{
+			auto handle = m_result_handles[rank];
 			starpu_mpi_get_data_on_all_nodes_detached(MPI_COMM_WORLD, handle);
 			starpu_data_acquire(handle, STARPU_R);
-			res = ReduceFunc::CPU(res, *(Ret *)starpu_data_get_local_ptr(handle));
+			Ret part_res = *(Ret *)starpu_data_get_local_ptr(handle);
+			pack_expand(
+				get_or_return<OI>(res) =
+					ReduceFunc::CPU(
+						get_or_return<OI>(res),
+						get_or_return<OI>(part_res))...);
 			starpu_data_release(handle);
 			starpu_mpi_cache_flush(MPI_COMM_WORLD, handle);
 		}

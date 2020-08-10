@@ -47,7 +47,8 @@ struct map_pairs_reduce_rowwise
 		#pragma omp parallel for num_threads(starpu_combined_worker_get_size())
 		for(size_t row = 0; row < task_rows; ++row)
 		{
-			pack_expand(((std::get<RHI>(buffers)[row] = start_value),0)...);
+			pack_expand(((
+				std::get<RHI>(buffers)[row] = get_or_return<RHI>(start_value)),0)...);
 			for(size_t col = 0; col < task_cols; ++col)
 			{
 				auto map_res =
@@ -101,7 +102,8 @@ struct map_pairs_reduce_colwise
 		#pragma omp parallel for num_threads(starpu_combined_worker_get_size())
 		for(size_t col = 0; col < task_cols; ++col)
 		{
-			pack_expand(((std::get<RHI>(buffers)[col] = start_value),0)...);
+			pack_expand(((
+				std::get<RHI>(buffers)[col] = get_or_return<RHI>(start_value)),0)...);
 			for(size_t row = 0; row < task_rows; ++row)
 			{
 				auto map_res =
@@ -135,18 +137,18 @@ class MapPairsReduce
 : public SkeletonBase,
 	private cluster::skeleton_task<
 		_starpu::map_pairs_reduce_rowwise<MapFunc, ReduceFunc>,
-		std::tuple<typename MapFunc::Ret>,
+		typename cluster::result_tuple<typename MapFunc::Ret>::type,
 		typename MapFunc::ElwiseArgs,
 		typename MapFunc::ContainerArgs,
 		typename MapFunc::UniformArgs>,
 	private cluster::skeleton_task<
 		_starpu::map_pairs_reduce_colwise<MapFunc, ReduceFunc>,
-		std::tuple<typename MapFunc::Ret>,
+		typename cluster::result_tuple<typename MapFunc::Ret>::type,
 		typename MapFunc::ElwiseArgs,
 		typename MapFunc::ContainerArgs,
 		typename MapFunc::UniformArgs>
 {
-	typedef typename ReduceFunc::Ret Ret;
+	typedef typename MapFunc::Ret Ret;
 	typedef std::tuple<> ResultArg;
 	typedef typename MapFunc::ElwiseArgs ElwiseArgs;
 	typedef typename MapFunc::ContainerArgs ContainerArgs;
@@ -154,14 +156,14 @@ class MapPairsReduce
 	static constexpr bool prefers_matrix = MapFunc::prefersMatrix;
 	typedef cluster::skeleton_task<
 			_starpu::map_pairs_reduce_rowwise<MapFunc, ReduceFunc>,
-			std::tuple<Ret>,
+			typename cluster::result_tuple<Ret>::type,
 			ElwiseArgs,
 			ContainerArgs,
 			UniformArgs>
 		rowwise_task;
 	typedef cluster::skeleton_task<
 			_starpu::map_pairs_reduce_colwise<MapFunc, ReduceFunc>,
-			std::tuple<Ret>,
+			typename cluster::result_tuple<typename MapFunc::Ret>::type,
 			ElwiseArgs,
 			ContainerArgs,
 			UniformArgs>

@@ -711,3 +711,53 @@ TEST_CASE("Tensor3 reduction to vector in i axis")
 	for(size_t i(0); i < N; ++i)
 		REQUIRE(res(i) == expected[i]);
 }
+
+struct multiple_return_fn
+{
+	constexpr static size_t totalArity = 3;
+	constexpr static size_t outArity = 2;
+	constexpr static bool indexed = 1;
+	using ElwiseArgs = std::tuple<int, double>;
+	using ContainerArgs = std::tuple<>;
+	using UniformArgs = std::tuple<>;
+	typedef std::tuple<skepu::ProxyTag::Default> ProxyTags;
+	constexpr static skepu::AccessMode anyAccessMode[] = {
+		skepu::AccessMode::Read};
+	using Ret = std::tuple<int, double>;
+	constexpr static bool prefersMatrix = 0;
+
+	auto static inline
+	CPU(skepu::Index1D idx, int i, double d) noexcept
+	-> std::tuple<int, double>
+	{
+		return std::make_tuple(idx.i * i, (double)(idx.i)*d);
+	}
+
+	auto static inline
+	OMP(skepu::Index1D idx, int i, double d) noexcept
+	-> std::tuple<int, double>
+	{
+		return std::make_tuple(idx.i * i, (double)(idx.i)*d);
+	}
+};
+
+TEST_CASE("Multiple return")
+{
+	size_t constexpr N{100};
+	REQUIRE_NOTHROW(
+		skepu::backend::Map<2, multiple_return_fn, bool, void>(false));
+	auto map = skepu::backend::Map<2, multiple_return_fn, bool, void>(false);
+	skepu::Vector<int> vi(N, 1);
+	skepu::Vector<double> vd(N, 0.5);
+	skepu::Vector<int> res_i(N);
+	skepu::Vector<double> res_d(N);
+
+	REQUIRE_NOTHROW(map(res_i, res_d, vi, vd));
+	res_i.flush();
+	res_d.flush();
+	for(size_t i(0); i < N; ++i)
+	{
+		REQUIRE(res_i(i) == (int)i);
+		REQUIRE(res_d(i) == (double)i * 0.5);
+	}
+}

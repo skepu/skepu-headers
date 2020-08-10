@@ -76,7 +76,7 @@ class MapPairs
 : public SkeletonBase,
 	private cluster::skeleton_task<
 		_starpu::map_pairs<MapPairsFunc>,
-		std::tuple<typename MapPairsFunc::Ret>,
+		typename cluster::result_tuple<typename MapPairsFunc::Ret>::type,
 		typename MapPairsFunc::ElwiseArgs,
 		typename MapPairsFunc::ContainerArgs,
 		typename MapPairsFunc::UniformArgs>
@@ -84,7 +84,7 @@ class MapPairs
 	typedef typename MapPairsFunc::Ret T;
 	typedef cluster::skeleton_task<
 			_starpu::map_pairs<MapPairsFunc>,
-			std::tuple<typename MapPairsFunc::Ret>,
+			typename cluster::result_tuple<typename MapPairsFunc::Ret>::type,
 			typename MapPairsFunc::ElwiseArgs,
 			typename MapPairsFunc::ContainerArgs,
 			typename MapPairsFunc::UniformArgs>

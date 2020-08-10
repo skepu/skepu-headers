@@ -10,6 +10,12 @@
 namespace skepu {
 namespace cluster {
 
+template<typename T>
+struct result_tuple { typedef std::tuple<T> type; };
+
+template<typename ... T>
+struct result_tuple<std::tuple<T...>> { typedef std::tuple<T...> type; };
+
 template<typename Container>
 auto inline
 advance(Container & c, size_t) noexcept

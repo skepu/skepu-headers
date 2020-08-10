@@ -5,9 +5,8 @@
 #include <skepu3/cluster/containers/vector/vector.hpp>
 #include <skepu3/cluster/skeletons/map/mappairsreduce.hpp>
 
-std::random_device rd;
-std::mt19937 gen(rd());
-std::uniform_int_distribution<int> rigen;
+std::mt19937 gen(1234);
+std::uniform_int_distribution<int> rigen(0,10);
 
 struct mappr_index
 {
@@ -501,5 +500,112 @@ TEST_CASE("Multiplication reduce function")
 		ret.flush();
 		for(size_t i(0); i < N; ++i)
 			REQUIRE(ret(i) == expected[i]);
+	}
+}
+
+struct multret_fn
+{
+	constexpr static size_t totalArity = 2;
+	constexpr static size_t outArity = 2;
+	constexpr static bool indexed = 0;
+	using IndexType = void;
+	using ElwiseArgs = std::tuple<int, int>;
+	using ContainerArgs = std::tuple<>;
+	using UniformArgs = std::tuple<>;
+	typedef std::tuple<> ProxyTags;
+	constexpr static skepu::AccessMode anyAccessMode[] = {};
+	using Ret = std::tuple<int,int>;
+	constexpr static bool prefersMatrix = 1;
+
+	auto inline static
+	CPU(int a, int b)
+	-> std::tuple<int,int>
+	{
+		return std::tuple<int,int>{a,b};
+	}
+
+	auto inline static
+	OMP(int a, int b)
+	-> std::tuple<int,int>
+	{
+		return std::tuple<int,int>{a,b};
+	}
+};
+
+TEST_CASE("Multireturn rowwise")
+{
+	REQUIRE_NOTHROW(
+		skepu::backend::MapPairsReduce<1,1, multret_fn, add, bool, bool, void>(
+			false, false));
+	auto mappr =
+		skepu::backend::MapPairsReduce<1,1, multret_fn, add, bool, bool, void>(
+			false, false);
+	REQUIRE_NOTHROW(
+		mappr.setStartValue(std::tuple<int,int>{2,7}));
+
+	SECTION("Rowwize")
+	{
+		REQUIRE_NOTHROW(
+			mappr.setReduceMode(skepu::ReduceMode::RowWise));
+
+		size_t constexpr N{100};
+		skepu::Vector<int> v(100);
+		skepu::Vector<int> h(100);
+		std::vector<int> expected1(N, 2);
+		int expected2{7};
+
+		v.flush();
+		h.flush();
+		for(size_t i(0); i < N; ++i)
+		{
+			v(i) = rigen(gen);
+			expected1[i] += N*v(i);
+			h(i) = rigen(gen);
+			expected2 += h(i);
+		}
+
+		skepu::Vector<int> res1(N);
+		skepu::Vector<int> res2(N);
+		mappr(res1, res2, v, h);
+		res1.flush();
+		res2.flush();
+		for(size_t i(0); i < N; ++i)
+		{
+			REQUIRE(res1(i) == expected1[i]);
+			REQUIRE(res2(i) == expected2);
+		}
+	}
+
+	SECTION("Colwize")
+	{
+		REQUIRE_NOTHROW(
+			mappr.setReduceMode(skepu::ReduceMode::ColWise));
+
+		size_t constexpr N{100};
+		skepu::Vector<int> v(100);
+		skepu::Vector<int> h(100);
+		int expected1{2};
+		std::vector<int> expected2(N, 7);
+
+		v.flush();
+		h.flush();
+		for(size_t i(0); i < N; ++i)
+		{
+			v(i) = rigen(gen);
+			expected1 += v(i);
+			h(i) = rigen(gen);
+			expected2[i] += N*h(i);
+		}
+
+		skepu::Vector<int> res1(N);
+		skepu::Vector<int> res2(N);
+		mappr(res1, res2, v, h);
+		res1.flush();
+		res2.flush();
+		for(size_t i(0); i < N; ++i)
+		{
+			REQUIRE(res1(i) == expected1);
+			REQUIRE(res2(i) == expected2[i]);
+		}
 	}
 }
