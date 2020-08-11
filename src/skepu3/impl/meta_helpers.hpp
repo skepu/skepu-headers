@@ -88,8 +88,13 @@ struct pack_element<0, First, Rest...>
 /////////////////////////////
 // first_element
 
+struct empty_pack_error {};
+
 template<typename... Args>
 struct first_element: pack_element<0, Args...>{};
+
+template<>
+struct first_element<> { using type = empty_pack_error; };
 
 /////////////////////////////
 // get
@@ -418,11 +423,17 @@ struct select_if<false, T, F> { using type = F; };
 template<size_t Index, typename T>
 auto get_or_return(T &&arg) -> decltype(arg)
 {
-	return arg; 
+	return std::forward<T>(arg); 
 }
 
 template<size_t Index, typename... Args>
-auto get_or_return(std::tuple<Args...> arg) -> decltype(std::get<Index>(arg))
+auto get_or_return(std::tuple<Args...> &arg) -> decltype(std::get<Index>(arg))
+{
+	return std::get<Index>(arg);
+}
+
+template<size_t Index, typename... Args>
+auto get_or_return(std::tuple<Args...> const& arg) -> decltype(std::get<Index>(arg))
 {
 	return std::get<Index>(arg);
 }

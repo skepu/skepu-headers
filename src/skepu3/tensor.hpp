@@ -45,7 +45,13 @@ namespace skepu
 		T &operator[](size_t index)       { return this->data[index]; }
 		T  operator[](size_t index) const { return this->data[index]; }
 		
+#ifdef SKEPU_CUDA
+		__host__ __device__
+#endif
 		T &operator()(size_t i, size_t j, size_t k)       { return this->data[i * this->size_j * this->size_k + j * this->size_k + k]; }
+#ifdef SKEPU_CUDA
+		__host__ __device__
+#endif
 		T  operator()(size_t i, size_t j, size_t k) const { return this->data[i * this->size_j * this->size_k + j * this->size_k + k]; }
 		
 		T *data;
@@ -291,10 +297,17 @@ namespace skepu
 		T &operator[](size_t index)       { return this->data[index]; }
 		T  operator[](size_t index) const { return this->data[index]; }
 		
+#ifdef SKEPU_CUDA
+		__host__ __device__
+#endif
 		T &operator()(size_t i, size_t j, size_t k, size_t l)
-			{ return this->data[i * this->size_j * this->size_k * this->size_l + j * this->size_k * this->size_l + k * this->size_l + l]; }
+		{ return this->data[i * this->size_j * this->size_k * this->size_l + j * this->size_k * this->size_l + k * this->size_l + l]; }
+		
+#ifdef SKEPU_CUDA
+		__host__ __device__
+#endif
 		T  operator()(size_t i, size_t j, size_t k, size_t l) const
-			{ return this->data[i * this->size_j * this->size_k * this->size_l + j * this->size_k * this->size_l + k * this->size_l + l]; }
+		{ return this->data[i * this->size_j * this->size_k * this->size_l + j * this->size_k * this->size_l + k * this->size_l + l]; }
 		
 		T *data;
 		size_t size_i, size_j, size_k, size_l;

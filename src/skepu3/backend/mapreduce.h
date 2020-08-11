@@ -61,7 +61,6 @@ namespace skepu
 			static constexpr typename make_pack_indices<numArgs, arity + anyArity>::type const_indices{};
 			
 			using defaultDim = index_dimension<typename std::conditional<MapFunc::indexed, typename MapFunc::IndexType, skepu::Index1D>::type>;
-			using First = typename parameter_type<MapFunc::indexed ? 1 : 0, decltype(&MapFunc::CPU)>::type;
 			
 			using F = ConditionalIndexForwarder<MapFunc::indexed, decltype(&MapFunc::CPU)>;
 			using Ret = typename MapFunc::Ret;
@@ -91,29 +90,24 @@ namespace skepu
 				tuner::tune(*this, std::forward<Args>(args)...);
 			}
 			
-			template<template<class> class Container, typename... CallArgs, REQUIRES(is_skepu_container<Container<First>>::value)>
-			Ret operator()(const Container<First> &arg1, CallArgs&&... args)
-			{
-				return backendDispatch(out_indices, elwise_indices, any_indices, const_indices, arg1.size(), arg1, std::forward<CallArgs>(args)...);
-			}
-			
-			template<template<class> class Container, typename... CallArgs, REQUIRES(is_skepu_container<Container<First>>::value)>
+			// For first elwise argument as container
+			template<typename First, template<class> class Container, typename... CallArgs, REQUIRES(is_skepu_container<Container<First>>::value)>
 			Ret operator()(Container<First> &arg1, CallArgs&&... args)
 			{
 				return backendDispatch(out_indices, elwise_indices, any_indices, const_indices, arg1.size(), arg1, std::forward<CallArgs>(args)...);
 			}
 			
-			template<typename Iterator, typename... CallArgs, REQUIRES(is_skepu_iterator<Iterator, First>::value)>
+			// For first elwise argument as iterator
+			template<typename Iterator, typename... CallArgs, REQUIRES(sizeof...(CallArgs) + 1 == numArgs)>
 			Ret operator()(Iterator arg1, Iterator arg1_end, CallArgs&&... args)
 			{
 				return backendDispatch(out_indices, elwise_indices, any_indices, const_indices, arg1_end - arg1, arg1, std::forward<CallArgs>(args)...);
 			}
 			
-			template<template<class> class Container = Vector, typename... CallArgs>
+			// For no elwise arguments
+			template<typename... CallArgs, REQUIRES(sizeof...(CallArgs) == numArgs)>
 			Ret operator()(CallArgs&&... args)
 			{
-				static_assert(sizeof...(CallArgs) == numArgs, "Number of arguments not matching Map function");
-				
 				size_t size = this->default_size_i;
 				if (defaultDim::value >= 2) size *= this->default_size_j;
 				if (defaultDim::value >= 3) size *= this->default_size_k;

@@ -48,7 +48,6 @@ namespace skepu
 		static constexpr size_t anyCont = trait_count_all<is_skepu_container_proxy, Args...>::value;
 		
 		using defaultDim = typename std::conditional<indexed, index_dimension<typename first_element<Args...>::type>, std::integral_constant<int, 1>>::type;
-		using First = typename pack_element<indexed ? 1 : 0, Args...>::type;
 		
 		// Supports the "index trick": using a variant of tag dispatching to index template parameter packs
 		static constexpr typename make_pack_indices<OutArity, 0>::type out_indices{};
@@ -119,25 +118,25 @@ namespace skepu
 			this->default_size_l = l;
 		}
 		
-		template<template<class> class Container, typename... CallArgs, REQUIRES_VALUE(is_skepu_container<Container<First>>)>
+		// For first elwise argument as container
+		template<typename First, template<class> class Container, typename... CallArgs, REQUIRES_VALUE(is_skepu_container<Container<First>>)>
 		RetType operator()(Container<First>& arg1, CallArgs&&... args)
 		{
 			static_assert(sizeof...(CallArgs) + 1 == numArgs, "Number of arguments not matching Map function");
 			return apply(out_indices, elwise_indices, any_indices, const_indices, arg1.size(), arg1.begin(), std::forward<CallArgs>(args)...);
 		}
 		
-		
-		template<typename Iterator, typename... CallArgs, REQUIRES_VALUE(is_skepu_iterator<Iterator, First>)>
+		// For first elwise argument as iterator
+		template<typename Iterator, typename... CallArgs, REQUIRES(sizeof...(CallArgs) + 1 == numArgs)>
 		RetType operator()(Iterator arg1, Iterator arg1_end, CallArgs&&... args)
 		{
-			static_assert(sizeof...(CallArgs) + 1 == numArgs, "Number of arguments not matching Map function");
 			return apply(out_indices, elwise_indices, any_indices, const_indices, arg1_end - arg1, arg1, std::forward<CallArgs>(args)...);
 		}
 		
-		template<template<class> class Container = Vector, typename... CallArgs>
+		// For no elwise arguments
+		template<typename... CallArgs, REQUIRES(sizeof...(CallArgs) == numArgs)>
 		RetType operator()(CallArgs&&... args)
 		{
-			static_assert(sizeof...(CallArgs) == numArgs, "Number of arguments not matching Map function");
 			return this->zero_apply(out_indices, any_indices, const_indices, std::forward<CallArgs>(args)...);
 		}
 		
