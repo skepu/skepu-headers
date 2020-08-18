@@ -149,6 +149,7 @@ public:
 			ptag_indices,
 			begin,
 			end,
+			begin,
 			std::forward<CallArgs>(args)...);
 		return begin;
 	}

@@ -412,10 +412,10 @@ private:
 	{
 		auto static constexpr pt = typename MapFunc::ProxyTags{};
 		auto static constexpr cbai = make_pack_indices<3>::type{};
-		pack_expand(
+		pack_expand((
 			skeleton_task::handle_container_arg(
 				cont::getParent(get<AI>(args...)),
-				std::get<PI>(pt))...);
+				std::get<PI>(pt)),0)...);
 		pack_expand((cont::getParent(get<EI>(args...)).partition(),0)...);
 
 		std::set<size_t> scheduled_ranks;
@@ -488,10 +488,10 @@ private:
 	{
 		auto static constexpr pt = typename MapFunc::ProxyTags{};
 		auto static constexpr cbai = make_pack_indices<6>::type{};
-		pack_expand(
+		pack_expand((
 			skeleton_task::handle_container_arg(
 				cont::getParent(get<AI>(args...)),
-				std::get<PI>(pt))...);
+				std::get<PI>(pt)),0)...);
 		size_t task_size = size / cluster::mpi_size();
 		if(size - (task_size * cluster::mpi_size()))
 			++task_size;
@@ -532,11 +532,11 @@ private:
 			starpu_mpi_get_data_on_all_nodes_detached(MPI_COMM_WORLD, handle);
 			starpu_data_acquire(handle, STARPU_R);
 			Ret part_res = *(Ret *)starpu_data_get_local_ptr(handle);
-			pack_expand(
+			pack_expand((
 				get_or_return<OI>(res) =
 					ReduceFunc::CPU(
 						get_or_return<OI>(res),
-						get_or_return<OI>(part_res))...);
+						get_or_return<OI>(part_res)),0)...);
 			starpu_data_release(handle);
 			starpu_mpi_cache_flush(MPI_COMM_WORLD, handle);
 		}
