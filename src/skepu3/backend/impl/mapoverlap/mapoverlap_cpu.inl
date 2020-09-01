@@ -197,69 +197,89 @@ namespace skepu
 		
 		
 		template<typename MapOverlapFunc, typename CUDAKernel, typename CLKernel>
-		template<size_t... AI, size_t... CI, typename... CallArgs>
+		template<size_t... OI, size_t... EI, size_t... AI, size_t... CI, typename... CallArgs>
 		void MapOverlap2D<MapOverlapFunc, CUDAKernel, CLKernel>
-		::helper_CPU(skepu::Matrix<Ret>& res, skepu::Matrix<T>& arg, pack_indices<AI...>, pack_indices<CI...>,  CallArgs&&... args)
+		::helper_CPU(pack_indices<OI...>, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args)
 		{
 			// Sync with device data
-			arg.updateHost();
+			pack_expand((get<EI, CallArgs...>(args...).getParent().updateHost(), 0)...);
 			pack_expand((get<AI, CallArgs...>(args...).getParent().updateHost(hasReadAccess(MapOverlapFunc::anyAccessMode[AI])), 0)...);
 			pack_expand((get<AI, CallArgs...>(args...).getParent().invalidateDeviceData(hasWriteAccess(MapOverlapFunc::anyAccessMode[AI])), 0)...);
-			res.invalidateDeviceData();
+			pack_expand((get<OI, CallArgs...>(args...).getParent().invalidateDeviceData(), 0)...);
+			
+			auto arg = get<outArity>(args...);
 			
 			const int overlap_x = (int)this->m_overlap_x;
 			const int overlap_y = (int)this->m_overlap_y;
+			const size_t rows = get<0>(args...).total_rows();
+			const size_t cols = get<0>(args...).total_cols();
 			const size_t in_cols = arg.total_cols();
 			
-			for (size_t i = 0; i < res.total_rows(); i++)
-				for (size_t j = 0; j < res.total_cols(); j++)
-					res(i, j) = MapOverlapFunc::CPU({overlap_x, overlap_y, in_cols, &arg(i + overlap_y, j + overlap_x)}, get<AI, CallArgs...>(args...).hostProxy()..., get<CI, CallArgs...>(args...)...);
+			for (size_t i = 0; i < rows; i++)
+				for (size_t j = 0; j < cols; j++)
+				{
+					auto res = F::forward(MapOverlapFunc::CPU, Index2D{i,j},
+						Region2D<T>{overlap_x, overlap_y, in_cols, &arg((i + overlap_y) * in_cols + (j + overlap_x))},
+						get<AI, CallArgs...>(args...).hostProxy()..., get<CI, CallArgs...>(args...)...);
+					std::tie(get<OI>(args...)(i, j)...) = res;
+				}
 		}
 		
 		
 		
 		
 		template<typename MapOverlapFunc, typename CUDAKernel, typename CLKernel>
-		template<size_t... AI, size_t... CI, typename... CallArgs>
+		template<size_t... OI, size_t... EI, size_t... AI, size_t... CI,  typename... CallArgs>
 		void MapOverlap3D<MapOverlapFunc, CUDAKernel, CLKernel>
-		::helper_CPU(skepu::Tensor3<Ret>& res, skepu::Tensor3<T>& arg, pack_indices<AI...>, pack_indices<CI...>,  CallArgs&&... args)
+		::helper_CPU(pack_indices<OI...>, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args)
 		{
 			// Sync with device data
-			arg.updateHost();
+			pack_expand((get<EI, CallArgs...>(args...).getParent().updateHost(), 0)...);
 			pack_expand((get<AI, CallArgs...>(args...).getParent().updateHost(hasReadAccess(MapOverlapFunc::anyAccessMode[AI])), 0)...);
 			pack_expand((get<AI, CallArgs...>(args...).getParent().invalidateDeviceData(hasWriteAccess(MapOverlapFunc::anyAccessMode[AI])), 0)...);
-			res.invalidateDeviceData();
+			pack_expand((get<OI, CallArgs...>(args...).getParent().invalidateDeviceData(), 0)...);
 			
-			for (size_t i = 0; i < res.size_i(); i++)
-				for (size_t j = 0; j < res.size_j(); j++)
-					for (size_t k = 0; k < res.size_k(); k++)
-						res(i, j, k) = MapOverlapFunc::CPU(Region3D<T>{this->m_overlap_i, this->m_overlap_j, this->m_overlap_k,
-							arg.size_i(), arg.size_j(), &arg(i+this->m_overlap_i, + j+this->m_overlap_j, + k+this->m_overlap_k)},
+			auto arg = get<outArity>(args...);
+			
+			for (size_t i = 0; i < get<0>(args...).size_i(); i++)
+				for (size_t j = 0; j < get<0>(args...).size_j(); j++)
+					for (size_t k = 0; k < get<0>(args...).size_k(); k++)
+					{
+						auto res = F::forward(MapOverlapFunc::CPU, Index3D{i,j,k},
+							Region3D<T>{this->m_overlap_i, this->m_overlap_j, this->m_overlap_k,
+								arg.size_i(), arg.size_j(), &arg(i+this->m_overlap_i, + j+this->m_overlap_j, + k+this->m_overlap_k)},
 							get<AI, CallArgs...>(args...).hostProxy()..., get<CI, CallArgs...>(args...)...);
+						std::tie(get<OI>(args...)(i, j, k)...) = res;
+					}
 		}
 		
 		
 		
 		
 		template<typename MapOverlapFunc, typename CUDAKernel, typename CLKernel>
-		template<size_t... AI, size_t... CI, typename... CallArgs>
+		template<size_t... OI, size_t... EI, size_t... AI, size_t... CI, typename... CallArgs>
 		void MapOverlap4D<MapOverlapFunc, CUDAKernel, CLKernel>
-		::helper_CPU(skepu::Tensor4<Ret>& res, skepu::Tensor4<T>& arg, pack_indices<AI...>, pack_indices<CI...>,  CallArgs&&... args)
+		::helper_CPU(pack_indices<OI...>, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args)
 		{
 			// Sync with device data
-			arg.updateHost();
+			pack_expand((get<EI, CallArgs...>(args...).getParent().updateHost(), 0)...);
 			pack_expand((get<AI, CallArgs...>(args...).getParent().updateHost(hasReadAccess(MapOverlapFunc::anyAccessMode[AI])), 0)...);
 			pack_expand((get<AI, CallArgs...>(args...).getParent().invalidateDeviceData(hasWriteAccess(MapOverlapFunc::anyAccessMode[AI])), 0)...);
-			res.invalidateDeviceData();
+			pack_expand((get<OI, CallArgs...>(args...).getParent().invalidateDeviceData(), 0)...);
 			
-			for (size_t i = 0; i < res.size_i(); i++)
-				for (size_t j = 0; j < res.size_j(); j++)
-					for (size_t k = 0; k < res.size_k(); k++)
-						for (size_t l = 0; l < res.size_l(); l++)
+			auto arg = get<outArity>(args...);
+			
+			for (size_t i = 0; i < get<0>(args...).size_i(); i++)
+				for (size_t j = 0; j < get<0>(args...).size_j(); j++)
+					for (size_t k = 0; k < get<0>(args...).size_k(); k++)
+						for (size_t l = 0; l < get<0>(args...).size_l(); l++)
 						{
-							res(i, j, k, l) = MapOverlapFunc::CPU(Region4D<T>{this->m_overlap_i, this->m_overlap_j, this->m_overlap_k, this->m_overlap_l,
-								arg.size_i(), arg.size_j(), arg.size_k(), &arg(i + this->m_overlap_i, j + this->m_overlap_j, k + this->m_overlap_k, l + this->m_overlap_l)},
+							auto res = F::forward(MapOverlapFunc::CPU, Index4D{i,j,k,l},
+								Region4D<T>{this->m_overlap_i, this->m_overlap_j, this->m_overlap_k, this->m_overlap_l,
+									arg.size_i(), arg.size_j(), arg.size_k(),
+									&arg(i + this->m_overlap_i, j + this->m_overlap_j, k + this->m_overlap_k, l + this->m_overlap_l)},
 								get<AI, CallArgs...>(args...).hostProxy()..., get<CI, CallArgs...>(args...)...);
+							std::tie(get<OI>(args...)(i, j, k, l)...) = res;
 						}
 		}
 		

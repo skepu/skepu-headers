@@ -425,7 +425,8 @@ namespace skepu
 		class MapOverlap2D: public SkeletonBase
 		{
 			using Ret = typename MapOverlapFunc::Ret;
-			using T = typename region_type<typename parameter_type<0, decltype(&MapOverlapFunc::CPU)>::type>::type;
+			using T = typename region_type<typename parameter_type<(MapOverlapFunc::indexed ? 1 : 0), decltype(&MapOverlapFunc::CPU)>::type>::type;
+			using F = ConditionalIndexForwarder<MapOverlapFunc::indexed, decltype(&MapOverlapFunc::CPU)>;
 			
 		public:
 			
@@ -434,7 +435,17 @@ namespace skepu
 			using ElwiseArgs = std::tuple<T>;
 			using ContainerArgs = typename MapOverlapFunc::ContainerArgs;
 			using UniformArgs = typename MapOverlapFunc::UniformArgs;
-			static constexpr bool prefers_matrix = true;
+			static constexpr bool prefers_matrix = false;
+			
+			static constexpr size_t arity = 1;
+			static constexpr size_t outArity = MapOverlapFunc::outArity;
+			static constexpr size_t numArgs = MapOverlapFunc::totalArity - (MapOverlapFunc::indexed ? 1 : 0) + outArity;
+			static constexpr size_t anyArity = std::tuple_size<typename MapOverlapFunc::ContainerArgs>::value;
+			
+			static constexpr typename make_pack_indices<outArity, 0>::type out_indices{};
+			static constexpr typename make_pack_indices<arity + outArity, outArity>::type elwise_indices{};
+			static constexpr typename make_pack_indices<arity + anyArity + outArity, arity + outArity>::type any_indices{};
+			static constexpr typename make_pack_indices<numArgs, arity + anyArity + outArity>::type const_indices{};
 			
 			MapOverlap2D(CUDAKernel kernel) : m_cuda_kernel(kernel)
 			{
@@ -486,13 +497,13 @@ namespace skepu
 			
 			
 		private:
-			template<size_t... AnyIndx, size_t... ConstIndx, typename... CallArgs>
-			void helper_CPU(Matrix<Ret>& res, Matrix<T>& arg, pack_indices<AnyIndx...>, pack_indices<ConstIndx...>,  CallArgs&&... args);
+			template<size_t... OI, size_t... EI, size_t... AI, size_t... CI, typename... CallArgs>
+			void helper_CPU(pack_indices<OI...>, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args);
 			
 #ifdef SKEPU_OPENMP
 			
-			template<size_t... AnyIndx, size_t... ConstIndx, typename... CallArgs>
-			void helper_OpenMP(Matrix<Ret>& res, Matrix<T>& arg, pack_indices<AnyIndx...>, pack_indices<ConstIndx...>,  CallArgs&&... args);
+			template<size_t... OI, size_t... EI, size_t... AI, size_t... CI, typename... CallArgs>
+			void helper_OpenMP(pack_indices<OI...>, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args);
 			
 #endif
 		
@@ -530,24 +541,28 @@ namespace skepu
 #endif
 			
 		public:
-			template<typename... CallArgs>
-			Matrix<Ret> &operator()(Matrix<Ret> &res, Matrix<T> &arg, CallArgs&&... args)
+			template<size_t... OI, size_t... EI, size_t... AI, size_t... CI, typename... CallArgs>
+			auto backendDispatch(pack_indices<OI...>, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args) -> decltype(get<0>(args...))
 			{
-				static constexpr size_t anyCont = std::tuple_size<typename MapOverlapFunc::ContainerArgs>::value;
-				typename make_pack_indices<anyCont, 0>::type any_indices;
-				typename make_pack_indices<sizeof...(CallArgs), anyCont>::type const_indices;
+				size_t size_i = get<0>(args...).size_i();
+				size_t size_j = get<0>(args...).size_j();
 				
-				const size_t overlap_x = this->m_overlap_x;
-				const size_t overlap_y = this->m_overlap_y;
-				const size_t in_rows = arg.total_rows();
-				const size_t in_cols = arg.total_cols();
-				const size_t out_rows = res.total_rows();
-				const size_t out_cols = res.total_cols();
+				if (disjunction(
+					(get<OI>(args...).size_i() < size_i) &&
+					(get<OI>(args...).size_j() < size_j) ...))
+					SKEPU_ERROR("Non-matching container sizes");
 				
-				if ((in_rows - overlap_y*2 != out_rows) && (in_cols - overlap_x*2 != out_cols))
-					SKEPU_ERROR("MapOverlap 2D: Non-matching container sizes");
+				if (disjunction(
+					(get<EI>(args...).size_i() - this->m_overlap_y*2 != size_i) &&
+					(get<EI>(args...).size_j() - this->m_overlap_x*2 != size_j) ...))
+					SKEPU_ERROR("Non-matching container sizes");
 				
-				this->selectBackend(arg.size());
+				// Remove later
+				auto res = get<0>(args...);
+				auto arg = get<outArity>(args...);
+				// End remove
+				
+				this->selectBackend(get<0>(args...).size());
 					
 				switch (this->m_selected_spec->activateBackend())
 				{
@@ -568,15 +583,21 @@ namespace skepu
 #endif
 				case Backend::Type::OpenMP:
 #ifdef SKEPU_OPENMP
-					this->helper_OpenMP(res, arg, any_indices, const_indices, std::forward<CallArgs>(args)...);
+					this->helper_OpenMP(out_indices, elwise_indices, any_indices, const_indices, std::forward<CallArgs>(args)...);
 					break;
 #endif
 				default:
-					this->helper_CPU(res, arg, any_indices, const_indices, std::forward<CallArgs>(args)...);
+					this->helper_CPU(out_indices, elwise_indices, any_indices, const_indices, std::forward<CallArgs>(args)...);
 					break;
 				}
 				
-				return res;
+				return get<0>(args...);
+			}
+			
+			template<typename... CallArgs>
+			auto operator()(CallArgs&&... args) -> decltype(get<0>(args...))
+			{
+				return this->backendDispatch(out_indices, elwise_indices, any_indices, const_indices, std::forward<CallArgs>(args)...);
 			}
 		};
 		
@@ -591,7 +612,8 @@ namespace skepu
 		class MapOverlap3D: public SkeletonBase
 		{
 			using Ret = typename MapOverlapFunc::Ret;
-			using T = typename region_type<typename parameter_type<0, decltype(&MapOverlapFunc::CPU)>::type>::type;
+			using T = typename region_type<typename parameter_type<(MapOverlapFunc::indexed ? 1 : 0), decltype(&MapOverlapFunc::CPU)>::type>::type;
+			using F = ConditionalIndexForwarder<MapOverlapFunc::indexed, decltype(&MapOverlapFunc::CPU)>;
 			
 		public:
 			
@@ -601,6 +623,16 @@ namespace skepu
 			using ContainerArgs = typename MapOverlapFunc::ContainerArgs;
 			using UniformArgs = typename MapOverlapFunc::UniformArgs;
 			static constexpr bool prefers_matrix = false;
+			
+			static constexpr size_t arity = 1;
+			static constexpr size_t outArity = MapOverlapFunc::outArity;
+			static constexpr size_t numArgs = MapOverlapFunc::totalArity - (MapOverlapFunc::indexed ? 1 : 0) + outArity;
+			static constexpr size_t anyArity = std::tuple_size<typename MapOverlapFunc::ContainerArgs>::value;
+			
+			static constexpr typename make_pack_indices<outArity, 0>::type out_indices{};
+			static constexpr typename make_pack_indices<arity + outArity, outArity>::type elwise_indices{};
+			static constexpr typename make_pack_indices<arity + anyArity + outArity, arity + outArity>::type any_indices{};
+			static constexpr typename make_pack_indices<numArgs, arity + anyArity + outArity>::type const_indices{};
 			
 			MapOverlap3D(CUDAKernel kernel) : m_cuda_kernel(kernel)
 			{
@@ -654,13 +686,13 @@ namespace skepu
 			
 			
 		private:
-			template<size_t... AnyIndx, size_t... ConstIndx, typename... CallArgs>
-			void helper_CPU(Tensor3<Ret>& res, Tensor3<T>& arg, pack_indices<AnyIndx...>, pack_indices<ConstIndx...>,  CallArgs&&... args);
+			template<size_t... OI, size_t... EI, size_t... AI, size_t... CI, typename... CallArgs>
+			void helper_CPU(pack_indices<OI...>, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args);
 			
 #ifdef SKEPU_OPENMP
 			
-			template<size_t... AnyIndx, size_t... ConstIndx, typename... CallArgs>
-			void helper_OpenMP(Tensor3<Ret>& res, Tensor3<T>& arg, pack_indices<AnyIndx...>, pack_indices<ConstIndx...>,  CallArgs&&... args);
+			template<size_t... OI, size_t... EI, size_t... AI, size_t... CI, typename... CallArgs>
+			void helper_OpenMP(pack_indices<OI...>, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args);
 			
 #endif
 		
@@ -698,19 +730,32 @@ namespace skepu
 #endif
 			
 		public:
-			template<typename... CallArgs>
-			Tensor3<Ret> &operator()(Tensor3<Ret> &res, Tensor3<T> &arg, CallArgs&&... args)
+			
+			template<size_t... OI, size_t... EI, size_t... AI, size_t... CI, typename... CallArgs>
+			auto backendDispatch(pack_indices<OI...>, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args) -> decltype(get<0>(args...))
 			{
-				static constexpr size_t anyCont = std::tuple_size<typename MapOverlapFunc::ContainerArgs>::value;
-				typename make_pack_indices<anyCont, 0>::type any_indices;
-				typename make_pack_indices<sizeof...(CallArgs), anyCont>::type const_indices;
+				size_t size_i = get<0>(args...).size_i();
+				size_t size_j = get<0>(args...).size_j();
+				size_t size_k = get<0>(args...).size_k();
 				
-				if (  (arg.size_i() - this->m_overlap_i*2 != res.size_i())
-					&& (arg.size_j() - this->m_overlap_j*2 != res.size_j())
-					&& (arg.size_k() - this->m_overlap_k*2 != res.size_k()))
-					SKEPU_ERROR("MapOverlap3D: Non-matching container sizes");
+				if (disjunction(
+					(get<OI>(args...).size_i() < size_i) &&
+					(get<OI>(args...).size_j() < size_j) &&
+					(get<OI>(args...).size_k() < size_k) ...))
+					SKEPU_ERROR("Non-matching container sizes");
 				
-				this->selectBackend(arg.size());
+				if (disjunction(
+					(get<EI>(args...).size_i() - this->m_overlap_i*2 != size_i) &&
+					(get<EI>(args...).size_j() - this->m_overlap_j*2 != size_j) &&
+					(get<EI>(args...).size_k() - this->m_overlap_k*2 != size_k) ...))
+					SKEPU_ERROR("Non-matching container sizes");
+				
+				// Remove later
+				auto res = get<0>(args...);
+				auto arg = get<outArity>(args...);
+				// End remove
+				
+				this->selectBackend(get<0>(args...).size());
 					
 				switch (this->m_selected_spec->activateBackend())
 				{
@@ -731,15 +776,21 @@ namespace skepu
 #endif
 				case Backend::Type::OpenMP:
 #ifdef SKEPU_OPENMP
-					this->helper_OpenMP(res, arg, any_indices, const_indices, std::forward<CallArgs>(args)...);
+					this->helper_OpenMP(out_indices, elwise_indices, any_indices, const_indices, std::forward<CallArgs>(args)...);
 					break;
 #endif
 				default:
-					this->helper_CPU(res, arg, any_indices, const_indices, std::forward<CallArgs>(args)...);
+					this->helper_CPU(out_indices, elwise_indices, any_indices, const_indices, std::forward<CallArgs>(args)...);
 					break;
 				}
 				
-				return res;
+				return get<0>(args...);
+			}
+			
+			template<typename... CallArgs>
+			auto operator()(CallArgs&&... args) -> decltype(get<0>(args...))
+			{
+				return this->backendDispatch(out_indices, elwise_indices, any_indices, const_indices, std::forward<CallArgs>(args)...);
 			}
 		};
 		
@@ -754,7 +805,8 @@ namespace skepu
 		class MapOverlap4D: public SkeletonBase
 		{
 			using Ret = typename MapOverlapFunc::Ret;
-			using T = typename region_type<typename parameter_type<0, decltype(&MapOverlapFunc::CPU)>::type>::type;
+			using T = typename region_type<typename parameter_type<(MapOverlapFunc::indexed ? 1 : 0), decltype(&MapOverlapFunc::CPU)>::type>::type;
+			using F = ConditionalIndexForwarder<MapOverlapFunc::indexed, decltype(&MapOverlapFunc::CPU)>;
 			
 		public:
 			
@@ -765,21 +817,21 @@ namespace skepu
 			using UniformArgs = typename MapOverlapFunc::UniformArgs;
 			static constexpr bool prefers_matrix = false;
 			
+			static constexpr size_t arity = 1;
+			static constexpr size_t outArity = MapOverlapFunc::outArity;
+			static constexpr size_t numArgs = MapOverlapFunc::totalArity - (MapOverlapFunc::indexed ? 1 : 0) + outArity;
+			static constexpr size_t anyArity = std::tuple_size<typename MapOverlapFunc::ContainerArgs>::value;
+			
+			static constexpr typename make_pack_indices<outArity, 0>::type out_indices{};
+			static constexpr typename make_pack_indices<arity + outArity, outArity>::type elwise_indices{};
+			static constexpr typename make_pack_indices<arity + anyArity + outArity, arity + outArity>::type any_indices{};
+			static constexpr typename make_pack_indices<numArgs, arity + anyArity + outArity>::type const_indices{};
+			
 			MapOverlap4D(CUDAKernel kernel) : m_cuda_kernel(kernel)
 			{
 #ifdef SKEPU_OPENCL
 				CLKernel::initialize();
 #endif
-			}
-			
-			void setEdgeMode(Edge mode)
-			{
-				this->m_edge = mode;
-			}
-			
-			void setPad(T pad)
-			{
-				this->m_pad = pad;
 			}
 			
 			void setOverlap(int o)
@@ -812,20 +864,17 @@ namespace skepu
 		private:
 			CUDAKernel m_cuda_kernel;
 			
-			Edge m_edge = Edge::Duplicate;
-			T m_pad {};
-			
 			int m_overlap_i, m_overlap_j, m_overlap_k, m_overlap_l;
 			
 			
 		private:
-			template<size_t... AnyIndx, size_t... ConstIndx, typename... CallArgs>
-			void helper_CPU(Tensor4<Ret>& res, Tensor4<T>& arg, pack_indices<AnyIndx...>, pack_indices<ConstIndx...>,  CallArgs&&... args);
+			template<size_t... OI, size_t... EI, size_t... AI, size_t... CI, typename... CallArgs>
+			void helper_CPU(pack_indices<OI...>, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args);
 			
 #ifdef SKEPU_OPENMP
 			
-			template<size_t... AnyIndx, size_t... ConstIndx, typename... CallArgs>
-			void helper_OpenMP(Tensor4<Ret>& res, Tensor4<T>& arg, pack_indices<AnyIndx...>, pack_indices<ConstIndx...>,  CallArgs&&... args);
+			template<size_t... OI, size_t... EI, size_t... AI, size_t... CI, typename... CallArgs>
+			void helper_OpenMP(pack_indices<OI...>, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args);
 			
 #endif
 		
@@ -863,20 +912,34 @@ namespace skepu
 #endif
 			
 		public:
-			template<typename... CallArgs>
-			Tensor4<Ret> &operator()(Tensor4<Ret> &res, Tensor4<T> &arg, CallArgs&&... args)
+			template<size_t... OI, size_t... EI, size_t... AI, size_t... CI, typename... CallArgs>
+			auto backendDispatch(pack_indices<OI...>, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args) -> decltype(get<0>(args...))
 			{
-				static constexpr size_t anyCont = std::tuple_size<typename MapOverlapFunc::ContainerArgs>::value;
-				typename make_pack_indices<anyCont, 0>::type any_indices;
-				typename make_pack_indices<sizeof...(CallArgs), anyCont>::type const_indices;
+				size_t size_i = get<0>(args...).size_i();
+				size_t size_j = get<0>(args...).size_j();
+				size_t size_k = get<0>(args...).size_k();
+				size_t size_l = get<0>(args...).size_l();
 				
-				if (  (arg.size_i() - this->m_overlap_i*2 != res.size_i())
-					&& (arg.size_j() - this->m_overlap_j*2 != res.size_j())
-					&& (arg.size_k() - this->m_overlap_k*2 != res.size_k())
-					&& (arg.size_l() - this->m_overlap_l*2 != res.size_l()))
-					SKEPU_ERROR("MapOverlap4D: Non-matching container sizes");
+				if (disjunction(
+					(get<OI>(args...).size_i() < size_i) &&
+					(get<OI>(args...).size_j() < size_j) &&
+					(get<OI>(args...).size_k() < size_k) &&
+					(get<OI>(args...).size_l() < size_l)...))
+					SKEPU_ERROR("Non-matching container sizes");
 				
-				this->selectBackend(arg.size());
+				if (disjunction(
+					(get<EI>(args...).size_i() - this->m_overlap_i*2 != size_i) &&
+					(get<EI>(args...).size_j() - this->m_overlap_j*2 != size_j) &&
+					(get<EI>(args...).size_k() - this->m_overlap_k*2 != size_k) &&
+					(get<EI>(args...).size_l() - this->m_overlap_l*2 != size_l)...))
+					SKEPU_ERROR("Non-matching container sizes");
+				
+				// Remove later
+				auto res = get<0>(args...);
+				auto arg = get<outArity>(args...);
+				// End remove
+				
+				this->selectBackend(get<0>(args...).size());
 					
 				switch (this->m_selected_spec->activateBackend())
 				{
@@ -897,15 +960,21 @@ namespace skepu
 #endif
 				case Backend::Type::OpenMP:
 #ifdef SKEPU_OPENMP
-					this->helper_OpenMP(res, arg, any_indices, const_indices, std::forward<CallArgs>(args)...);
+					this->helper_OpenMP(out_indices, elwise_indices, any_indices, const_indices, std::forward<CallArgs>(args)...);
 					break;
 #endif
 				default:
-					this->helper_CPU(res, arg, any_indices, const_indices, std::forward<CallArgs>(args)...);
+					this->helper_CPU(out_indices, elwise_indices, any_indices, const_indices, std::forward<CallArgs>(args)...);
 					break;
 				}
 				
-				return res;
+				return get<0>(args...);
+			}
+			
+			template<typename... CallArgs>
+			auto operator()(CallArgs&&... args) -> decltype(get<0>(args...))
+			{
+				return this->backendDispatch(out_indices, elwise_indices, any_indices, const_indices, std::forward<CallArgs>(args)...);
 			}
 		};
 		

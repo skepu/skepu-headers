@@ -549,7 +549,37 @@ namespace skepu
 			- (is_indexed<Args...>::value ? 1 : 0)
 	> {};
 
+
+	// ----------------------------------------------------------------
+	// MapOverlap dimensionality deducer
+	// ----------------------------------------------------------------
 	
+	template<typename... Args>
+	struct mapoverlap_dimensionality {};
+	
+	template<typename T, typename... Args>
+	struct mapoverlap_dimensionality<Region1D<T>, Args...>: std::integral_constant<int, 1> {};
+	
+	template<typename T, typename... Args>
+	struct mapoverlap_dimensionality<Region2D<T>, Args...>: std::integral_constant<int, 2> {};
+	
+	template<typename T, typename... Args>
+	struct mapoverlap_dimensionality<Region3D<T>, Args...>: std::integral_constant<int, 3> {};
+	
+	template<typename T, typename... Args>
+	struct mapoverlap_dimensionality<Region4D<T>, Args...>: std::integral_constant<int, 4> {};
+	
+	template<typename T, typename... Args>
+	struct mapoverlap_dimensionality<Index1D, Region1D<T>, Args...>: std::integral_constant<int, 1> {};
+	
+	template<typename T, typename... Args>
+	struct mapoverlap_dimensionality<Index2D, Region2D<T>, Args...>: std::integral_constant<int, 2> {};
+	
+	template<typename T, typename... Args>
+	struct mapoverlap_dimensionality<Index3D, Region3D<T>, Args...>: std::integral_constant<int, 3> {};
+	
+	template<typename T, typename... Args>
+	struct mapoverlap_dimensionality<Index4D, Region4D<T>, Args...>: std::integral_constant<int, 4> {};
 	
 	// ----------------------------------------------------------------
 	// Smart Container Coherency Helpers
