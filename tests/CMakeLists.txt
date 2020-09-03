@@ -1,11 +1,4 @@
 find_package(Catch2 REQUIRED)
-find_package(MPI REQUIRED)
-find_package(OpenMP REQUIRED)
-find_package(PkgConfig REQUIRED)
-
-pkg_check_modules(STARPU  REQUIRED IMPORTED_TARGET
-	starpu-1.3 starpumpi-1.3)
-
 add_subdirectory(catch2_main)
 
 # Use add_mpi_test(<name> <command>) to get a parallel mpi test added.

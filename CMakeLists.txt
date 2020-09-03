@@ -1,6 +1,10 @@
 cmake_minimum_required(VERSION 3.10)
 
-project(skepu-headers
+if(CMAKE_PROJECT_NAME)
+	set(SKEPU_HEADERS_SUBPROJECT ${CMAKE_PROJECT_NAME})
+endif()
+
+project(SkePU-headers
 	VERSION 3.0.0
 	LANGUAGES CXX)
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/CMake")
@@ -58,5 +62,9 @@ install(
 		${CMAKE_CURRENT_BINARY_DIR}/skepu-headersConfig.cmake
 		${CMAKE_CURRENT_BINARY_DIR}/skepu-headersConfigVersion.cmake
 	DESTINATION lib/cmake/SkePU)
+
+if(NOT SKEPU_HEADERS_SUBPROJECT)
+	skepu_headers_print_config()
+endif()
 
 # vi:ts=2 sw=2 noet
