@@ -18,6 +18,7 @@
 #include <algorithm>
 #include <functional>
 #include <cstdbool>
+#include <iomanip>
 
 namespace skepu
 {
@@ -102,113 +103,18 @@ namespace skepu
 		return o << "Index4D(" << idx.i << ", "  << idx.j << ", " << idx.k << ", " << idx.l << ")";
 	}
 	
-	// Container Regions (perhaps relocate)
-	
-
-	template<typename T>
-	struct Region1D
+	/*!
+	 *  Enumeration of the different edge policies (what happens when a read outside the vector is performed) that the map overlap skeletons support.
+	 */
+	enum class Edge
 	{
-		int oi;
-		size_t stride;
-		const T *data;
-		
-#ifdef SKEPU_CUDA
-	__host__ __device__
-#endif
-		T operator()(int i)
-		{
-			return data[i * this->stride];
-		}
-		
-#ifdef SKEPU_CUDA
-	__host__ __device__
-#endif
-		Region1D(int arg_oi, size_t arg_stride, const T *arg_data)
-		: oi(arg_oi), stride(arg_stride), data(arg_data) {}
+		None, Cyclic, Duplicate, Pad
 	};
 	
-	template<typename T>
-	struct Region2D
+	enum class Overlap
 	{
-		int oi, oj;
-		size_t stride;
-		const T *data;
-		
-#ifdef SKEPU_CUDA
-	__host__ __device__
-#endif
-		T operator()(int i, int j)
-		{
-			return data[i * this->stride + j];
-		}
-		
-#ifdef SKEPU_CUDA
-	__host__ __device__
-#endif
-		Region2D(int arg_oi, int arg_oj, size_t arg_stride, const T *arg_data)
-		: oi(arg_oi), oj(arg_oj), stride(arg_stride), data(arg_data) {}
+		RowWise, ColWise, RowColWise, ColRowWise
 	};
-	
-	template<typename T>
-	struct Region3D
-	{
-		int oi, oj, ok;
-		size_t stride1, stride2;
-		const T *data;
-		
-#ifdef SKEPU_CUDA
-	__host__ __device__
-#endif
-		T operator()(int i, int j, int k)
-		{
-			return data[i * this->stride1 * this->stride2 + j * this->stride2 + k];
-		}
-		
-#ifdef SKEPU_CUDA
-	__host__ __device__
-#endif
-		Region3D(int arg_oi, int arg_oj, int arg_ok, size_t arg_stride1, size_t arg_stride2, const T *arg_data)
-		: oi(arg_oi), oj(arg_oj), ok(arg_ok), stride1(arg_stride1), stride2(arg_stride2), data(arg_data) {}
-	};
-	
-	template<typename T>
-	struct Region4D
-	{
-		int oi, oj, ok, ol;
-		size_t stride1, stride2, stride3;
-		const T *data;
-		
-#ifdef SKEPU_CUDA
-	__host__ __device__
-#endif
-		T operator()(int i, int j, int k, int l)
-		{
-			return data[i * this->stride1 * this->stride2 * this->stride3 + j * this->stride2 * this->stride3 + k * this->stride3 + l];
-		}
-		
-#ifdef SKEPU_CUDA
-	__host__ __device__
-#endif
-		Region4D(int arg_oi, int arg_oj, int arg_ok, int arg_ol, size_t arg_stride1, size_t arg_stride2, size_t arg_stride3, const T *arg_data)
-		: oi(arg_oi), oj(arg_oj), ok(arg_ok), ol(arg_ol), stride1(arg_stride1), stride2(arg_stride2), stride3(arg_stride3), data(arg_data) {}
-	};
-	
-	
-	template<typename T>
-	struct region_type {};
-	
-	template<typename T>
-	struct region_type<Region1D<T>> { using type = T; };
-	
-	template<typename T>
-	struct region_type<Region2D<T>> { using type = T; };
-	
-	template<typename T>
-	struct region_type<Region3D<T>> { using type = T; };
-	
-	template<typename T>
-	struct region_type<Region4D<T>> { using type = T; };
-	
 	
 	enum class AccessMode
 	{
@@ -550,37 +456,6 @@ namespace skepu
 	> {};
 
 
-	// ----------------------------------------------------------------
-	// MapOverlap dimensionality deducer
-	// ----------------------------------------------------------------
-	
-	template<typename... Args>
-	struct mapoverlap_dimensionality {};
-	
-	template<typename T, typename... Args>
-	struct mapoverlap_dimensionality<Region1D<T>, Args...>: std::integral_constant<int, 1> {};
-	
-	template<typename T, typename... Args>
-	struct mapoverlap_dimensionality<Region2D<T>, Args...>: std::integral_constant<int, 2> {};
-	
-	template<typename T, typename... Args>
-	struct mapoverlap_dimensionality<Region3D<T>, Args...>: std::integral_constant<int, 3> {};
-	
-	template<typename T, typename... Args>
-	struct mapoverlap_dimensionality<Region4D<T>, Args...>: std::integral_constant<int, 4> {};
-	
-	template<typename T, typename... Args>
-	struct mapoverlap_dimensionality<Index1D, Region1D<T>, Args...>: std::integral_constant<int, 1> {};
-	
-	template<typename T, typename... Args>
-	struct mapoverlap_dimensionality<Index2D, Region2D<T>, Args...>: std::integral_constant<int, 2> {};
-	
-	template<typename T, typename... Args>
-	struct mapoverlap_dimensionality<Index3D, Region3D<T>, Args...>: std::integral_constant<int, 3> {};
-	
-	template<typename T, typename... Args>
-	struct mapoverlap_dimensionality<Index4D, Region4D<T>, Args...>: std::integral_constant<int, 4> {};
-	
 	// ----------------------------------------------------------------
 	// Smart Container Coherency Helpers
 	// ----------------------------------------------------------------

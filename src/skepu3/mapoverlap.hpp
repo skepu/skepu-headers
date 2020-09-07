@@ -1,6 +1,7 @@
 #pragma once
 
 #include "skepu3/impl/common.hpp"
+#include "skepu3/impl/region.hpp"
 
 namespace skepu
 {
@@ -67,19 +68,10 @@ namespace skepu
 	
 	
 	
-	enum class Edge
-	{
-		Cyclic, Duplicate, Pad
-	};
-	
-	enum class Overlap
-	{
-		RowWise, ColWise, RowColWise, ColRowWise
-	};
 	
 	namespace impl
 	{
-		template<typename Ret, typename T, typename... Args>
+		template<typename T>
 		class MapOverlapBase: public SeqSkeletonBase
 		{
 		protected:
@@ -110,7 +102,7 @@ namespace skepu
 		
 		
 		template<typename Ret, typename T, typename... Args>
-		class MapOverlap1D: public MapOverlapBase<Ret, T, Args...>
+		class MapOverlap1D: public MapOverlapBase<T>
 		{
 		//	static_assert(std::is_pointer<Arg1>::value, "Parameter must be of pointer type");
 			
@@ -355,7 +347,7 @@ namespace skepu
 		
 		
 		template<typename Ret, typename... Args>
-		class MapOverlap2D
+		class MapOverlap2D: public MapOverlapBase<typename region_type<typename pack_element<is_indexed<Args...>::value ? 1 : 0, Args...>::type>::type>
 		{
 			static constexpr bool indexed = is_indexed<Args...>::value;
 			static constexpr size_t InArity = 1;
@@ -404,21 +396,26 @@ namespace skepu
 					(get<OI>(args...).size_i() < size_i) &&
 					(get<OI>(args...).size_j() < size_j) ...))
 					SKEPU_ERROR("Non-matching container sizes");
+					
+				if (this->m_edge != Edge::None && disjunction(
+					(get<EI>(args...).size_i() != size_i) &&
+					(get<EI>(args...).size_j() != size_j) ...))
+					SKEPU_ERROR("Non-matching input container sizes");
 				
-				if (disjunction(
+				if (this->m_edge == Edge::None && disjunction(
 					(get<EI>(args...).size_i() - this->m_overlap_i*2 != size_i) &&
 					(get<EI>(args...).size_j() - this->m_overlap_j*2 != size_j) ...))
-					SKEPU_ERROR("Non-matching container sizes");
+					SKEPU_ERROR("Non-matching input container sizes");
 			
 				auto arg = get<OutArity>(args...);
+				
+				RegionType region{arg, this->m_overlap_i, this->m_overlap_j, this->m_edge, this->m_pad};
 				
 				for (size_t i = 0; i < size_i; i++)
 					for (size_t j = 0; j < size_j; j++)
 					{
-						auto res = F::forward(this->mapFunc, Index2D{i,j},
-							RegionType{this->m_overlap_i, this->m_overlap_j,
-								arg.size_i(), &arg(i + this->m_overlap_i, j + this->m_overlap_j)},
-							get<AI>(args...).hostProxy()..., get<CI>(args...)...);
+						region.idx = (this->m_edge != Edge::None) ? Index2D{i,j} : Index2D{i + this->m_overlap_i, j + this->m_overlap_j};
+						auto res = F::forward(this->mapFunc, Index2D{i,j}, region, get<AI>(args...).hostProxy()..., get<CI>(args...)...);
 						std::tie(get<OI>(args...)(i, j)...) = res;
 					}
 			}
@@ -432,7 +429,10 @@ namespace skepu
 			
 		private:
 			MapFunc mapFunc;
-			MapOverlap2D(MapFunc map): mapFunc(map) {}
+			MapOverlap2D(MapFunc map): mapFunc(map)
+			{
+				this->m_edge = Edge::None;
+			}
 			
 			int m_overlap_i, m_overlap_j;
 			
@@ -446,7 +446,7 @@ namespace skepu
 		
 		
 		template<typename Ret, typename... Args>
-		class MapOverlap3D
+		class MapOverlap3D: public MapOverlapBase<typename region_type<typename pack_element<is_indexed<Args...>::value ? 1 : 0, Args...>::type>::type>
 		{
 			static constexpr bool indexed = is_indexed<Args...>::value;
 			static constexpr size_t InArity = 1;
@@ -498,24 +498,30 @@ namespace skepu
 					(get<OI>(args...).size_i() < size_i) &&
 					(get<OI>(args...).size_j() < size_j) &&
 					(get<OI>(args...).size_k() < size_k) ...))
-					SKEPU_ERROR("Non-matching container sizes");
+					SKEPU_ERROR("Non-matching output container sizes");
 				
-				if (disjunction(
+				if (this->m_edge != Edge::None && disjunction(
+					(get<EI>(args...).size_i() != size_i) &&
+					(get<EI>(args...).size_j() != size_j) &&
+					(get<EI>(args...).size_k() != size_k) ...))
+					SKEPU_ERROR("Non-matching input container sizes");
+				
+				if (this->m_edge == Edge::None && disjunction(
 					(get<EI>(args...).size_i() - this->m_overlap_i*2 != size_i) &&
 					(get<EI>(args...).size_j() - this->m_overlap_j*2 != size_j) &&
 					(get<EI>(args...).size_k() - this->m_overlap_k*2 != size_k) ...))
-					SKEPU_ERROR("Non-matching container sizes");
+					SKEPU_ERROR("Non-matching input container sizes");
 			
 				auto arg = get<OutArity>(args...);
+				
+				RegionType region{arg, this->m_overlap_i, this->m_overlap_j, this->m_overlap_k, this->m_edge, this->m_pad};
 				
 				for (size_t i = 0; i < size_i; i++)
 					for (size_t j = 0; j < size_j; j++)
 						for (size_t k = 0; k < size_k; k++)
 						{
-							auto res = F::forward(this->mapFunc, Index3D{i,j,k},
-								RegionType{this->m_overlap_i, this->m_overlap_j, this->m_overlap_k, arg.size_i(), arg.size_j(),
-									&arg(i + this->m_overlap_i, j + this->m_overlap_j, k + this->m_overlap_k)},
-								get<AI>(args...).hostProxy()..., get<CI>(args...)...);
+							region.idx = (this->m_edge != Edge::None) ? Index3D{i,j,k} : Index3D{i + this->m_overlap_i, j + this->m_overlap_j, k + this->m_overlap_k};
+							auto res = F::forward(this->mapFunc, Index3D{i,j,k}, region, get<AI>(args...).hostProxy()..., get<CI>(args...)...);
 							std::tie(get<OI>(args...)(i, j, k)...) = res;
 						}
 			}
@@ -529,7 +535,10 @@ namespace skepu
 			
 		private:
 			MapFunc mapFunc;
-			MapOverlap3D(MapFunc map): mapFunc(map) {}
+			MapOverlap3D(MapFunc map): mapFunc(map)
+			{
+				this->m_edge = Edge::None;
+			}
 			
 			int m_overlap_i, m_overlap_j, m_overlap_k;
 			
@@ -541,7 +550,7 @@ namespace skepu
 		
 		
 		template<typename Ret, typename... Args>
-		class MapOverlap4D
+		class MapOverlap4D: public MapOverlapBase<typename region_type<typename pack_element<is_indexed<Args...>::value ? 1 : 0, Args...>::type>::type>
 		{
 			static constexpr bool indexed = is_indexed<Args...>::value;
 			static constexpr size_t InArity = 1;
@@ -597,27 +606,33 @@ namespace skepu
 					(get<OI>(args...).size_j() < size_j) &&
 					(get<OI>(args...).size_k() < size_k) &&
 					(get<OI>(args...).size_l() < size_l)...))
-					SKEPU_ERROR("Non-matching container sizes");
+					SKEPU_ERROR("Non-matching output container sizes");
 				
-				if (disjunction(
+				if (this->m_edge != Edge::None && disjunction(
+					(get<EI>(args...).size_i() != size_i) &&
+					(get<EI>(args...).size_j() != size_j) &&
+					(get<EI>(args...).size_k() != size_k) &&
+					(get<EI>(args...).size_l() != size_l)...))
+					SKEPU_ERROR("Non-matching input container sizes");
+				
+				if (this->m_edge == Edge::None && disjunction(
 					(get<EI>(args...).size_i() - this->m_overlap_i*2 != size_i) &&
 					(get<EI>(args...).size_j() - this->m_overlap_j*2 != size_j) &&
 					(get<EI>(args...).size_k() - this->m_overlap_k*2 != size_k) &&
 					(get<EI>(args...).size_l() - this->m_overlap_l*2 != size_l)...))
-					SKEPU_ERROR("Non-matching container sizes");
+					SKEPU_ERROR("Non-matching input container sizes");
 			
 				auto arg = get<OutArity>(args...);
+				
+				RegionType region{arg, this->m_overlap_i, this->m_overlap_j, this->m_overlap_k, this->m_overlap_l, this->m_edge, this->m_pad};
 				
 				for (size_t i = 0; i < size_i; i++)
 					for (size_t j = 0; j < size_j; j++)
 						for (size_t k = 0; k < size_k; k++)
 							for (size_t l = 0; l < size_l; l++)
 							{
-								auto res = F::forward(this->mapFunc, Index4D{i,j,k,l},
-									RegionType{this->m_overlap_i, this->m_overlap_j, this->m_overlap_k, this->m_overlap_l,
-										arg.size_i(), arg.size_j(), arg.size_k(),
-										&arg(i + this->m_overlap_i, j + this->m_overlap_j, k + this->m_overlap_k, l + this->m_overlap_l)},
-									get<AI>(args...).hostProxy()..., get<CI>(args...)...);
+								region.idx = (this->m_edge != Edge::None) ? Index4D{i,j,k,l} : Index4D{i + this->m_overlap_i, j + this->m_overlap_j, k + this->m_overlap_k, l + this->m_overlap_l};
+								auto res = F::forward(this->mapFunc, Index4D{i,j,k,l}, region, get<AI>(args...).hostProxy()..., get<CI>(args...)...);
 								std::tie(get<OI>(args...)(i, j, k, l)...) = res;
 							}
 			}
@@ -631,7 +646,10 @@ namespace skepu
 			
 		private:
 			MapFunc mapFunc;
-			MapOverlap4D(MapFunc map): mapFunc(map) {}
+			MapOverlap4D(MapFunc map): mapFunc(map)
+			{
+				this->m_edge = Edge::None;
+			}
 			
 			int m_overlap_i, m_overlap_j, m_overlap_k, m_overlap_l;
 			

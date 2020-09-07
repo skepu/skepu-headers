@@ -5,20 +5,10 @@
 #ifndef MAPOVERLAP_H
 #define MAPOVERLAP_H
 
+#include "skepu3/impl/region.hpp"
+
 namespace skepu
 {
-	/*!
-	 *  Enumeration of the different edge policies (what happens when a read outside the vector is performed) that the map overlap skeletons support.
-	 */
-	enum class Edge
-	{
-		Pad = 0, Cyclic = 1, Duplicate = 2
-	};
-	
-	enum class Overlap
-	{
-		RowWise, ColWise, RowColWise, ColRowWise
-	};
 	
 	namespace backend
 	{
@@ -490,10 +480,10 @@ namespace skepu
 		private:
 			CUDAKernel m_cuda_kernel;
 			
-			Edge m_edge = Edge::Duplicate;
+			Edge m_edge = Edge::None;
 			T m_pad {};
 			
-			size_t m_overlap_x, m_overlap_y;
+			int m_overlap_x, m_overlap_y;
 			
 			
 		private:
@@ -552,10 +542,15 @@ namespace skepu
 					(get<OI>(args...).size_j() < size_j) ...))
 					SKEPU_ERROR("Non-matching container sizes");
 				
-				if (disjunction(
+				if (this->m_edge != Edge::None && disjunction(
+					(get<EI>(args...).size_i() != size_i) &&
+					(get<EI>(args...).size_j() != size_j) ...))
+					SKEPU_ERROR("Non-matching input container sizes");
+				
+				if (this->m_edge == Edge::None && disjunction(
 					(get<EI>(args...).size_i() - this->m_overlap_y*2 != size_i) &&
 					(get<EI>(args...).size_j() - this->m_overlap_x*2 != size_j) ...))
-					SKEPU_ERROR("Non-matching container sizes");
+					SKEPU_ERROR("Non-matching input container sizes");
 				
 				// Remove later
 				auto res = get<0>(args...);
@@ -679,7 +674,7 @@ namespace skepu
 		private:
 			CUDAKernel m_cuda_kernel;
 			
-			Edge m_edge = Edge::Duplicate;
+			Edge m_edge = Edge::None;
 			T m_pad {};
 			
 			int m_overlap_i, m_overlap_j, m_overlap_k;
@@ -742,13 +737,19 @@ namespace skepu
 					(get<OI>(args...).size_i() < size_i) &&
 					(get<OI>(args...).size_j() < size_j) &&
 					(get<OI>(args...).size_k() < size_k) ...))
-					SKEPU_ERROR("Non-matching container sizes");
+					SKEPU_ERROR("Non-matching output container sizes");
 				
-				if (disjunction(
+				if (this->m_edge != Edge::None && disjunction(
+					(get<EI>(args...).size_i() != size_i) &&
+					(get<EI>(args...).size_j() != size_j) &&
+					(get<EI>(args...).size_k() != size_k) ...))
+					SKEPU_ERROR("Non-matching input container sizes");
+				
+				if (this->m_edge == Edge::None && disjunction(
 					(get<EI>(args...).size_i() - this->m_overlap_i*2 != size_i) &&
 					(get<EI>(args...).size_j() - this->m_overlap_j*2 != size_j) &&
 					(get<EI>(args...).size_k() - this->m_overlap_k*2 != size_k) ...))
-					SKEPU_ERROR("Non-matching container sizes");
+					SKEPU_ERROR("Non-matching input container sizes");
 				
 				// Remove later
 				auto res = get<0>(args...);
@@ -834,6 +835,16 @@ namespace skepu
 #endif
 			}
 			
+			void setEdgeMode(Edge mode)
+			{
+				this->m_edge = mode;
+			}
+			
+			void setPad(T pad)
+			{
+				this->m_pad = pad;
+			}
+			
 			void setOverlap(int o)
 			{
 				this->m_overlap_i = o;
@@ -863,6 +874,9 @@ namespace skepu
 			
 		private:
 			CUDAKernel m_cuda_kernel;
+			
+			Edge m_edge = Edge::None;
+			T m_pad {};
 			
 			int m_overlap_i, m_overlap_j, m_overlap_k, m_overlap_l;
 			
@@ -925,14 +939,21 @@ namespace skepu
 					(get<OI>(args...).size_j() < size_j) &&
 					(get<OI>(args...).size_k() < size_k) &&
 					(get<OI>(args...).size_l() < size_l)...))
-					SKEPU_ERROR("Non-matching container sizes");
+					SKEPU_ERROR("Non-matching output container sizes");
 				
-				if (disjunction(
+				if (this->m_edge != Edge::None && disjunction(
+					(get<EI>(args...).size_i() != size_i) &&
+					(get<EI>(args...).size_j() != size_j) &&
+					(get<EI>(args...).size_k() != size_k) &&
+					(get<EI>(args...).size_l() != size_l)...))
+					SKEPU_ERROR("Non-matching input container sizes");
+				
+				if (this->m_edge == Edge::None && disjunction(
 					(get<EI>(args...).size_i() - this->m_overlap_i*2 != size_i) &&
 					(get<EI>(args...).size_j() - this->m_overlap_j*2 != size_j) &&
 					(get<EI>(args...).size_k() - this->m_overlap_k*2 != size_k) &&
 					(get<EI>(args...).size_l() - this->m_overlap_l*2 != size_l)...))
-					SKEPU_ERROR("Non-matching container sizes");
+					SKEPU_ERROR("Non-matching input container sizes");
 				
 				// Remove later
 				auto res = get<0>(args...);
