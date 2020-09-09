@@ -3,6 +3,7 @@
 #include <skepu3/cluster/skeletons/map/map.hpp>
 #include <skepu3/cluster/containers/matrix/matrix.hpp>
 #include <skepu3/cluster/containers/tensor3/tensor3.hpp>
+#include <skepu3/cluster/containers/tensor4/tensor4.hpp>
 #include <skepu3/cluster/containers/vector/vector.hpp>
 
 struct simple_map_fn
@@ -760,4 +761,76 @@ TEST_CASE("Multiple return")
 		REQUIRE(res_i(i) == (int)i);
 		REQUIRE(res_d(i) == (double)i * 0.5);
 	}
+}
+
+struct tensor_reduce_l
+{
+	constexpr static size_t totalArity = 2;
+	constexpr static size_t outArity = 1;
+	constexpr static bool indexed = 1;
+	using ElwiseArgs = std::tuple<>;
+	using ContainerArgs = std::tuple<skepu::Ten4<int>>;
+	using UniformArgs = std::tuple<>;
+	typedef std::tuple<skepu::ProxyTag::Default> ProxyTags;
+	constexpr static skepu::AccessMode anyAccessMode[] = {
+		skepu::AccessMode::Read};
+	using Ret = int;
+	constexpr static bool prefersMatrix = 0;
+
+	auto static inline
+	OMP(skepu::Index1D idx, skepu::Ten4<int> & t)
+	-> int
+	{
+		int res(0);
+		auto start_it = t.data + (idx.i * t.size_jkl);
+		auto end_it = start_it + t.size_jkl;
+
+		for(; start_it != end_it; ++start_it)
+			res += *start_it;
+
+		return res;
+		return 0;
+	}
+
+	auto static inline
+	CPU(skepu::Index1D idx, skepu::Ten4<int> & t)
+	-> int
+	{
+		int res(0);
+		auto start_it = t.data + (idx.i * t.size_jkl);
+		auto end_it = start_it + t.size_jkl;
+
+		for(; start_it != end_it; ++start_it)
+			res += *start_it;
+
+		return res;
+	}
+};
+
+TEST_CASE("Tensor4 reduction to vector in i axis")
+{
+	size_t constexpr N{10};
+	skepu::Tensor4<int> tensor(N,N,N,N);
+	skepu::Vector<int> res(N);
+	std::vector<int> expected(N);
+	auto reduce = skepu::backend::Map<0, tensor_reduce_l, bool, void>(false);
+
+	tensor.flush();
+	for(size_t i(0); i < N; ++i)
+	{
+		int result(0);
+		for(size_t j(0); j < N; ++j)
+			for(size_t k(0); k < N; ++k)
+				for(size_t l(0); l < N; ++l)
+				{
+					tensor(i,j,k,l)= i*j*k*l;
+					result += i*j*k*l;
+				}
+		expected[i] = result;
+	}
+
+	REQUIRE_NOTHROW(reduce(res, tensor));
+	res.flush();
+	for(size_t i(0); i < N; ++i)
+		REQUIRE(res(i) == expected[i]);
 }

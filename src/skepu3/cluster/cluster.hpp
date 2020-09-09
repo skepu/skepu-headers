@@ -16,13 +16,13 @@ namespace skepu {
 				// Figure out howto enable all cores when not using STARPU_NCPU
 				internal_state() {
 					starpu_conf_init(&conf);
-					conf.single_combined_worker = 1;
+					conf.sched_policy_name = "peager";
 					if(conf.ncpus > 1)
-						conf.sched_policy_name = "peager";
-					if(conf.ncpus == -1)
 						conf.reserve_ncpus = 1;
 					// Not using starpu_mpi_init_conf because that makes
 					// starpu_mpi_shutdown segfault.
+					// TODO:As the performance models in the skeletons are not static in
+					// any way. Change that and it shall work fine.
 					auto err = starpu_init(&conf);
 					assert(!err);
 					starpu_mpi_init(NULL, NULL, 1);
@@ -32,12 +32,9 @@ namespace skepu {
 				};
 
 				~internal_state() {
-					starpu_mpi_wait_for_all(MPI_COMM_WORLD);
-					starpu_mpi_barrier(MPI_COMM_WORLD);
 					starpu_mpi_shutdown();
-					// StarPU shutdown is apparently not MPI safe when using performance
-					// models.. However, starpu_mpi_shutdown should suffice.
-					//starpu_shutdown();
+					// TODO: See comment in constructor...
+					//starpu_mpi_shutdown();
 				};
 			};
 		}

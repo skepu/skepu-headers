@@ -1,6 +1,6 @@
 #pragma once
-#ifndef SKEPU_STARPU_TENSOR3_PARTITION_HPP
-#define SKEPU_STARPU_TENSOR3_PARTITION_HPP 1
+#ifndef SKEPU_STARPU_TENSOR4_PARTITION_HPP
+#define SKEPU_STARPU_TENSOR4_PARTITION_HPP 1
 
 #include <starpu_mpi.h>
 
@@ -11,49 +11,64 @@ namespace skepu {
 namespace util {
 
 template<typename T>
-class tensor3_partition : private partition_base<T>
+class tensor4_partition : private partition_base<T>
 {
 	typedef partition_base<T> base;
 
 	size_t m_size_i;
 	size_t m_size_j;
 	size_t m_size_k;
-	size_t m_size_jk;
+	size_t m_size_l;
+
+	size_t m_size_kl;
+	size_t m_size_jkl;
+
 	size_t m_part_i;
 
 public:
-	typedef skepu::Index3D index_type;
+	typedef skepu::Index4D index_type;
 
-	tensor3_partition() noexcept
+	tensor4_partition() noexcept
 	: base()
 	{}
 
-	tensor3_partition(size_t i, size_t j, size_t k) noexcept
-	: base()
+	tensor4_partition(size_t i, size_t j, size_t k, size_t l) noexcept
+	: base(),
+		m_size_i(i),
+		m_size_j(j),
+		m_size_k(k),
+		m_size_l(l),
+		m_size_kl(k*l),
+		m_size_jkl(j*k*l)
 	{
-		init(i, j, k);
+		set_sizes();
+		if(base::m_size)
+			alloc_partitions();
 	}
 
-	tensor3_partition(tensor3_partition const & other) noexcept
-	: tensor3_partition(other.m_size_i, other.m_size_j, other.m_size_k)
+	tensor4_partition(tensor4_partition const & other) noexcept
+	: tensor4_partition(
+			other.m_size_i, other.m_size_j, other.m_size_k, other.m_size_l)
 	{
 		base::copy(other);
 	}
 
-	tensor3_partition(tensor3_partition && other) noexcept
+	tensor4_partition(tensor4_partition && other) noexcept
 	: base(std::move(other))
 	{}
 
-	~tensor3_partition() noexcept = default;
+	~tensor4_partition() noexcept = default;
 
 	auto
-	init(size_t i, size_t j, size_t k) noexcept
+	init(size_t i, size_t j, size_t k, size_t l)
 	-> void
 	{
 		m_size_i = i;
 		m_size_j = j;
 		m_size_k = k;
-		m_size_jk = j*k;
+		m_size_l = l;
+		m_size_kl = k*l;
+		m_size_jkl = j*m_size_kl;
 		set_sizes();
 
 		if(base::m_external)
@@ -63,40 +78,48 @@ public:
 	}
 
 	auto
-	operator=(tensor3_partition const & other) noexcept
-	-> tensor3_partition &
+	operator=(tensor4_partition const & other) noexcept
+	-> tensor4_partition &
 	{
-		this->~tensor3_partition();
-		new(this) tensor3_partition(other);
+		this->~tensor4_partition();
+		new(this) tensor4_partition(other);
 		return *this;
 	}
 
 	auto
-	operator=(tensor3_partition && other) noexcept
-	-> tensor3_partition &
+	operator=(tensor4_partition && other) noexcept
+	-> tensor4_partition &
 	{
-		this->~tensor3_partition();
-		new(this) tensor3_partition(std::move(other));
+		this->~tensor4_partition();
+		new(this) tensor4_partition(std::move(other));
 		return *this;
 	}
 
 	auto
-	operator()(size_t i, size_t j, size_t k) noexcept
+	operator()(size_t i, size_t j, size_t k, size_t l) noexcept
 	-> T &
 	{
-		return base::operator()((i * m_size_jk) + (j * m_size_k) + k);
+		return base::operator()(
+			(i * m_size_jkl)
+			+ (j * m_size_kl)
+			+ (k * m_size_l)
+			+ l);
 	}
 
 	auto
-	operator()(size_t i, size_t j, size_t k) const noexcept
+	operator()(size_t i, size_t j, size_t k, size_t l) const noexcept
 	-> T const &
 	{
-		return base::operator()((i * m_size_jk) + (j * m_size_k) + k);
+		return base::operator()(
+			(i * m_size_jkl)
+			+ (j * m_size_kl)
+			+ (k * m_size_l)
+			+ l);
 	}
 
 	auto
 	getParent() noexcept
-	-> tensor3_partition &
+	-> tensor4_partition &
 	{
 		return *this;
 	}
@@ -106,33 +129,42 @@ public:
 	-> index_type
 	{
 		index_type idx;
-		idx.i = pos / m_size_jk;
-		pos -= idx.i * m_size_jk;
-		idx.j = pos / m_size_k;
-		idx.k = pos - (idx.j * m_size_k);
+		idx.i = pos / m_size_jkl;
+		pos -= idx.i * m_size_jkl;
+		idx.j = pos / m_size_kl;
+		pos -= idx.j * m_size_kl;
+		idx.k = pos / m_size_l;
+		idx.l = pos - (idx.k * m_size_l);
 
 		return idx;
 	}
 
 	auto
 	size_i() const noexcept
-	-> size_t
+	-> size_t const &
 	{
 		return m_size_i;
 	}
 
 	auto
 	size_j() const noexcept
-	-> size_t
+	-> size_t const &
 	{
 		return m_size_j;
 	}
 
 	auto
 	size_k() const noexcept
-	-> size_t
+	-> size_t const &
 	{
 		return m_size_k;
+	}
+
+	auto
+	size_l() const noexcept
+	-> size_t const &
+	{
+		return m_size_l;
 	}
 
 	using base::operator();
@@ -161,14 +193,14 @@ private:
 		if(!base::m_data)
 			base::m_data = new T[base::m_size];
 
-		if(!base::m_external)
+		if(!base::m_external && !base::m_data_handle)
 		{
-			starpu_block_data_register(
+			starpu_tensor_data_register(
 				&(base::m_data_handle),
 				STARPU_MAIN_RAM,
 				(uintptr_t)(base::m_data),
-				m_size_k, m_size_k * m_size_j,
-				m_size_k, m_size_j, m_size_i,
+				m_size_l, m_size_kl, m_size_jkl,
+				m_size_l, m_size_k, m_size_j, m_size_i,
 				sizeof(T));
 			starpu_mpi_data_register(
 				base::m_data_handle,
@@ -186,31 +218,30 @@ private:
 
 		if(!base::m_part_data)
 			base::m_part_data = new T[base::m_part_size];
+
 		for(size_t i(0); i < base::m_handles.size(); ++i)
 		{
 			auto & handle = base::m_handles[i];
 			if(handle)
 				continue;
 
-			auto ptr = (i == cluster::mpi_rank() ? base::m_part_data : 0);
-
-			/* StarPU manages memory on nodes that does not own the data. */
-			int home_node = -1;
-			/* But it the rank owns the data, we manage the storage. */
-			if(ptr)
+			auto tag = cluster::mpi_tag();
+			T * ptr{0};
+			int home_node{-1};
+			if(i == cluster::mpi_rank())
+			{
+				ptr = base::m_part_data;
 				home_node = STARPU_MAIN_RAM;
+			}
 
-			starpu_block_data_register(
+			starpu_tensor_data_register(
 				&handle,
 				home_node,
 				(uintptr_t)ptr,
-				m_size_k, m_size_j * m_size_k,
-				m_size_k, m_size_j, m_part_i,
+				m_size_l, m_size_kl, m_size_jkl,
+				m_size_l, m_size_k, m_size_j, m_part_i,
 				sizeof(T));
-			starpu_mpi_data_register(
-				handle,
-				cluster::mpi_tag(),
-				i);
+			starpu_mpi_data_register(handle, tag, i);
 		}
 	}
 
@@ -218,30 +249,35 @@ private:
 	get_ptr(starpu_data_handle_t & handle) noexcept
 	-> T * override
 	{
-		return (T *)starpu_block_get_local_ptr(handle);
+		return (T *)starpu_tensor_get_local_ptr(handle);
 	}
 
 	auto
 	update_sizes() noexcept
 	-> void override
 	{
-		size_t size_arr[]{m_size_i, m_size_j, m_size_k};
+		size_t size_arr[]{m_size_i, m_size_j, m_size_k, m_size_l};
 		starpu_data_handle_t size_handle;
 		starpu_variable_data_register(
 			&size_handle,
 			STARPU_MAIN_RAM,
-			(uintptr_t)size_arr,
-			3 * sizeof(size_t));
-		starpu_mpi_data_register(size_handle, cluster::mpi_tag(), 0);
+			(uintptr_t)&size_arr,
+			4 * sizeof(size_t));
+		starpu_mpi_data_register(size_handle, cluster::mpi_tag(), 0),
 		starpu_mpi_get_data_on_all_nodes_detached(MPI_COMM_WORLD, size_handle);
 		starpu_data_acquire(size_handle, STARPU_R);
 
 		m_size_i = size_arr[0];
 		m_size_j = size_arr[1];
 		m_size_k = size_arr[2];
+		m_size_l = size_arr[3];
+		m_size_kl = m_size_k * m_size_l;
+		m_size_jkl = m_size_j * m_size_kl;
 
 		starpu_data_release(size_handle);
 		starpu_data_unregister_no_coherency(size_handle);
+
+		starpu_mpi_barrier(MPI_COMM_WORLD);
 
 		set_sizes();
 
@@ -253,14 +289,14 @@ private:
 	set_sizes() noexcept
 	-> void
 	{
-		base::m_size = m_size_i * m_size_j * m_size_k;
+		base::m_size = m_size_i * m_size_jkl;
 		if(base::m_size)
 		{
 			auto ranks = skepu::cluster::mpi_size();
 			m_part_i = m_size_i / ranks;
 			if(m_size_i - (m_part_i * ranks))
 				++m_part_i;
-			base::m_part_size = m_part_i * m_size_j * m_size_k;
+			base::m_part_size = m_part_i * m_size_jkl;
 			base::m_capacity = base::m_part_size * ranks;
 		}
 	}
@@ -269,4 +305,4 @@ private:
 } // namespace util
 } // namespace skepu
 
-#endif // SKEPU_STARPU_TENSOR3_PARTITION_HPP
+#endif // SKEPU_STARPU_TENSOR4_PARTITION_HPP

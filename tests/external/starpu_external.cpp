@@ -5,6 +5,7 @@
 #include <skepu3/cluster/external.hpp>
 #include <skepu3/cluster/containers/matrix/matrix.hpp>
 #include <skepu3/cluster/containers/tensor3/tensor3.hpp>
+#include <skepu3/cluster/containers/tensor4/tensor4.hpp>
 #include <skepu3/cluster/containers/vector/vector.hpp>
 
 std::random_device rd;
@@ -540,5 +541,84 @@ TEST_CASE("Tensor3 can be initialized in external calls")
 		auto t3_it = t3.begin();
 		for(auto & val : expected_values)
 			REQUIRE(*(t3_it++) == val);
+	}
+}
+
+TEST_CASE("Tensor 4 initialization")
+{
+	SECTION("Initialize with operator()")
+	{
+		size_t constexpr I{10};
+		size_t constexpr J{10};
+		size_t constexpr K{10};
+		size_t constexpr L{10};
+		std::vector<float> expected_values(I*J*K*L);
+
+		skepu::Tensor4<float> t4;
+		skepu::external(
+			[&]
+			{
+				t4.init(I,J,K,L);
+				for(size_t i(0); i < I; ++i)
+					for(size_t j(0); j < J; ++j)
+						for(size_t k(0); k < K; ++k)
+							for(size_t l(0); l < L; ++l)
+							{
+								size_t exp_pos =
+									(i * J*K*L) + (j * K*L) + (k * L) + l;
+								expected_values.at(exp_pos) = float_dist(gen);
+								t4(i,j,k,l) = expected_values[exp_pos];
+							}
+			},
+			skepu::write(t4)
+		);
+
+		MPI_Bcast(expected_values.data(), expected_values.size(), MPI_FLOAT,
+			0, MPI_COMM_WORLD);
+		REQUIRE(t4.size() == expected_values.size());
+		REQUIRE(t4.size_i() == I);
+		REQUIRE(t4.size_j() == J);
+		REQUIRE(t4.size_k() == K);
+		REQUIRE(t4.size_l() == L);
+		t4.flush();
+		auto t4_it = t4.begin();
+		for(auto & val : expected_values)
+			REQUIRE(*(t4_it++) == val);
+	}
+
+	SECTION("Initialize with iterators")
+	{
+		size_t constexpr I{10};
+		size_t constexpr J{10};
+		size_t constexpr K{10};
+		size_t constexpr L{10};
+		std::vector<float> expected_values(I*J*K*L);
+
+		skepu::Tensor4<float> t4;
+		skepu::external(
+			[&]
+			{
+				t4.init(I,J,K,L);
+				auto expected_it = expected_values.begin();
+				for(auto t4_it = t4.begin(); t4_it != t4.end(); ++t4_it, ++expected_it)
+				{
+					*expected_it = float_dist(gen);
+					*t4_it = *expected_it;
+				}
+			},
+			skepu::write(t4)
+		);
+
+		MPI_Bcast(expected_values.data(), expected_values.size(), MPI_FLOAT,
+			0, MPI_COMM_WORLD);
+		REQUIRE(t4.size() == expected_values.size());
+		REQUIRE(t4.size_i() == I);
+		REQUIRE(t4.size_j() == J);
+		REQUIRE(t4.size_k() == K);
+		REQUIRE(t4.size_l() == L);
+		t4.flush();
+		auto t4_it = t4.begin();
+		for(auto & val : expected_values)
+			REQUIRE(*(t4_it++) == val);
 	}
 }

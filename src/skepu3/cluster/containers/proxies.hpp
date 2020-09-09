@@ -4,6 +4,7 @@
 
 #include "matrix/proxy.hpp"
 #include "tensor3/proxy.hpp"
+#include "tensor4/proxy.hpp"
 #include "vector/proxy.hpp"
 
 #endif // SKEPU_STARPU_PROXIES_HPP

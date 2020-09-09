@@ -111,9 +111,30 @@ protected:
 	fill(size_t count, T const & value) noexcept
 	-> void
 	{
+		if(m_external)
+		{
+			std::fill(m_data, m_data + m_size, value);
+			return;
+		}
+		if(m_size < m_part_size * cluster::mpi_rank())
+			return;
+
 		if(!m_part_valid)
 			partition();
 
+		auto handle = m_handles[cluster::mpi_rank()];
+		auto size =
+			cluster::mpi_rank() == cluster::mpi_size() -1
+			? m_size - (m_part_size * cluster::mpi_rank())
+			: m_part_size;
+
+		starpu_data_acquire(handle, STARPU_W);
+
+		std::fill(m_part_data, m_part_data + size, value);
+
+		starpu_data_release(handle);
+
+/*
 		auto end_part_idx = count / m_part_size;
 		auto end_idx = count % m_part_size;
 		if(end_part_idx >= cluster::mpi_rank())
@@ -125,6 +146,7 @@ protected:
 				std::fill(m_part_data, m_part_data + end_idx, value);
 			starpu_data_release(m_handles[cluster::mpi_rank()]);
 		}
+*/
 
 		m_data_valid = false;
 		m_part_valid = true;
@@ -189,7 +211,7 @@ public:
 	allgather() noexcept
 	-> void
 	{
-		if(m_data_valid)
+		if(m_data_valid || m_external)
 			return;
 
 		if(m_capacity)
@@ -354,9 +376,10 @@ public:
 	scatter_from_root() noexcept
 	-> void
 	{
+		m_external = false;
 		update_sizes();
 
-		if(m_size && m_data)
+		if(m_data)
 		{
 			auto rank = cluster::mpi_rank();
 			auto data_it = m_data;
@@ -373,27 +396,30 @@ public:
 			for(size_t i(1); i < cluster::mpi_size(); ++i)
 			{
 				auto tag = cluster::mpi_tag();
-				MPI_Status status;
-				starpu_data_acquire(m_handles[i], STARPU_W);
-				auto count = std::min(m_part_size, m_size - (i * m_part_size));
-				auto out_it = get_ptr(m_handles[i]);
-				std::copy(data_it, data_it + count, out_it);
-				starpu_data_release(m_handles[i]);
-				data_it += count;
+				auto & handle = m_handles[i];
 
-				if(i == rank)
-					starpu_mpi_recv(m_handles[i], 0, tag, MPI_COMM_WORLD, &status);
-				else if(!rank)
-					starpu_mpi_send(m_handles[i], i, tag, MPI_COMM_WORLD);
-
-				starpu_mpi_cache_flush(MPI_COMM_WORLD, m_handles[i]);
+				if(!rank)
+				{
+					starpu_data_acquire(handle, STARPU_W);
+					auto count = std::min(m_part_size, m_size - (i * m_part_size));
+					auto out_it = get_ptr(handle);
+					std::copy(data_it, data_it + count, out_it);
+					starpu_data_release(handle);
+					data_it += count;
+					starpu_mpi_send(handle, i, tag, MPI_COMM_WORLD);
+				}
+				else if(i == rank)
+				{
+					MPI_Status status;
+					starpu_mpi_recv(handle, 0, tag, MPI_COMM_WORLD, &status);
+				}
+				starpu_mpi_cache_flush(MPI_COMM_WORLD, handle);
 			}
 
 			if(!rank)
 				starpu_data_release(m_data_handle);
 		}
 
-		m_external = false;
 		m_part_valid = true;
 		m_data_valid = false;
 	}
@@ -466,6 +492,8 @@ private:
 	{
 		if(m_data)
 		{
+			starpu_data_acquire(m_data_handle, STARPU_RW);
+			starpu_data_release(m_data_handle);
 			starpu_data_unregister_no_coherency(m_data_handle);
 			delete[] m_data;
 			m_data = 0;

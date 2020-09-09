@@ -1,19 +1,18 @@
 #pragma once
-#ifndef SKEPU_STARPU_TENSOR3_HPP
-#define SKEPU_STARPU_TENSOR3_HPP 1
+#ifndef SKEPU_STARPU_TENSOR4_HPP
+#define SKEPU_STARPU_TENSOR4_HPP 1
 
 #include "skepu3/cluster/common.hpp"
 
-#include "iterator.hpp"
+#include "../tensor3/iterator.hpp"
 #include "proxy.hpp"
 #include "partition.cpp"
 
 namespace skepu
 {
 
-/* TODO: Original container inherrits from Vector. */
 template<typename T>
-class Tensor3
+class Tensor4
 {
 public:
 	typedef size_t size_type;
@@ -23,85 +22,92 @@ public:
 	typedef T * pointer;
 	typedef ptrdiff_t difference_type;
 
-	typedef Iterator<T, util::tensor3_partition> iterator;
-	typedef Iterator<const T, util::tensor3_partition> const_iterator;
+	typedef Iterator<T, util::tensor4_partition> iterator;
+	typedef Iterator<const T, util::tensor4_partition> const_iterator;
 
-	typedef util::tensor3_partition<T> partition_type;
+	typedef util::tensor4_partition<T> partition_type;
 
 private:
 	partition_type m_partition;
 
 public:
-	explicit Tensor3() noexcept : m_partition() {}
+	Tensor4() noexcept : m_partition() {}
 
-	explicit
-	Tensor3(Tensor3 const & other) noexcept
+	Tensor4(Tensor4 const & other) noexcept
 	: m_partition(other.m_partition)
 	{}
 
-	explicit
-	Tensor3(Tensor3 && other) noexcept
+	Tensor4(Tensor4 && other) noexcept
 	: m_partition(std::move(other))
 	{}
 
-	explicit
-	Tensor3(size_type i, size_type j, size_type k)
-	{
-		if(i && j && k)
-			init(i, j, k, T());
-	}
+	~Tensor4() noexcept = default;
 
 	explicit
-	Tensor3(size_type i, size_type j, size_type k, const_reference val)
-	{
-		if(i && j && k)
-			init(i, j, k, val);
-	}
+	Tensor4(size_type i, size_type j, size_type k, size_type l)
+	: Tensor4(i, j, k, l, T())
+	{}
 
-	~Tensor3() noexcept = default;
-
-	auto
-	init(size_type i, size_type j, size_type k) noexcept
-	-> void
+	explicit
+	Tensor4(
+		size_type i,
+		size_type j,
+		size_type k,
+		size_type l,
+		const_reference val)
+	: m_partition(i,j,k,l)
 	{
-		init(i, j, k, T());
+		if(m_partition.size())
+			m_partition.fill(m_partition.size(), val);
 	}
 
 	auto
-	init(size_type i, size_type j, size_type k, const_reference val) noexcept
+	init(size_type i, size_type j, size_type k, size_type l) noexcept
 	-> void
 	{
-		auto size = i * j * k;
+		auto size = i * j * k * l;
 		if(m_partition.size())
 		{
 			if(!cluster::mpi_rank())
-				std::cerr << "[SkePU][Vector] Error: "
+				std::cerr << "[SkePU][Tensor4] Error: "
 					"Can only be initialized once!\n";
 			std::abort();
 		}
 		if(!(size))
 		{
 			if(!cluster::mpi_rank())
-				std::cerr << "[SkePU][Vector] Error: "
-					"Can not initialize without size\n";
+				std::cerr << "[SkePU][Tensor4] Error: "
+					"Can not initialize to size of zero\n";
 			std::abort();
 		}
 
-		m_partition.init(i, j, k);
-		m_partition.fill(size, val);
+		m_partition.init(i, j, k, l);
 	}
 
 	auto
-	operator=(Tensor3 const & other) noexcept
-	-> Tensor3 &
+	init(
+		size_type i,
+		size_type j,
+		size_type k,
+		size_type l,
+		const_reference val) noexcept
+	-> void
+	{
+		init(i, j, k, l);
+		m_partition.fill(m_partition.size(), val);
+	}
+
+	auto
+	operator=(Tensor4 const & other) noexcept
+	-> Tensor4 &
 	{
 		m_partition = other.m_partition;
 		return *this;
 	}
 
 	auto
-	operator=(Tensor3 && other) noexcept
-	-> Tensor3 &
+	operator=(Tensor4 && other) noexcept
+	-> Tensor4 &
 	{
 		m_partition = std::move(other.m_partition);
 		return *this;
@@ -122,24 +128,17 @@ public:
 	}
 
 	auto
-	operator()(size_type i, size_type j, size_type k) noexcept
+	operator()(size_type i, size_type j, size_type k, size_type l) noexcept
 	-> reference
 	{
-		return m_partition(i, j, k);
+		return m_partition(i, j, k, l);
 	}
 
 	auto
-	operator()(size_type i, size_type j, size_type k) const noexcept
+	operator()(size_type i, size_type j, size_type k, size_type l) const noexcept
 	-> const_reference
 	{
-		return m_partition(i, j, k);
-	}
-
-	auto
-	getAddress() noexcept
-	-> pointer
-	{
-		return m_partition.data();
+		return m_partition(i, j, k, l);
 	}
 
 	auto
@@ -195,11 +194,11 @@ public:
 	end() const noexcept
 	-> const_iterator
 	{
-		return const_iterator(m_partition.data + m_partition.size(), m_partition);
+		return const_iterator(m_partition.data() + m_partition.size(), m_partition);
 	}
 
 	auto
-	swap(Tensor3 & other) noexcept
+	swap(Tensor4 & other) noexcept
 	-> void
 	{
 		auto tmp = std::move(m_partition);
@@ -240,7 +239,7 @@ public:
 	size_l() const noexcept
 	-> size_type
 	{
-		return 0;
+		return m_partition.size_l();
 	}
 
 	auto
@@ -251,38 +250,52 @@ public:
 	}
 
 	auto
-	resize(size_type i, size_type j, size_type k) noexcept
+	resize(size_type i, size_type j, size_type k, size_type l) noexcept
 	-> void
 	{
-		resize(i, j, k, T());
+		resize(i, j, k, l, T());
 	}
 
 	auto
-	resize(size_type i, size_type j, size_type k, const_reference val) noexcept
+	resize(
+		size_type i,
+		size_type j,
+		size_type k,
+		size_type l,
+		const_reference val) noexcept
 	-> void
 	{
-		auto tmp = partition_type(i, j, k);
+		auto tmp = partition_type(i, j, k, l);
 		auto cpy_i = std::min(i, m_partition.size_i());
 		auto cpy_j = std::min(j, m_partition.size_j());
 		auto cpy_k = std::min(k, m_partition.size_k());
+		auto cpy_l = std::min(l, m_partition.size_l());
 
 		for(size_t ii(0); ii < cpy_i; ++ii)
 		{
 			for(size_t ij(0); ij < cpy_j; ++ij)
 			{
 				for(size_t ik(0); ik < cpy_k; ++ik)
-					tmp(ii, ij, ik) = m_partition(ii, ij, ik);
+				{
+					for(size_t il(0); il < cpy_l; ++il)
+						tmp(ii, ij, ik, il) = m_partition(ii, ij, ik, il);
+					for(size_t il(cpy_l); il < l; ++il)
+						tmp(ii, ij, ik, il) = val;
+				}
 				for(size_t ik(cpy_k); ik < k; ++ik)
-					tmp(ii,ij,ik) = val;
+					for(size_t il(0); il < l; ++il)
+						tmp(ii, ij, ik, il) = val;
 			}
 			for(size_t ij(cpy_j); ij < j; ++ij)
 				for(size_t ik(0); ik < k; ++ik)
-					tmp(ii, ij, ik) = val;
+					for(size_t il(0); il < l; ++il)
+						tmp(ii, ij, ik, il) = val;
 		}
 		for(size_t ii(cpy_i); ii < i; ++ii)
 			for(size_t ij(cpy_j); ij < j; ++ij)
 				for(size_t ik(0); ik < k; ++ik)
-					tmp(ii, ij, ik) = val;
+					for(size_t il(0); il < l; ++il)
+						tmp(ii, ij, ik, il) = val;
 
 		m_partition = std::move(tmp);
 	}
@@ -295,14 +308,13 @@ public:
 		m_partition.allgather();
 	}
 
-	template<typename U>
+	/* Utility functions */
 	auto
-	randomize(
-		U const & min = 0,
-		U const & max = std::numeric_limits<U>::max()) noexcept
+	randomize(int /* n */, int /* x */)
 	-> void
 	{
-		m_partition.randomize(min, max);
+		throw std::logic_error{std::string(__PRETTY_FUNCTION__)
+			+ " Not implemented yet!\n"};
 	}
 
 	auto
@@ -340,7 +352,7 @@ private:
 };
 
 template<typename T>
-struct is_skepu_tensor3<Tensor3<T>> : public std::true_type {};
+struct is_skepu_tensor4<Tensor4<T>> : public std::true_type {};
 
 } // namespace skepu
 
@@ -348,7 +360,7 @@ namespace std {
 
 template<typename T>
 auto
-swap(skepu::Tensor3<T> & a, skepu::Tensor3<T> & b) noexcept
+swap(skepu::Tensor4<T> & a, skepu::Tensor4<T> & b) noexcept
 -> void
 {
 	return a.swap(b);
@@ -356,4 +368,4 @@ swap(skepu::Tensor3<T> & a, skepu::Tensor3<T> & b) noexcept
 
 } // namespace std
 
-#endif // SKEPU_STARPU_TENSOR3_HPP
+#endif // SKEPU_STARPU_TENSOR4_HPP

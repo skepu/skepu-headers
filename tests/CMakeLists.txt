@@ -22,6 +22,7 @@ add_subdirectory(external)
 add_subdirectory(matrix)
 add_subdirectory(vector)
 add_subdirectory(tensor3)
+add_subdirectory(tensor4)
 
 # Skeletons
 add_subdirectory(map)

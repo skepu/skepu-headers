@@ -57,10 +57,10 @@ public:
 		m_cols = cols;
 
 		set_sizes();
-		if(base::m_size)
-			alloc_partitions();
 		if(base::m_external)
 			alloc_local_storage();
+		else
+			alloc_partitions();
 	}
 
 	auto
@@ -181,50 +181,49 @@ private:
 	alloc_local_storage() noexcept
 	-> void override
 	{
-		if(base::m_data)
+		if(!base::m_size)
 			return;
 
-		base::m_data = new T[base::m_size];
-		starpu_matrix_data_register(
-			&(base::m_data_handle),
-			STARPU_MAIN_RAM,
-			(uintptr_t)(base::m_data),
-			m_cols,
-			m_cols,
-			m_rows,
-			sizeof(T));
-		starpu_mpi_data_register(
-			base::m_data_handle,
-			skepu::cluster::mpi_tag(),
-			STARPU_MAIN_RAM);
+		if(!base::m_data)
+			base::m_data = new T[base::m_size];
+
+		if(!base::m_external && !base::m_data_handle)
+		{
+			starpu_matrix_data_register(
+				&(base::m_data_handle),
+				STARPU_MAIN_RAM,
+				(uintptr_t)(base::m_data),
+				m_cols,
+				m_cols,
+				m_rows,
+				sizeof(T));
+			starpu_mpi_data_register(
+				base::m_data_handle,
+				skepu::cluster::mpi_tag(),
+				STARPU_MPI_PER_NODE);
+		}
 	}
 
 	auto
 	alloc_partitions() noexcept
 	-> void override
 	{
-		//starpu_mpi_barrier(MPI_COMM_WORLD);
-		if(base::m_size)
-		{
+		if(!base::m_size)
+			return;
+
+		if(!base::m_part_data)
 			base::m_part_data = new T[base::m_part_size];
-			//starpu_mpi_barrier(MPI_COMM_WORLD);
-			for(size_t i(0); i < base::m_handles.size(); ++i)
-			{
-				if(i == skepu::cluster::mpi_rank())
-					starpu_register(
-						base::m_part_data,
-						m_part_rows,
-						m_cols,
-						base::m_handles[i],
-						i);
-				else
-					starpu_register(
-						0, // The data is not on our node, so we don't need a ptr here.
-						m_part_rows,
-						m_cols,
-						base::m_handles[i],
-						i);
-			}
+
+		for(size_t i(0); i < base::m_handles.size(); ++i)
+		{
+			auto & handle = base::m_handles[i];
+			if(handle)
+				continue;
+
+			if(i == skepu::cluster::mpi_rank())
+				starpu_register(base::m_part_data, m_part_rows, m_cols, handle, i);
+			else
+				starpu_register(0, m_part_rows, m_cols, handle, i);
 		}
 	}
 
@@ -239,20 +238,27 @@ private:
 	update_sizes() noexcept
 	-> void override
 	{
-		size_t rows{m_rows};
-		size_t cols{m_cols};
-		MPI_Bcast(&rows, sizeof(size_t), MPI_CHAR, 0, MPI_COMM_WORLD);
-		MPI_Bcast(&cols, sizeof(size_t), MPI_CHAR, 0, MPI_COMM_WORLD);
+		size_t size_arr[]{m_rows, m_cols};
+		starpu_data_handle_t size_handle;
+		starpu_variable_data_register(
+			&size_handle,
+			STARPU_MAIN_RAM,
+			(uintptr_t)size_arr,
+			sizeof(size_arr));
+		starpu_mpi_data_register(size_handle, cluster::mpi_tag(), 0);
+		starpu_mpi_get_data_on_all_nodes_detached(MPI_COMM_WORLD, size_handle);
+		starpu_data_acquire(size_handle, STARPU_R);
 
-		if(rows != m_rows || cols != m_cols)
-		{
-			m_rows = rows;
-			m_cols = cols;
-			set_sizes();
+		m_rows = size_arr[0];
+		m_cols = size_arr[1];
 
-			alloc_partitions();
-			alloc_local_storage();
-		}
+		starpu_data_release(size_handle);
+		starpu_data_unregister_no_coherency(size_handle);
+
+		set_sizes();
+
+		alloc_partitions();
+		alloc_local_storage();
 	}
 
 	auto

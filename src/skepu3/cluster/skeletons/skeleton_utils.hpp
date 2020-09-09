@@ -108,6 +108,19 @@ prepare_buffer(Ten3<T> const *, void * ptr)
 
 template<typename T>
 auto inline
+prepare_buffer(Ten4<T> const *, void * ptr)
+-> Ten4<T>
+{
+	return Ten4<T>(
+		(T *)STARPU_TENSOR_GET_PTR(ptr),
+		STARPU_TENSOR_GET_NT(ptr),
+		STARPU_TENSOR_GET_NZ(ptr),
+		STARPU_TENSOR_GET_NY(ptr),
+		STARPU_TENSOR_GET_NX(ptr));
+}
+
+template<typename T>
+auto inline
 prepare_buffer(Vec<T> const *, void * ptr)
 -> Vec<T>
 {
