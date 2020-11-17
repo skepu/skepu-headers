@@ -178,6 +178,8 @@ namespace skepu
 	template <typename T>
 	void Vector<T>::init(size_type size)
 	{
+		DEBUG_TEXT_LEVEL1("Vector: Allocating with " << size << " elements");
+		
 		if (!this->m_data)
 		{
 			if (size < 1)
@@ -213,6 +215,8 @@ namespace skepu
 		
 		if (m_data && m_deallocEnabled)
 			backend::deallocateHostMemory<T>(m_data);
+		
+		DEBUG_TEXT_LEVEL1("Vector: Deallocated with " << this->m_size << " elements");
 	}
 	
 ///////////////////////////////////////////////

@@ -74,7 +74,7 @@ namespace skepu
 			if (argc > 3)
 				repetitions = std::stoul(argv[3]);
 			
-			return std::make_tuple(minSize, maxSize, repetitions);
+			return {minSize, maxSize, repetitions};
 		}
 		
 		class BenchmarkResult

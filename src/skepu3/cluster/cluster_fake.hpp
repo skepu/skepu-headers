@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <vector>
 // Mockup of the cluster interface, to allow the SkePU precompiler to
 // compile the code.
