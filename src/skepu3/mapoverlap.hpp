@@ -143,6 +143,8 @@ namespace skepu
 					case Edge::Pad:
 						start[i] = this->m_pad;
 						end[3*overlap-1 - i] = this->m_pad;
+					default:
+						SKEPU_ERROR("Edge mode not supported");
 					}
 				}
 				
@@ -212,6 +214,8 @@ namespace skepu
 							start[i] = this->m_pad;
 							end[3*overlap-1 - i] = this->m_pad;
 							break;
+						default:
+							SKEPU_ERROR("Edge mode not supported");
 						}
 					}
 					
@@ -273,6 +277,8 @@ namespace skepu
 							start[i] = this->m_pad;
 							end[3*overlap-1 - i] = this->m_pad;
 							break;
+						default:
+							SKEPU_ERROR("Edge mode not supported");
 						}
 					}
 					

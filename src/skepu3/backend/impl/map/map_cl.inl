@@ -17,9 +17,6 @@ namespace skepu
 			const size_t numElemPerSlice = size / numDevices;
 			const size_t rest = size % numDevices;
 			
-		//	std::vector<DeviceMemPointer_CL<T>*> outMemP(numDevices);
-		//	std::tuple<std::vector<DeviceMemPointer_CL<T>*> outMemP(numDevices);
-			
 			for (size_t i = 0; i < numDevices; ++i)
 			{
 				Device_CL *device = this->m_environment->m_devices_CL[i];
@@ -28,7 +25,6 @@ namespace skepu
 				
 				pack_expand((get<EI, CallArgs...>(args...).getParent().updateDevice_CL(get<EI, CallArgs...>(args...).getAddress() + baseIndex, numElem, device, false), 0)...);
 				pack_expand((get<AI, CallArgs...>(args...).getParent().updateDevice_CL(get<AI, CallArgs...>(args...).getAddress(), get<AI, CallArgs...>(args...).size(), device, false), 0)...);
-			//	outMemP[i] = res                          .getParent().updateDevice_CL(res                          .getAddress() + baseIndex, numElem, device, false);
 				pack_expand((get<OI, CallArgs...>(args...).getParent().updateDevice_CL(get<OI, CallArgs...>(args...).getAddress() + baseIndex, numElem, device, false), 0)...);
 			}
 			
@@ -55,17 +51,13 @@ namespace skepu
 					std::get<EI-outArity>(elwiseMemP)...,
 					std::get<AI-arity-outArity>(anyMemP)...,
 					get<CI, CallArgs...>(args...)...,
-				//	outMemP[i],
-					get<0>(args...).getParent().size_j(),
-					get<0>(args...).getParent().size_k(),
-					get<0>(args...).getParent().size_l(),
+					get<0>(args...).getParent().size_info(),
 					numElem,
 					baseIndex
 				);
 				
 				// Make sure the data is marked as changed by the device
 				pack_expand((std::get<1>(std::get<AI-arity-outArity>(anyMemP))->changeDeviceData(hasWriteAccess(MapFunc::anyAccessMode[AI-arity-outArity])), 0)...);
-			//	outMemP[i]->changeDeviceData();
 				pack_expand((std::get<OI>(outMemP)->changeDeviceData(), 0)...);
 			}
 		}

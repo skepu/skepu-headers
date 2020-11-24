@@ -527,8 +527,10 @@ namespace skepu
 				
 				out_mem_p[i] = res.updateDevice_CU(res.getAddress() + i * numElemPerSlice, numRows * numCols, i, AccessMode::Write, false, true);
 				
-				auto anyMemP = std::make_tuple(get<AI, CallArgs...>(args...).getParent().updateDevice_CU(get<AI, CallArgs...>(args...).getAddress(),
-					get<AI, CallArgs...>(args...).getParent().size(), i, MapOverlapFunc::anyAccessMode[AI])...);
+			//	auto anyMemP = std::make_tuple(get<AI, CallArgs...>(args...).getParent().updateDevice_CU(get<AI, CallArgs...>(args...).getAddress(),
+			//		get<AI, CallArgs...>(args...).getParent().size(), i, MapOverlapFunc::anyAccessMode[AI])...);
+					
+				auto anyMemP = std::make_tuple(get<AI, CallArgs...>(args...).cudaProxy(i, MapOverlapFunc::anyAccessMode[AI])...);
 				
 				const size_t numThreads = trdsize[i]; //std::min(maxThreads, rowWidth);
 				const size_t numBlocks = std::max<size_t>(1, std::min(blocksPerCol[i] * numCols, maxBlocks));
@@ -839,10 +841,12 @@ namespace skepu
 		 *  The actual filter is specified in a user-function.
 		 */
 		template<typename MapOverlapFunc, typename CUDAKernel, typename CLKernel>
-		template<size_t... AI, size_t... CI, typename... CallArgs>
+		template<size_t... OI, size_t... EI, size_t... AI, size_t... CI, typename... CallArgs>
 		void MapOverlap2D<MapOverlapFunc, CUDAKernel, CLKernel>
-		::mapOverlapSingleThread_CU(size_t deviceID, Matrix<Ret>& res, Matrix<T>& arg, pack_indices<AI...>, pack_indices<CI...>,  CallArgs&&... args)
+		::mapOverlapSingleThread_CU(size_t deviceID, pack_indices<OI...>, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args)
 		{
+			auto &res = get<0>(args...);
+			auto &arg = get<outArity>(args...);
 			const size_t in_rows = arg.total_rows();
 			const size_t in_cols = arg.total_cols();
 			const size_t out_rows = res.total_rows();
@@ -874,7 +878,7 @@ namespace skepu
 #endif
 			(
 				in_mem_p->getDeviceDataPointer(),
-				std::get<AI>(anyMemP).second...,
+				std::get<AI-arity-outArity>(anyMemP).second...,
 				get<CI, CallArgs...>(args...)...,
 				out_mem_p->getDeviceDataPointer(),
 				out_rows, out_cols,
@@ -894,10 +898,12 @@ namespace skepu
 		*  The actual filter is specified in a user-function.
 		 */
 		template<typename MapOverlapFunc, typename CUDAKernel, typename CLKernel>
-		template<size_t... AI, size_t... CI, typename... CallArgs>
+		template<size_t... OI, size_t... EI, size_t... AI, size_t... CI, typename... CallArgs>
 		void MapOverlap2D<MapOverlapFunc, CUDAKernel, CLKernel>
-		::mapOverlapMultipleThread_CU(size_t numDevices, Matrix<Ret>& res, Matrix<T>& arg, pack_indices<AI...>, pack_indices<CI...>,  CallArgs&&... args)
+		::mapOverlapMultipleThread_CU(size_t numDevices, pack_indices<OI...>, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args)
 		{
+			auto &res = get<0>(args...);
+			auto &arg = get<outArity>(args...);
 			const size_t in_rows = arg.total_rows();
 			const size_t in_cols = arg.total_cols();
 			const size_t out_rows = res.total_rows();
@@ -968,7 +974,7 @@ namespace skepu
 #endif
 				(
 					in_mem_p[i]->getDeviceDataPointer(), 
-					std::get<AI>(anyMemP).second...,
+					std::get<AI-arity-outArity>(anyMemP).second...,
 					get<CI, CallArgs...>(args...)...,
 					out_mem_p[i]->getDeviceDataPointer(),
 					outRows, out_cols,
@@ -985,10 +991,11 @@ namespace skepu
 		
 		
 		template<typename MapOverlapFunc, typename CUDAKernel, typename CLKernel>
-		template<size_t... AI, size_t... CI, typename... CallArgs>
+		template<size_t... OI, size_t... EI, size_t... AI, size_t... CI, typename... CallArgs>
 		void MapOverlap2D<MapOverlapFunc, CUDAKernel, CLKernel>
-		::helper_CUDA(skepu::Matrix<Ret>& res, skepu::Matrix<T>& arg, pack_indices<AI...> ai, pack_indices<CI...> ci,  CallArgs&&... args)
+		::helper_CUDA(pack_indices<OI...> oi, pack_indices<EI...> ei, pack_indices<AI...> ai, pack_indices<CI...> ci, CallArgs&&... args)
 		{
+			auto &arg = get<outArity>(args...);
 			DEBUG_TEXT_LEVEL1("CUDA MapOverlap 2D: size = " << arg.size() << ", maxDevices = " << this->m_selected_spec->devices()
 				<< ", maxBlocks = " << this->m_selected_spec->GPUBlocks() << ", maxThreads = " << this->m_selected_spec->GPUThreads());
 			
@@ -996,10 +1003,10 @@ namespace skepu
 			
 #ifndef SKEPU_DEBUG_FORCE_MULTI_GPU_IMPL
 			if (numDevices <= 1)
-				return this->mapOverlapSingleThread_CU(0, res, arg, ai, ci, get<AI, CallArgs...>(args...)..., get<CI, CallArgs...>(args...)...);
+				return this->mapOverlapSingleThread_CU(0, oi, ei, ai, ci, args...);
 			else
 #endif // SKEPU_DEBUG_FORCE_MULTI_GPU_IMPL
-				return this->mapOverlapMultipleThread_CU(numDevices, res, arg, ai, ci, get<AI, CallArgs...>(args...)..., get<CI, CallArgs...>(args...)...);
+				return this->mapOverlapMultipleThread_CU(numDevices, oi, ei, ai, ci, args...);
 		}
 		
 		

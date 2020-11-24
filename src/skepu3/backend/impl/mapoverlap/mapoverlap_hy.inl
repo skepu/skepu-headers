@@ -292,29 +292,13 @@ namespace skepu
 		
 		
 		template<typename MapOverlapFunc, typename CUDAKernel, typename CLKernel>
-		template<size_t... AI, size_t... CI, typename... CallArgs>
+		template<size_t... OI, size_t... EI, size_t... AI, size_t... CI, typename... CallArgs>
 		void MapOverlap2D<MapOverlapFunc, CUDAKernel, CLKernel>
-		::helper_Hybrid(skepu::Matrix<Ret>& res, skepu::Matrix<T>& arg, pack_indices<AI...>, pack_indices<CI...>,  CallArgs&&... args)
+		::helper_Hybrid(pack_indices<OI...> oi, pack_indices<EI...> ei, pack_indices<AI...> ai, pack_indices<CI...> ci, CallArgs&&... args)
 		{
 			std::cout << "WARNING: helper_Hybrid is not implemented for Hybrid exection yet. Will run OpenMP version." << std::endl;
-			// Sync with device data
-			arg.updateHost();
-			pack_expand((get<AI, CallArgs...>(args...).getParent().updateHost(hasReadAccess(MapOverlapFunc::anyAccessMode[AI])), 0)...);
-			pack_expand((get<AI, CallArgs...>(args...).getParent().invalidateDeviceData(hasWriteAccess(MapOverlapFunc::anyAccessMode[AI])), 0)...);
-			res.invalidateDeviceData();
 			
-			omp_set_num_threads(this->m_selected_spec->CPUThreads());
-			
-			const int overlap_x = this->m_overlap_x;
-			const int overlap_y = this->m_overlap_y;
-			const size_t rows = res.total_rows();
-			const size_t cols = res.total_cols();
-			const size_t in_cols = arg.total_cols();
-			
-#pragma omp parallel for
-			for (size_t i = 0; i < rows; i++)
-				for (size_t j = 0; j < cols; j++)
-					res(i, j) = MapOverlapFunc::CPU(overlap_x, overlap_y, in_cols, &arg((i + overlap_y) * in_cols + (j + overlap_x)), get<AI, CallArgs...>(args...).hostProxy()..., get<CI, CallArgs...>(args...)...);
+			this->helper_OpenMP(oi, ei, ai, ci, std::forward<CallArgs>(args)...);
 		}
 		
 	} // namespace backend

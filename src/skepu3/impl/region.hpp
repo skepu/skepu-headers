@@ -2,6 +2,9 @@
 namespace future_std
 {
 	template<class T>
+	#ifdef SKEPU_CUDA
+		__host__ __device__
+	#endif
 	constexpr const T& clamp( const T& v, const T& lo, const T& hi )
 	{
 	  return (v < lo) ? lo : (hi < v) ? hi : v;
@@ -77,9 +80,6 @@ namespace skepu
 			}
 		}
 		
-#ifdef SKEPU_CUDA
-		__host__ __device__
-#endif
 		Region2D(Matrix<T> &mat, int arg_oi, int arg_oj, Edge arg_edge, T arg_pad)
 		:	oi(arg_oi), oj(arg_oj),
 			size_i(mat.size_i()), size_j(mat.size_j()),
@@ -87,6 +87,20 @@ namespace skepu
 			edge(arg_edge),
 			pad(arg_pad),
 			data(mat.getAddress())
+		{}
+
+// For CUDA kernel
+#ifdef SKEPU_CUDA
+		__host__ __device__
+#endif
+		Region2D(int arg_oj, int arg_oi, size_t arg_stride, T *arg_data)
+		:	oi(arg_oi), oj(arg_oj),
+			size_i(static_cast<size_t>(-1)), size_j(static_cast<size_t>(-1)),
+			stride(arg_stride),
+			edge(Edge::None),
+			pad(0),
+			data(arg_data),
+			idx{0,0}
 		{}
 	};
 	

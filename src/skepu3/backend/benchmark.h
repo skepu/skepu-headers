@@ -123,6 +123,17 @@ namespace skepu
 			return std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1);
 		}
 		
+		template<typename BF, typename... Args>
+		inline std::chrono::microseconds measureExecTimeIdempotent(BF f, Args&&... args)
+		{
+			f(std::forward<Args>(args)...);
+			
+			auto t1 = std::chrono::high_resolution_clock::now();
+			f(std::forward<Args>(args)...);
+			auto t2 = std::chrono::high_resolution_clock::now();
+			return std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1);
+		}
+		
 		template<typename T>
 		inline T median(std::vector<T> &v)
 		{
