@@ -219,6 +219,8 @@ namespace skepu
 		
 		T *getAddress() { return m_data; }
 		
+		T *data() { return m_data; }
+		
 	public: //-- Additions to interface --//
 		
 #ifdef SKEPU_OPENCL
@@ -350,6 +352,7 @@ namespace skepu
 		size_t size(); // returns number of elements "left" in parent container from this index
 		
 		T* getAddress() const;
+		T* data();
 		
 		template<typename Ignore>
 		Vec<T> hostProxy(ProxyTag::Default, Ignore)

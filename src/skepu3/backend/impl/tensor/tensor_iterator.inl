@@ -36,7 +36,13 @@ namespace skepu
 	}
 	
 	template <typename T>
-	T* Tensor3Iterator<T>::getAddress() const
+	T* Tensor3Iterator<T>::getAddress()
+	{
+		return m_std_iterator;
+	}
+	
+	template <typename T>
+	T* Tensor3Iterator<T>::data()
 	{
 		return m_std_iterator;
 	}
@@ -251,7 +257,13 @@ namespace skepu
 	}
 	
 	template <typename T>
-	T* Tensor4Iterator<T>::getAddress() const
+	T* Tensor4Iterator<T>::getAddress()
+	{
+		return m_std_iterator;
+	}
+	
+	template <typename T>
+	T* Tensor4Iterator<T>::data()
 	{
 		return m_std_iterator;
 	}

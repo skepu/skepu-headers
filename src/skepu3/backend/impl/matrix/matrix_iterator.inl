@@ -46,6 +46,12 @@ namespace skepu
 		return &(*m_std_iterator);
 	}
 	
+	template<typename T>
+	T* MatrixIterator<T>::data()
+	{
+		return &(*m_std_iterator);
+	}
+	
 	
 // Does not care about device data, use with care...
 	template<typename T>

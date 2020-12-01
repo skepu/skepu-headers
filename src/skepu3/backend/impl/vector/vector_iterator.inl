@@ -35,6 +35,12 @@ namespace skepu
 	}
 	
 	template <typename T>
+	T* VectorIterator<T>::data()
+	{
+		return m_std_iterator;
+	}
+	
+	template <typename T>
 	T& VectorIterator<T>::operator()(const ssize_t index)
 	{
 		return m_std_iterator[index];

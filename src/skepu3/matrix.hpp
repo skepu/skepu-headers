@@ -278,6 +278,11 @@ namespace skepu
 			return &m_data[0];
 		}
 		
+		T *data()
+		{
+			return &m_data[0];
+		}
+		
 		template<typename Ignore>
 		Mat<T> hostProxy(ProxyTag::Default, Ignore)
 		{
@@ -650,6 +655,7 @@ namespace skepu
 		size_t size(); // returns number of elements "left" in parent container from this index
 		
 		T* getAddress() const;
+		T* data();
 		
 		//Does care about device data, uses updateAndInvalidateDevice for read and write access
 		T& operator()(const ssize_t rows, const ssize_t cols);

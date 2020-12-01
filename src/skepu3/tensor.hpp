@@ -267,7 +267,8 @@ namespace skepu
 		iterator& begin(); // returns itself
 		size_t size(); // returns number of elements "left" in parent container from this index
 		
-		T* getAddress() const;
+		T* getAddress();
+		T* data();
 		
 		template<typename Ignore>
 		proxy_type hostProxy(ProxyTag::Default, Ignore)
@@ -570,7 +571,8 @@ namespace skepu
 		iterator& begin(); // returns itself
 		size_t size(); // returns number of elements "left" in parent container from this index
 		
-		T* getAddress() const;
+		T* getAddress();
+		T* data();
 		
 		template<typename Ignore>
 		proxy_type hostProxy(ProxyTag::Default, Ignore)
