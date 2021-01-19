@@ -137,7 +137,7 @@ namespace skepu
 #endif
 				case Backend::Type::CUDA:
 #ifdef SKEPU_CUDA
-					return CUDA(0, size, ei, ai, ci, res, get<EI, CallArgs...>(args...).begin()..., get<AI, CallArgs...>(args...)..., get<CI, CallArgs...>(args...)...);
+					return CUDA(0, size, oi, ei, ai, ci, res, get<EI, CallArgs...>(args...).begin()..., get<AI, CallArgs...>(args...)..., get<CI, CallArgs...>(args...)...);
 #endif
 				case Backend::Type::OpenCL:
 #ifdef SKEPU_OPENCL
@@ -171,23 +171,22 @@ namespace skepu
 #endif // SKEPU_OPENMP
 
 #ifdef SKEPU_CUDA
-
-			template<size_t... EI, size_t... AI, size_t... CI, typename... CallArgs>
-			Ret CUDA(size_t startIdx, size_t size, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, Ret &res, CallArgs&&... args);
-
-			template<size_t... EI, size_t... AI, size_t... CI, typename ...CallArgs>
-			Ret mapReduceSingleThread_CU(size_t deviceID, size_t startIdx, size_t size, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, Ret &res, CallArgs&&... args);
-
-			template<size_t... EI, size_t... AI, size_t... CI, typename ...CallArgs>
-			Ret mapReduceMultiStream_CU(size_t deviceID, size_t startIdx, size_t size, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, Ret &res, CallArgs&&... args);
-
-			template<size_t... EI, size_t... AI, size_t... CI, typename... CallArgs>
-			Ret mapReduceSingleThreadMultiGPU_CU(size_t useNumGPU, size_t startIdx, size_t size, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, Ret &res, CallArgs&&... args);
-
-			template<size_t... EI, size_t... AI, size_t... CI, typename ...CallArgs>
-			Ret mapReduceMultiStreamMultiGPU_CU(size_t useNumGPU, size_t startIdx, size_t size, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, Ret &res, CallArgs&&... args);
-
-
+			
+			template<size_t... OI, size_t... EI, size_t... AI, size_t... CI, typename... CallArgs>
+			Ret CUDA(size_t startIdx, size_t size, pack_indices<OI...>, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, Ret &res, CallArgs&&... args);
+			
+			template<size_t... OI, size_t... EI, size_t... AI, size_t... CI, typename ...CallArgs>
+			Ret mapReduceSingleThread_CU(size_t deviceID, size_t startIdx, size_t size, pack_indices<OI...>, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, Ret &res, CallArgs&&... args);
+			
+			template<size_t... OI, size_t... EI, size_t... AI, size_t... CI, typename ...CallArgs>
+			Ret mapReduceMultiStream_CU(size_t deviceID, size_t startIdx, size_t size, pack_indices<OI...>, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, Ret &res, CallArgs&&... args);
+			
+			template<size_t... OI, size_t... EI, size_t... AI, size_t... CI, typename... CallArgs>
+			Ret mapReduceSingleThreadMultiGPU_CU(size_t useNumGPU, size_t startIdx, size_t size, pack_indices<OI...>, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, Ret &res, CallArgs&&... args);
+			
+			template<size_t... OI, size_t... EI, size_t... AI, size_t... CI, typename ...CallArgs>
+			Ret mapReduceMultiStreamMultiGPU_CU(size_t useNumGPU, size_t startIdx, size_t size, pack_indices<OI...>, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, Ret &res, CallArgs&&... args);
+			
 #endif // SKEPU_CUDA
 
 #ifdef SKEPU_OPENCL

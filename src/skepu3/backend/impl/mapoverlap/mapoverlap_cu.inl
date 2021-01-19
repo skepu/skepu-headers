@@ -81,10 +81,10 @@ namespace skepu
 			this->m_cuda_kernel<<<numBlocks, numThreads, sharedMemSize>>>
 #endif
 			(
+				outMemP->getDeviceDataPointer(),
 				inMemP->getDeviceDataPointer(),
 				std::get<AI>(anyMemP).second...,
 				get<CI, CallArgs...>(args...)...,
-				outMemP->getDeviceDataPointer(),
 				wrapMemP->getDeviceDataPointer(),
 				n, out_offset, out_numelements,
 				static_cast<int>(this->m_edge),
@@ -215,10 +215,10 @@ namespace skepu
 					this->m_cuda_kernel<<<numBlocks[i], numThreads[i], sharedMemSize>>>
 #endif
 					(
+						out_mem_p[i]->getDeviceDataPointer(),
 						in_mem_p[i]->getDeviceDataPointer(),
 						std::get<AI>(anyMemP).second...,
 						get<CI, CallArgs...>(args...)...,
-						out_mem_p[i]->getDeviceDataPointer(),
 						wrap_mem_p[i]->getDeviceDataPointer(),
 						n[i], out_offset[i], out_numelements,
 						static_cast<int>(this->m_edge),
@@ -389,10 +389,10 @@ namespace skepu
 			this->m_cuda_colwise_kernel<<<numBlocks, numThreads, sharedMemSize>>>
 #endif
 			(
+				out_mem_p->getDeviceDataPointer(),
 				in_mem_p->getDeviceDataPointer(),
 				std::get<AI>(anyMemP).second...,
 				get<CI, CallArgs...>(args...)...,
-				out_mem_p->getDeviceDataPointer(),
 				wrap_mem_p.getDeviceDataPointer(),
 				n, 0, n,
 				static_cast<int>(this->m_edge),
@@ -549,10 +549,10 @@ namespace skepu
 				this->m_cuda_colwise_multi_kernel<<<numBlocks, numThreads, sharedMemSize>>>
 #endif
 				(
+					out_mem_p[i]->getDeviceDataPointer(),
 					in_mem_p[i]->getDeviceDataPointer(),
 					std::get<AI>(anyMemP).second...,
 					get<CI, CallArgs...>(args...)...,
-					out_mem_p[i]->getDeviceDataPointer(),
 					wrapStartDev_mem_p[i]->getDeviceDataPointer(),
 					n, in_offset, n,
 					static_cast<int>(this->m_edge),
@@ -669,10 +669,10 @@ namespace skepu
 			this->m_cuda_rowwise_kernel<<<numBlocks, numThreads, sharedMemSize>>>
 #endif
 			(
+				out_mem_p->getDeviceDataPointer(),
 				in_mem_p->getDeviceDataPointer(),
 				std::get<AI>(anyMemP).second...,
 				get<CI, CallArgs...>(args...)...,
-				out_mem_p->getDeviceDataPointer(),
 				wrap_mem_p.getDeviceDataPointer(),
 				n, 0, n,
 				static_cast<int>(this->m_edge),
@@ -790,10 +790,10 @@ namespace skepu
 				this->m_cuda_rowwise_kernel<<<numBlocks, numThreads, sharedMemSize>>>
 #endif
 				(
+					out_mem_p[i]->getDeviceDataPointer(),
 					in_mem_p[i]->getDeviceDataPointer(),
 					std::get<AI>(anyMemP).second...,
 					get<CI, CallArgs...>(args...)...,
-					out_mem_p[i]->getDeviceDataPointer(),
 					wrap_mem_p[i]->getDeviceDataPointer(),
 					numElems, 0, numElems,
 					static_cast<int>(this->m_edge),
@@ -877,10 +877,10 @@ namespace skepu
 			this->m_cuda_kernel<<<numBlocks,numThreads, sharedMem>>>
 #endif
 			(
+				out_mem_p->getDeviceDataPointer(),
 				in_mem_p->getDeviceDataPointer(),
 				std::get<AI-arity-outArity>(anyMemP).second...,
 				get<CI, CallArgs...>(args...)...,
-				out_mem_p->getDeviceDataPointer(),
 				out_rows, out_cols,
 				this->m_overlap_y, this->m_overlap_x,
 				in_cols, out_cols,
@@ -973,10 +973,10 @@ namespace skepu
 				this->m_cuda_kernel<<< numBlocks,numThreads, sharedMem >>>
 #endif
 				(
+					out_mem_p[i]->getDeviceDataPointer(),
 					in_mem_p[i]->getDeviceDataPointer(), 
 					std::get<AI-arity-outArity>(anyMemP).second...,
 					get<CI, CallArgs...>(args...)...,
-					out_mem_p[i]->getDeviceDataPointer(),
 					outRows, out_cols,
 					this->m_overlap_y, this->m_overlap_x,
 					in_cols, out_cols,
@@ -1064,10 +1064,10 @@ namespace skepu
 			this->m_cuda_kernel<<<numBlocks,numThreads, sharedMem>>>
 #endif
 			(
+				out_mem_p->getDeviceDataPointer(),
 				in_mem_p->getDeviceDataPointer(),
 				std::get<AI>(anyMemP).second...,
 				get<CI, CallArgs...>(args...)...,
-				out_mem_p->getDeviceDataPointer(),
 				out_i, out_j, out_k,
 				this->m_overlap_i, this->m_overlap_j, this->m_overlap_k,
 				in_j, out_j,
@@ -1158,10 +1158,10 @@ namespace skepu
 				this->m_cuda_kernel<<< numBlocks,numThreads, sharedMem >>>
 #endif
 				(
+					out_mem_p[i]->getDeviceDataPointer(),
 					in_mem_p[i]->getDeviceDataPointer(), 
 					std::get<AI>(anyMemP).second...,
 					get<CI, CallArgs...>(args...)...,
-					out_mem_p[i]->getDeviceDataPointer(),
 					outRows, out_cols,
 					this->m_overlap_y, this->m_overlap_x,
 					in_cols, out_cols,

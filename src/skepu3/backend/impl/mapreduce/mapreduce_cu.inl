@@ -14,16 +14,16 @@ namespace skepu
 	namespace backend
 	{
 		template<size_t arity, typename MapFunc, typename ReduceFunc, typename CUDAKernel, typename CUDAReduceKernel, typename CLKernel>
-		template<size_t... EI, size_t... AI, size_t... CI, typename ...CallArgs> 
+		template<size_t... OI, size_t... EI, size_t... AI, size_t... CI, typename ...CallArgs> 
 		typename MapFunc::Ret MapReduce<arity, MapFunc, ReduceFunc, CUDAKernel, CUDAReduceKernel, CLKernel>
-		::mapReduceSingleThread_CU(size_t deviceID, size_t startIdx, size_t size, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, Ret &res, CallArgs&&... args)
+		::mapReduceSingleThread_CU(size_t deviceID, size_t startIdx, size_t size, pack_indices<OI...>, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, Ret &res, CallArgs&&... args)
 		{
 			Ret startValue = res;
 			// Setup parameters
 			Device_CU *device = this->m_environment->m_devices_CU[deviceID];
-			auto eArgs  = std::make_tuple(get<EI, CallArgs...>(args...)...);
-			auto aArgs  = std::make_tuple(get<AI, CallArgs...>(args...)...);
-			auto scArgs = std::make_tuple(get<CI, CallArgs...>(args...)...);
+			auto eArgs  = std::forward_as_tuple(get<EI, CallArgs...>(args...)...);
+			auto aArgs  = std::forward_as_tuple(get<AI, CallArgs...>(args...)...);
+			auto scArgs = std::forward_as_tuple(get<CI, CallArgs...>(args...)...);
 			
 			// Number of threads per block, taken from NVIDIA source
 			size_t numBlocks, numThreads;
@@ -47,10 +47,10 @@ namespace skepu
 			this->m_cuda_kernel<<<numBlocks, numThreads, sharedMemSize>>>
 #endif
 			(
+				d_odata,
 				std::get<EI>(elwiseMemP)->getDeviceDataPointer()...,
 				std::get<AI-arity>(anyMemP).second...,
 				std::get<CI-arity-anyArity>(scArgs)...,
-				d_odata,
 				elwise_j(eArgs), elwise_k(eArgs), elwise_l(eArgs),
 				size,
 				startIdx
@@ -80,9 +80,9 @@ namespace skepu
 		
 		
 		template<size_t arity, typename MapFunc, typename ReduceFunc, typename CUDAKernel, typename CUDAReduceKernel, typename CLKernel>
-		template<size_t... EI, size_t... AI, size_t... CI, typename ...CallArgs> 
+		template<size_t... OI, size_t... EI, size_t... AI, size_t... CI, typename ...CallArgs> 
 		typename MapFunc::Ret MapReduce<arity, MapFunc, ReduceFunc, CUDAKernel, CUDAReduceKernel, CLKernel>
-		::mapReduceMultiStream_CU(size_t deviceID, size_t startIdx, size_t size, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, Ret &res, CallArgs&&... args)
+		::mapReduceMultiStream_CU(size_t deviceID, size_t startIdx, size_t size, pack_indices<OI...>, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, Ret &res, CallArgs&&... args)
 		{
 			CHECK_CUDA_ERROR(cudaSetDevice(deviceID));
 			
@@ -92,9 +92,9 @@ namespace skepu
 			const size_t numElemPerSlice = size / numKernels;
 			const size_t rest = size % numKernels;
 			
-			auto eArgs  = std::make_tuple(get<EI, CallArgs...>(args...)...);
-			auto aArgs  = std::make_tuple(get<AI, CallArgs...>(args...)...);
-			auto scArgs = std::make_tuple(get<CI, CallArgs...>(args...)...);
+			auto eArgs  = std::forward_as_tuple(get<EI, CallArgs...>(args...)...);
+			auto aArgs  = std::forward_as_tuple(get<AI, CallArgs...>(args...)...);
+			auto scArgs = std::forward_as_tuple(get<CI, CallArgs...>(args...)...);
 			
 			Ret result[numKernels];
 			typename to_device_pointer_cu<decltype(eArgs)>::type elwiseMemP[numKernels];
@@ -143,10 +143,10 @@ namespace skepu
 				this->m_cuda_kernel<<<numBlocks[i], numThreads[i], sharedMemSize>>>
 #endif
 				(
+					deviceOutMemP,
 					std::get<EI>(elwiseMemP[i])->getDeviceDataPointer()...,
 					std::get<AI-arity>(anyMemP[i]).second...,
 					std::get<CI-arity-anyArity>(scArgs)...,
-					deviceOutMemP,
 					elwise_j(eArgs), elwise_k(eArgs), elwise_l(eArgs),
 					numElem,
 					baseIndex
@@ -184,9 +184,9 @@ namespace skepu
 		
 		
 		template<size_t arity, typename MapFunc, typename ReduceFunc, typename CUDAKernel, typename CUDAReduceKernel, typename CLKernel>
-		template<size_t... EI, size_t... AI, size_t... CI, typename ...CallArgs> 
+		template<size_t... OI, size_t... EI, size_t... AI, size_t... CI, typename ...CallArgs> 
 		typename MapFunc::Ret MapReduce<arity, MapFunc, ReduceFunc, CUDAKernel, CUDAReduceKernel, CLKernel>
-		::mapReduceMultiStreamMultiGPU_CU(size_t useNumGPU, size_t startIdx, size_t size, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, Ret &res, CallArgs&&... args)
+		::mapReduceMultiStreamMultiGPU_CU(size_t useNumGPU, size_t startIdx, size_t size, pack_indices<OI...>, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, Ret &res, CallArgs&&... args)
 		{
 #ifdef USE_PINNED_MEMORY
 			const size_t numElemPerDevice = size / useNumGPU;
@@ -196,9 +196,9 @@ namespace skepu
 			size_t streamRest[MAX_GPU_DEVICES];
 			size_t maxKernels = 0;
 			
-			auto eArgs = std::make_tuple(get<EI, CallArgs...>(args...)...);
-			auto aArgs = std::make_tuple(get<AI, CallArgs...>(args...)...);
-			auto scArgs = std::make_tuple(get<CI, CallArgs...>(args...)...);
+			auto eArgs  = std::forward_as_tuple(get<EI, CallArgs...>(args...)...);
+			auto aArgs  = std::forward_as_tuple(get<AI, CallArgs...>(args...)...);
+			auto scArgs = std::forward_as_tuple(get<CI, CallArgs...>(args...)...);
 			
 			for (size_t i = 0; i < useNumGPU; ++i)
 			{
@@ -265,10 +265,10 @@ namespace skepu
 					
 					this->m_cuda_kernel<<<numBlocks[i][j], numThreads[i][j], sharedMemSize, this->m_environment->m_devices_CU[i]->m_streams[j]>>>
 					(
+						deviceOutMemP,
 						std::get<EI>(elwiseMemP[i][j])->getDeviceDataPointer()...,
 						std::get<AI-arity>(anyMemP[i][j]).second...,
 						std::get<CI-arity-anyArity>(scArgs)...,
-						deviceOutMemP,
 						elwise_j(eArgs), elwise_k(eArgs), elwise_l(eArgs),
 						numElem, baseIndex
 					);
@@ -304,17 +304,17 @@ namespace skepu
 		
 		
 		template<size_t arity, typename MapFunc, typename ReduceFunc, typename CUDAKernel, typename CUDAReduceKernel, typename CLKernel>
-		template<size_t... EI, size_t... AI, size_t... CI, typename... CallArgs> 
+		template<size_t... OI, size_t... EI, size_t... AI, size_t... CI, typename... CallArgs> 
 		typename MapFunc::Ret MapReduce<arity, MapFunc, ReduceFunc, CUDAKernel, CUDAReduceKernel, CLKernel>
-		::mapReduceSingleThreadMultiGPU_CU(size_t numDevices, size_t startIdx, size_t size, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, Ret &res, CallArgs&&... args)
+		::mapReduceSingleThreadMultiGPU_CU(size_t numDevices, size_t startIdx, size_t size, pack_indices<OI...>, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, Ret &res, CallArgs&&... args)
 		{
 			// Divide elements among participating devices
 			const size_t numElemPerSlice = size / numDevices;
 			const size_t rest = size % numDevices;
 			
-			auto eArgs = std::make_tuple(get<EI, CallArgs...>(args...)...);
-			auto aArgs = std::make_tuple(get<AI, CallArgs...>(args...)...);
-			auto scArgs = std::make_tuple(get<CI, CallArgs...>(args...)...);
+			auto eArgs  = std::forward_as_tuple(get<EI, CallArgs...>(args...)...);
+			auto aArgs  = std::forward_as_tuple(get<AI, CallArgs...>(args...)...);
+			auto scArgs = std::forward_as_tuple(get<CI, CallArgs...>(args...)...);
 			
 			typename to_device_pointer_cu<decltype(eArgs)>::type elwiseMemP[MAX_GPU_DEVICES];
 			typename to_proxy_cu<typename MapFunc::ProxyTags, decltype(aArgs)>::type anyMemP[MAX_GPU_DEVICES];
@@ -360,10 +360,10 @@ namespace skepu
 				this->m_cuda_kernel<<<numBlocks[i], numThreads[i], sharedMemSize>>>
 #endif
 				(
+					deviceOutMemP,
 					std::get<EI>(elwiseMemP[i])->getDeviceDataPointer()...,
 					std::get<AI-arity>(anyMemP[i]).second...,
 					std::get<CI-arity-anyArity>(scArgs)...,
-					deviceOutMemP,
 					elwise_j(eArgs), elwise_k(eArgs), elwise_l(eArgs),
 					numElem,
 					baseIndex
@@ -401,9 +401,9 @@ namespace skepu
 		
 		
 		template<size_t arity, typename MapFunc, typename ReduceFunc, typename CUDAKernel, typename CUDAReduceKernel, typename CLKernel>
-		template<size_t... EI, size_t... AI, size_t... CI, typename... CallArgs> 
+		template<size_t... OI, size_t... EI, size_t... AI, size_t... CI, typename... CallArgs> 
 		typename MapFunc::Ret MapReduce<arity, MapFunc, ReduceFunc, CUDAKernel, CUDAReduceKernel, CLKernel>
-		::CUDA(size_t startIdx, size_t size, pack_indices<EI...> ei, pack_indices<AI...> ai, pack_indices<CI...> ci, Ret &res, CallArgs&&... args)
+		::CUDA(size_t startIdx, size_t size, pack_indices<OI...> oi, pack_indices<EI...> ei, pack_indices<AI...> ai, pack_indices<CI...> ci, Ret &res, CallArgs&&... args)
 		{
 			DEBUG_TEXT_LEVEL1("CUDA MapReduce: size = " << size << ", maxDevices = " << this->m_selected_spec->devices()
 				<< ", maxBlocks = " << this->m_selected_spec->GPUBlocks() << ", maxThreads = " << this->m_selected_spec->GPUThreads());
@@ -418,10 +418,10 @@ namespace skepu
 				
 				//Checks whether or not the GPU supports MemoryTransfer/KernelExec overlapping, if not call mapReduceSingleThread function
 				if (this->m_environment->m_devices_CU.at(this->m_environment->bestCUDADevID)->isOverlapSupported())
-					return mapReduceMultiStream_CU(this->m_environment->bestCUDADevID, startIdx, size, ei, ai, ci, res, args...);
+					return mapReduceMultiStream_CU(this->m_environment->bestCUDADevID, startIdx, size, oi, ei, ai, ci, res, args...);
 				
 #endif
-				return mapReduceSingleThread_CU(this->m_environment->bestCUDADevID, startIdx, size, ei, ai, ci, res, args...);
+				return mapReduceSingleThread_CU(this->m_environment->bestCUDADevID, startIdx, size, oi, ei, ai, ci, res, args...);
 			}
 			
 #endif // SKEPU_DEBUG_FORCE_MULTI_GPU_IMPL
@@ -431,10 +431,10 @@ namespace skepu
 			// if pinned memory is used but the device does not support overlap the function continues with the previous implementation.
 			// if the multistream version is being used the function will exit at this point.
 			if (this->m_environment->supportsCUDAOverlap())
-				return mapReduceMultiStreamMultiGPU_CU(numDevices, startIdx, size, ei, ai, ci, res, args...);
+				return mapReduceMultiStreamMultiGPU_CU(numDevices, startIdx, size, oi, ei, ai, ci, res, args...);
 			
 #endif
-			return mapReduceSingleThreadMultiGPU_CU(numDevices, startIdx, size, ei, ai, ci, res, args...);
+			return mapReduceSingleThreadMultiGPU_CU(numDevices, startIdx, size, oi, ei, ai, ci, res, args...);
 		}
 	} // namespace backend
 } // namespace skepu

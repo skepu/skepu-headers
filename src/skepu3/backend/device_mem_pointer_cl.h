@@ -33,10 +33,10 @@ namespace skepu
 			DeviceMemPointer_CL(T* start, size_t numElements, Device_CL* device);
 			~DeviceMemPointer_CL();
 			
-			operator DeviceMemPointer_CL<const T>()
+	/*		operator DeviceMemPointer_CL<const T>()
 			{
 				return *this;
-			}
+			}*/
 			
 			void copyHostToDevice(size_t numElements = std::numeric_limits<size_t>::max(), bool copyLast=false) const;
 			void copyDeviceToHost(size_t numElements = std::numeric_limits<size_t>::max(), bool copyLast=false) const;

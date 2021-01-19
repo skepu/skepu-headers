@@ -831,7 +831,7 @@ namespace skepu
 		template<typename...Ts>
 		struct to_device_pointer_cu<std::tuple<Ts...>>
 		{
-			using type = std::tuple<typename Ts::device_pointer_type_cu...>;
+			using type = std::tuple<typename std::remove_reference<Ts>::type::device_pointer_type_cu...>;
 		};
 		
 		
@@ -844,7 +844,7 @@ namespace skepu
 		template<typename T>
 		struct to_proxy_cu<ProxyTag::Default, T>
 		{
-			using type = std::pair<typename T::device_pointer_type_cu, typename T::proxy_type>;
+			using type = std::pair<typename std::remove_reference<T>::type::device_pointer_type_cu, typename std::remove_reference<T>::type::proxy_type>;
 		};
 		
 		template<typename T>

@@ -31,7 +31,7 @@ namespace skepu
 			else if(cpuSize < 2) {
 				DEBUG_TEXT_LEVEL1("Hybrid MapReduce: Too small CPU size, fall back to GPU-only.");
 #ifdef SKEPU_HYBRID_USE_CUDA
-				return this->CUDA(0, size, ei, ai, ci, res, args...);
+				return this->CUDA(0, size, oi, ei, ai, ci, res, args...);
 #else
 				return this->CL(0, size, ei, ai, ci, res, args...);
 #endif
@@ -62,7 +62,7 @@ namespace skepu
 				if(myId == 0) {
 					// Let first thread take care of GPU part.
 #ifdef SKEPU_HYBRID_USE_CUDA
-					res = this->CUDA(cpuSize, gpuSize, ei, ai, ci, res, args...);
+					res = this->CUDA(cpuSize, gpuSize, oi, ei, ai, ci, res, args...);
 #else
 					res = this->CL(cpuSize, gpuSize, ei, ai, ci, res, args...);
 #endif
@@ -122,7 +122,7 @@ namespace skepu
 			else if(cpuSize < 2) {
 				DEBUG_TEXT_LEVEL1("Hybrid MapReduce: Too small CPU size, fall back to GPU-only.");
 #ifdef SKEPU_HYBRID_USE_CUDA
-				return this->CUDA(0, size, ei, ai, ci, res, args...);
+				return this->CUDA(0, size, oi, ei, ai, ci, res, args...);
 #else
 				return this->CL(0, size, ei, ai, ci, res, args...);
 #endif
@@ -153,7 +153,7 @@ namespace skepu
 				if(myId == lastThreadId) {
 					// Let last thread take care of GPU part.
 #ifdef SKEPU_HYBRID_USE_CUDA
-					res = this->CUDA(cpuSize, gpuSize, ei, ai, ci, res, args...);
+					res = this->CUDA(cpuSize, gpuSize, oi, ei, ai, ci, res, args...);
 #else
 					res = this->CL(cpuSize, gpuSize, ei, ai, ci, res, args...);
 #endif
