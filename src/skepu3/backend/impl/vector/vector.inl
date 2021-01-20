@@ -102,7 +102,15 @@ namespace skepu
 	 *  Constructs an empty vector.
 	 */
 	template <typename T>
-	inline Vector<T>::Vector(): m_data(nullptr), m_size(0), m_deallocEnabled(false), m_valid(false), m_noValidDeviceCopy(true) {}
+	inline Vector<T>::Vector()
+	:	m_data(nullptr),
+		m_size(0),
+		m_deallocEnabled(false),
+		m_valid(false),
+		m_noValidDeviceCopy(true)
+	{
+		DEBUG_TEXT_LEVEL1("Vector: Constructor to an empty state");
+	}
 	
 	/*!
 	 *  The copy occurs w.r.t. elements. As copy constructor creates a new storage.
@@ -110,10 +118,14 @@ namespace skepu
 	 *  Updates vector \p c before copying.
 	 */
 	template <typename T>
-	inline Vector<T>::Vector(const Vector& c): m_size(c.m_size), m_deallocEnabled(true), m_valid(true), m_noValidDeviceCopy(true)
+	inline Vector<T>::Vector(const Vector& c)
+	:	m_size(c.m_size),
+		m_deallocEnabled(true),
+		m_valid(true),
+		m_noValidDeviceCopy(true)
 	{
-		if (m_size < 1)
-			SKEPU_ERROR("The vector size should be positive.");
+		DEBUG_TEXT_LEVEL1("Vector: Copy constructor with " << this->m_size << " elements");
+		
 		this->init(this->m_size);
 		c.updateHost();
 		std::copy(c.m_data, c.m_data + this->m_size, this->m_data);
@@ -121,20 +133,26 @@ namespace skepu
 	
 	
 	template <typename T>
-	inline Vector<T>::Vector(Vector&& c):
+	inline Vector<T>::Vector(Vector&& move):
 		m_data(nullptr),
 		m_size(0),
 		m_deallocEnabled(false),
 		m_valid(false),
 		m_noValidDeviceCopy(true)
 	{
-		this->swap(c);
+		DEBUG_TEXT_LEVEL1("Vector: Move constructor with " << move.size() << " elements");
+		this->swap(move);
 	}
 	
 	
 	template <typename T>
-	inline Vector<T>::Vector(std::initializer_list<T> l): m_size(l.size()), m_deallocEnabled(true), m_valid(true), m_noValidDeviceCopy(true)
+	inline Vector<T>::Vector(std::initializer_list<T> l)
+	:	m_size(l.size()),
+		m_deallocEnabled(true),
+		m_valid(true),
+		m_noValidDeviceCopy(true)
 	{
+		DEBUG_TEXT_LEVEL1("Vector: Constructor from initializer list with " << this->m_size << " elements");
 		this->init(this->m_size);
 		
 		int i = 0;
@@ -148,8 +166,14 @@ namespace skepu
 	 * Useful when creating the vector object with existing raw data pointer.
 	 */
 	template <typename T>
-	inline Vector<T>::Vector(T * const ptr, size_type size, bool deallocEnabled): m_size (size), m_deallocEnabled(deallocEnabled), m_valid(true), m_noValidDeviceCopy(true)
+	inline Vector<T>::Vector(T * const ptr, size_type size, bool deallocEnabled)
+	:	m_size (size),
+		m_deallocEnabled(deallocEnabled),
+		m_valid(true),
+		m_noValidDeviceCopy(true)
 	{
+		DEBUG_TEXT_LEVEL1("Vector: Constructor from existing pointer with " << this->m_size << " elements");
+		
 		if (this->m_size < 1)
 			SKEPU_ERROR("The vector size must be positive.");
 		
@@ -167,8 +191,13 @@ namespace skepu
 	 *  Please refer to the documentation of \p std::vector.
 	 */
 	template <typename T>
-	inline Vector<T>::Vector(size_type num, const T& val): m_size(num), m_deallocEnabled(true), m_valid(true), m_noValidDeviceCopy(true)
+	inline Vector<T>::Vector(size_type num, const T& val)
+	:	m_size(num),
+		m_deallocEnabled(true),
+		m_valid(true),
+		m_noValidDeviceCopy(true)
 	{
+		DEBUG_TEXT_LEVEL1("Vector: Constructor with " << num << " elements");
 		this->init(num, val);
 	}
 
@@ -213,10 +242,14 @@ namespace skepu
 	{
 		releaseDeviceAllocations();
 		
-		if (m_data && m_deallocEnabled)
-			backend::deallocateHostMemory<T>(m_data);
+		if (this->m_data && this->m_deallocEnabled)
+			backend::deallocateHostMemory<T>(this->m_data);
+		else
+	  {
+	    DEBUG_TEXT_LEVEL1("Vector: Note, did not deallocate data.");
+	  }
 		
-		DEBUG_TEXT_LEVEL1("Vector: Deallocated with " << this->m_size << " elements");
+		DEBUG_TEXT_LEVEL1("Vector: Destroyed with " << this->m_size << " elements");
 	}
 	
 ///////////////////////////////////////////////
@@ -489,8 +522,9 @@ namespace skepu
 		updateHostAndReleaseDeviceAllocations();
 		from.updateHostAndReleaseDeviceAllocations();
 		
-		std::swap(m_data, from.m_data);
-		std::swap(m_size, from.m_size);
+		std::swap(this->m_data, from.m_data);
+		std::swap(this->m_size, from.m_size);
+		std::swap(this->m_deallocEnabled, from.m_deallocEnabled);
 	}
 
 ///////////////////////////////////////////////

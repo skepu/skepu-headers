@@ -274,7 +274,7 @@ namespace skepu
 		T *m_data = nullptr;
 		mutable bool m_valid; /*! to keep track of whether the main copy is valid or not */
 		size_type m_size = 0;
-		bool m_deallocEnabled;
+		bool m_deallocEnabled = true;
 		mutable bool m_noValidDeviceCopy;
 
 #ifdef SKEPU_OPENCL

@@ -198,28 +198,16 @@ namespace skepu
 	// Constructors, destructors
 	public:
 		
-		/*!
-		 *  Destructor, used to deallocate memory mainly, device memory.
-		 */
-		~Matrix()
-		{
-#ifdef SKEPU_OPENCL
-			releaseDeviceAllocations_CL();
-#endif
-		
-#ifdef SKEPU_CUDA
-			releaseDeviceAllocations_CU();
-#endif
-			if (m_transpose_matrix)
-				delete m_transpose_matrix;
-		}
-		
 		Matrix();
 		Matrix(size_type _rows, size_type _cols);
 		Matrix(size_type _rows, size_type _cols, const T& val);
-		Matrix(size_type _rows, size_type _cols, const std::vector<T>& vals);
-		Matrix(size_type _rows, size_type _cols, std::vector<T>&& vals);
+//		Matrix(size_type _rows, size_type _cols, const std::vector<T>& vals);
+//		Matrix(size_type _rows, size_type _cols, std::vector<T>&& vals);
 		Matrix(const Matrix<T>& copy);
+		Matrix(Matrix<T>&& move);
+		Matrix(T * const ptr, size_type _rows, size_type _cols, bool deallocEnabled = true);
+		
+		~Matrix();
 		
 		void init(size_type _rows, size_type _cols);
 		void init(size_type _rows, size_type _cols, const T& val);
@@ -240,7 +228,7 @@ namespace skepu
 		 */
 		size_type size() const
 		{
-			return m_data.size();
+			return this->m_rows * this->m_cols;
 		}
 		
 		/*!
@@ -249,7 +237,7 @@ namespace skepu
 		 */
 		size_type total_rows() const
 		{
-			return m_rows;
+			return this->m_rows;
 		}
 		
 		/*!
@@ -258,7 +246,7 @@ namespace skepu
 		 */
 		size_type total_cols() const
 		{
-			return m_cols;
+			return this->m_cols;
 		}
 		
 		size_type size_i() const { return this->m_rows; }
@@ -275,19 +263,19 @@ namespace skepu
 		// highly dangerous, use with care.
 		T *getAddress()
 		{
-			return &m_data[0];
+			return this->m_data;
 		}
 		
 		T *data()
 		{
-			return &m_data[0];
+			return this->m_data;
 		}
 		
 		template<typename Ignore>
 		Mat<T> hostProxy(ProxyTag::Default, Ignore)
 		{
 			Mat<T> proxy;
-			proxy.data = this->m_data.data();
+			proxy.data = this->m_data;
 			proxy.rows = this->m_rows;
 			proxy.cols = this->m_cols;
 			return proxy;
@@ -303,7 +291,7 @@ namespace skepu
 		MatRow<T> hostProxy(ProxyTag::MatRow, size_t r)
 		{
 			MatRow<T> proxy;
-			proxy.data = this->m_data.data() + r * this->m_cols;
+			proxy.data = this->m_data + r * this->m_cols;
 			proxy.cols = this->m_cols;
 			return proxy;
 		}
@@ -324,7 +312,7 @@ namespace skepu
 		MatCol<T> hostProxy(ProxyTag::MatCol, size_t c)
 		{
 			MatCol<T> proxy;
-			proxy.data = this->m_data.data() + c;
+			proxy.data = this->m_data + c;
 			proxy.rows = this->m_rows;
 			proxy.cols = this->m_cols;
 			return proxy;
@@ -374,17 +362,18 @@ namespace skepu
 		size_type m_rows, m_cols;
 		mutable bool m_dataChanged;
 		mutable bool m_noValidDeviceCopy;
+		bool m_deallocEnabled = true;
 		
 #ifdef USE_PINNED_MEMORY
 		mutable std::vector<T, malloc_allocator<T> > m_data;
 #else
-		mutable std::vector<T> m_data;
+		T *m_data = nullptr;
 #endif
 		
 		mutable bool m_valid; /*! to keep track of whether the main copy is valid or not */
 		
 		// for col_iterator,
-		mutable Matrix<T> *m_transpose_matrix;
+		mutable Matrix<T> *m_transpose_matrix = nullptr;
 		
 		template<typename Type>
 		void item_swap(Type &t1, Type &t2);
@@ -422,7 +411,6 @@ namespace skepu
 		// Element access
 #ifdef SKEPU_PRECOMPILED
 		proxy_elem at(size_type row, size_type col);
-		const T& at(size_type row, size_type col) const;
 #else
 		T& at(size_type row, size_type col);
 #endif // SKEPU_PRECOMPILED
@@ -453,7 +441,7 @@ namespace skepu
 		std::pair<device_pointer_type_cu, Mat<T>>
 		cudaProxy(size_t deviceID, AccessMode accessMode, ProxyTag::Default, Ignore)
 		{
-			device_pointer_type_cu devptr = this->updateDevice_CU(this->m_data.data(), this->m_rows * this->m_cols, deviceID, accessMode);
+			device_pointer_type_cu devptr = this->updateDevice_CU(this->m_data, this->m_rows * this->m_cols, deviceID, accessMode);
 			Mat<T> proxy;
 			proxy.data = devptr->getDeviceDataPointer();
 			proxy.rows = this->m_rows;
@@ -471,7 +459,7 @@ namespace skepu
 		cudaProxy(size_t deviceID, AccessMode accessMode, ProxyTag::MatRow, Index1D row)
 		{
 			// TODO: Optimize
-			device_pointer_type_cu devptr = this->updateDevice_CU(this->m_data.data(), this->m_rows * this->m_cols, deviceID, accessMode);
+			device_pointer_type_cu devptr = this->updateDevice_CU(this->m_data, this->m_rows * this->m_cols, deviceID, accessMode);
 			MatRow<T> proxy;
 			proxy.data = devptr->getDeviceDataPointer() + row.i * this->m_cols;
 			proxy.cols = this->m_cols;
@@ -637,14 +625,15 @@ namespace skepu
 #endif
 		
 	public: //-- Constructors & Destructor --//
-		
+	
+	/*	TODO: Fix pinned memory
 #ifdef USE_PINNED_MEMORY
 		typedef typename std::vector<typename std::remove_const<T>::type, malloc_allocator<typename std::remove_const<T>::type> >::iterator iterator_type;
 #else
 		typedef typename std::vector<typename std::remove_const<T>::type>::iterator iterator_type;
-#endif
+#endif*/
 	
-		MatrixIterator(parent_type *mat, iterator_type std_iterator);
+		MatrixIterator(parent_type *mat, T *std_iterator);
 		
 	public: //-- Extras --//
 		
@@ -669,7 +658,7 @@ namespace skepu
 		Mat<T> hostProxy()
 		{
 			Mat<T> proxy;
-			proxy.data = this->m_parent->m_data.data();
+			proxy.data = this->m_parent->m_data;
 			proxy.rows = this->m_parent->m_rows;
 			proxy.cols = this->m_parent->m_cols;
 			return proxy;
@@ -716,22 +705,12 @@ namespace skepu
 	private: //-- Data --//
 		
 		parent_type* m_parent;
-		iterator_type m_std_iterator;
+		T *m_std_iterator;
 	};
 	
 } // end namespace skepu
 
-#ifdef SKEPU_PRECOMPILED
 
 #include "backend/impl/matrix/matrix.inl"
-#include "backend/impl/matrix/matrix_iterator.inl"
-#include "backend/impl/matrix/matrix_proxy.inl"
-#include "backend/impl/matrix/matrix_transpose.inl"
-#include "backend/impl/matrix/matrix_cl.inl"
-#include "backend/impl/matrix/matrix_cu.inl"
-
-#else
-#include "backend/impl/matrix/matrix_sequential.inl"
-#endif // SKEPU_PRECOMPILED
 
 #endif

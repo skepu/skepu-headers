@@ -17,7 +17,7 @@ void Matrix<T>::setValidFlag(bool val)
 template<typename T>
 T* Matrix<T>::GetArrayRep()
 {
-   return &m_data[0];
+   return this->m_data;
 }
 
 
@@ -35,10 +35,9 @@ void Matrix<T>::randomize(int min, int max)
 {
    invalidateDeviceData();
 
-   for(typename Matrix<T>::size_type i = 0; i < size(); i++)
+   for(typename Matrix<T>::size_type i = 0; i < this->size(); i++)
    {
-      m_data.at(i) = (T)( rand() % (int)(max-min+1) + min);
-      //            m_data.at(i) = min + (T)rand()/((T)RAND_MAX/(max-min));
+      this->m_data[i] = (T)( rand() % (int)(max-min+1) + min);
    }
 }
 
@@ -59,15 +58,15 @@ void Matrix<T>::save(const std::string& filename)
 
    if (file.is_open())
    {
-      for(size_type i = 0; i < m_data.size(); ++i)
+      for(size_type i = 0; i < this->size(); ++i)
       {
-         file<<m_data.at(i) <<" ";
+         file << this->m_data[i] << " ";
       }
       file.close();
    }
    else
    {
-      std::cout<<"Unable to open file\n";
+      std::cout << "Unable to open file\n";
    }
 }
 
@@ -113,36 +112,32 @@ void Matrix<T>::load(const std::string& filename, size_type rowWidth, size_type 
          }
       }
 
-      m_cols = rowWidth;
-      m_rows = (size()/rowWidth);
+      this->m_cols = rowWidth;
+      this->m_rows = this->size() / rowWidth;
 
       file.close();
    }
    else
    {
-      std::cout<<"Unable to open file\n";
+      std::cout << "Unable to open file\n";
    }
 }
 
-
-/*!
-* Private helper to swap any two elements of same type
-*/
-template<typename T>
-template<typename Type>
-void Matrix<T>::item_swap(Type &t1, Type &t2)
-{
-   Type temp= t1;
-   t1=t2;
-   t2=temp;
-}
 
 /*
  * Default constructor of an empty matrix.
  */
 template<typename T>
 Matrix<T>::Matrix()
-: m_rows(0), m_cols(0), m_data(), m_dataChanged(false), m_transpose_matrix(0), m_noValidDeviceCopy(true), m_valid(false) {}
+: m_rows(0), m_cols(0),
+  m_dataChanged(false),
+  m_transpose_matrix(0),
+  m_noValidDeviceCopy(true),
+  m_valid(false),
+  m_deallocEnabled(true)
+{
+  DEBUG_TEXT_LEVEL1("Matrix: Constructor to an empty state");
+}
 
 
 /*!
@@ -152,11 +147,14 @@ Matrix<T>::Matrix()
  */
 template<typename T>
 Matrix<T>::Matrix(typename Matrix<T>::size_type _rows, typename Matrix<T>::size_type _cols)
-: m_rows(_rows), m_cols(_cols), m_data(_rows * _cols), m_dataChanged(false), m_transpose_matrix(0), m_noValidDeviceCopy(true), m_valid(true)
+: m_rows(_rows), m_cols(_cols),
+  m_dataChanged(false),
+  m_noValidDeviceCopy(true),
+  m_valid(true),
+  m_deallocEnabled(true)
 {
-#ifdef SKEPU_OPENCL
-   m_transposeKernels_CL = &(backend::Environment<T>::getInstance()->m_transposeKernels_CL);
-#endif
+  DEBUG_TEXT_LEVEL1("Matrix: Constructor with " << _rows << " x " << _cols << " (total " << this->size() << ") elements");
+  this->init(_rows, _cols);
 }
 
 /*!
@@ -167,59 +165,41 @@ Matrix<T>::Matrix(typename Matrix<T>::size_type _rows, typename Matrix<T>::size_
  */
 template<typename T>
 Matrix<T>::Matrix(typename Matrix<T>::size_type _rows, typename Matrix<T>::size_type _cols, const T& val)
-: m_rows(_rows), m_cols(_cols), m_data(m_rows * m_cols, val), m_dataChanged(false), m_transpose_matrix(0), m_noValidDeviceCopy(true), m_valid(true)
+: m_rows(_rows), m_cols(_cols),
+  m_dataChanged(false),
+  m_noValidDeviceCopy(true),
+  m_valid(true),
+  m_deallocEnabled(true)
 {
-#ifdef SKEPU_OPENCL
-   m_transposeKernels_CL = &(backend::Environment<T>::getInstance()->m_transposeKernels_CL);
-#endif
+  DEBUG_TEXT_LEVEL1("Matrix: Constructor with " << _rows << " x " << _cols << " (total " << this->size() << ") elements and default value " << val);
+  this->init(_rows, _cols, val);
 }
 
-/*!
- *  Constructor, used to allocate memory ($_rows * _cols$) with a vector to initialize all elements.
- *  The size of the vector must be the same as _rows * _cols.
- * \param _rows Number of rows in the matrix.
- * \param _cols Number of columns in the matrix.
- * \param val A value to initialize all elements.
- */
-template<typename T>
-Matrix<T>::Matrix(typename Matrix<T>::size_type _rows, typename Matrix<T>::size_type _cols, const std::vector<T>& vals):
-	m_rows(_rows),
-	m_cols(_cols),
-	m_data(vals),
-	m_dataChanged(false),
-	m_transpose_matrix(0),
-	m_noValidDeviceCopy(true),
-	m_valid(true)
-{
-	assert(m_data.size() == _rows * _cols);
-	
-#ifdef SKEPU_OPENCL
-	m_transposeKernels_CL = &(backend::Environment<T>::getInstance()->m_transposeKernels_CL);
-#endif
-}
 
-/*!
- *  Constructor, initializes elements with data moved from argument vector.
- *  The size of the vector must be the same as _rows * _cols.
- * \param _rows Number of rows in the matrix.
- * \param _cols Number of columns in the matrix.
- * \param val A value to initialize all elements.
+/**!
+ * Used to construct matrix on a raw data pointer passed to it as its payload data.
+ * Useful when creating the matrix object with existing raw data pointer.
  */
-template<typename T>
-Matrix<T>::Matrix(typename Matrix<T>::size_type _rows, typename Matrix<T>::size_type _cols, std::vector<T>&& vals):
-	m_rows(_rows),
-	m_cols(_cols),
-	m_data(std::move(vals)),
-	m_dataChanged(false),
-	m_transpose_matrix(0),
-	m_noValidDeviceCopy(true),
-	m_valid(true)
+template <typename T>
+inline Matrix<T>::Matrix(T * const ptr, typename Matrix<T>::size_type _rows, typename Matrix<T>::size_type _cols, bool deallocEnabled)
+: m_rows(_rows), m_cols(_cols),
+  m_dataChanged(false),
+  m_noValidDeviceCopy(true),
+  m_valid(true),
+  m_deallocEnabled(deallocEnabled)
 {
-	assert(m_data.size() == _rows * _cols);
-
-#ifdef SKEPU_OPENCL
-	m_transposeKernels_CL = &(backend::Environment<T>::getInstance()->m_transposeKernels_CL);
-#endif
+  DEBUG_TEXT_LEVEL1("Matrix: Constructor from existing pointer with " << _rows << " x " << _cols << " (total " << this->size() << ") elements");
+  
+  if (this->m_rows < 1 || this->m_cols < 1)
+    SKEPU_ERROR("The matrix size must be positive.");
+  
+  if (!ptr)
+  {
+    SKEPU_ERROR("Error: The supplied pointer for initializing matrix object is invalid");
+    return;
+  }
+  
+  this->m_data = ptr;
 }
 
 
@@ -230,32 +210,49 @@ Matrix<T>::Matrix(typename Matrix<T>::size_type _rows, typename Matrix<T>::size_
  * Update the matrix before assigning it to assign latest copy.
  */
 template<typename T>
-Matrix<T>::Matrix(const Matrix<T>& copy): m_noValidDeviceCopy(true), m_valid(true)
+Matrix<T>::Matrix(const Matrix<T>& copy)
+: m_rows(copy.m_rows), m_cols(copy.m_cols),
+  m_noValidDeviceCopy(true),
+  m_valid(true),
+  m_deallocEnabled(true),
+  m_dataChanged(false)
 {
+  DEBUG_TEXT_LEVEL1("Matrix: Copy constructor with " << this->m_rows << " x " << this->m_cols << " (total " << this->size() << ") elements");
    copy.updateHost();
-   this->m_rows = copy.m_rows;
-   this->m_cols = copy.m_cols;
-   this->m_data= copy.m_data;
-   this->m_transpose_matrix = copy.m_transpose_matrix;
-   this->m_dataChanged = copy.m_dataChanged;
+   this->init(copy.m_rows, copy.m_cols);
+   std::copy(copy.m_data, copy.m_data + copy.size(), this->m_data);
    
 #ifdef SKEPU_OPENCL
    this->m_transposeKernels_CL = copy.m_transposeKernels_CL;
 #endif
 }
 
+template<typename T>
+Matrix<T>::Matrix(Matrix<T>&& move): Matrix<T>()
+{
+  DEBUG_TEXT_LEVEL1("Matrix: Move constructor with " << move.m_rows << " x " << move.m_cols << " (total " << move.size() << ") elements");
+   this->swap(move);
+}
+
+
 // Initializers
 
 template<typename T>
 void Matrix<T>::init(size_type _rows, size_type _cols)
 {
-  if (!this->m_data.size())
+  DEBUG_TEXT_LEVEL1("Matrix: Allocating with " << _rows << " x " << _cols << " (total " << this->size() << ") elements");
+  
+  if (!this->m_data)
   {
     if (_rows * _cols < 1)
       SKEPU_ERROR("The container size must be positive.");
     this->m_rows = _rows;
     this->m_cols = _cols;
-    this->m_data = std::vector<T>(this->m_rows * this->m_cols, T{});
+    backend::allocateHostMemory<T>(this->m_data, this->m_rows * this->m_cols);
+    
+#ifdef SKEPU_OPENCL
+    this->m_transposeKernels_CL = &(backend::Environment<T>::getInstance()->m_transposeKernels_CL);
+#endif
   }
   else SKEPU_ERROR("Container is already initialized");
 }
@@ -263,15 +260,29 @@ void Matrix<T>::init(size_type _rows, size_type _cols)
 template<typename T>
 void Matrix<T>::init(size_type _rows, size_type _cols, const T& val)
 {
-  if (!this->m_data.size())
+  this->init(_rows, _cols);
+	std::fill(this->m_data, this->m_data + this->m_rows * this->m_cols, val);
+}
+
+/*!
+ *  Releases all allocations made on device.
+ */
+template <typename T>
+Matrix<T>::~Matrix()
+{
+  this->releaseDeviceAllocations();
+  
+  if (this->m_transpose_matrix)
+    delete this->m_transpose_matrix;
+  
+  if (this->m_data && this->m_deallocEnabled)
+    backend::deallocateHostMemory<T>(this->m_data);
+  else
   {
-    if (_rows * _cols < 1)
-      SKEPU_ERROR("The container size must be positive.");
-    this->m_rows = _rows;
-    this->m_cols = _cols;
-    this->m_data = std::vector<T>(this->m_rows * this->m_cols, val);
+    DEBUG_TEXT_LEVEL1("Matrix: Note, did not deallocate data.");
   }
-  else SKEPU_ERROR("Container is already initialized");
+  
+  DEBUG_TEXT_LEVEL1("Matrix: Destroyed with " << this->m_rows << " x " << this->m_cols << " (total " << this->size() << ") elements");
 }
 
 
@@ -397,148 +408,121 @@ inline void Matrix<T>::updateHostAndReleaseDeviceAllocations()
 // Regular interface functions START
 ///////////////////////////////////////////////
 
-//Iterators
-/*!
- *  Please refer to the documentation of \p std::vector and \p skepu::Matrix::iterator.
- */
 template <typename T>
 typename Matrix<T>::iterator Matrix<T>::begin()
 {
-   return iterator(this, m_data.begin());
+   return iterator(this, this->m_data);
 }
 
-/*!
- *  Please refer to the documentation of \p std::vector and \p skepu::Matrix::iterator. Uses \p row to get an iterator for that row.
- * \param row The index of row from where to start iterator.
- */
 template <typename T>
 typename Matrix<T>::iterator Matrix<T>::begin(size_t row)
 {
-   if(row>=total_rows())
+   if (row >= total_rows())
    {
       SKEPU_ERROR("ERROR! Row index is out of bound!");
    }
-   return iterator(this, m_data.begin()+(row*total_cols()));
+   return iterator(this, this->m_data + row * this->m_cols);
 }
 
-/*!
- *  Please refer to the documentation of \p std::vector and \p skepu::Matrix::iterator.
- */
 template <typename T>
 typename Matrix<T>::const_iterator Matrix<T>::begin() const
 {
-   return m_data.begin();
+   return iterator(this, this->m_data);
 }
 
-/*!
- *  Please refer to the documentation of \p std::vector and \p skepu::Matrix::iterator. Uses \p row to get an iterator for that row.
- * \param row The index of row from where to start iterator.
- */
 template <typename T>
 typename Matrix<T>::const_iterator Matrix<T>::begin(size_t row) const
 {
-   if(row>=total_rows())
+   if (row >= total_rows())
    {
       SKEPU_ERROR("ERROR! Row index is out of bound!");
    }
-   return iterator(this, m_data.begin()+(row*total_cols()));
+   return iterator(this, this->m_data + row * this->m_cols);
 }
 
-
-/*!
- *  Please refer to the documentation of \p std::vector and \p skepu::Matrix::iterator.
- */
 template <typename T>
 typename Matrix<T>::iterator Matrix<T>::end()
 {
-   return iterator(this, m_data.end());
+   return iterator(this, this->m_data + this->size());
 }
 
-/*!
- *  Please refer to the documentation of \p std::vector and \p skepu::Matrix::iterator. Get iterator to last element of \p row.
- * \param row Index of row the iterator will point to the last element.
- */
 template <typename T>
 typename Matrix<T>::iterator Matrix<T>::end(size_t row)
 {
-   if(row>=total_rows())
+   if (row >= total_rows())
    {
       SKEPU_ERROR("ERROR! Row index is out of bound!");
    }
-   return iterator(this, m_data.end()-((total_rows()-(row+1))*total_cols()));
+   return iterator(this, this->m_data + this->size() - (this->m_rows - row + 1) * this->m_cols);
 }
 
-/*!
- *  Please refer to the documentation of \p std::vector and \p skepu::Matrix::iterator.
- */
 template <typename T>
 typename Matrix<T>::const_iterator Matrix<T>::end() const
 {
-   return m_data.end();
+   return iterator(this, this->m_data + this->size());
 }
 
-/*!
- *  Please refer to the documentation of \p std::vector and \p skepu::Matrix::iterator. Get iterator to last element of \p row.
- * \param row Index of row the iterator will point to the last element.
- */
 template <typename T>
 typename Matrix<T>::const_iterator Matrix<T>::end(size_t row) const
 {
-   if(row>=total_rows())
+   if (row >= total_rows())
    {
       SKEPU_ERROR("ERROR! Row index is out of bound!");
    }
-   return iterator(this, m_data.end()-((total_rows()-(row+1))*total_cols()));
+   return iterator(this, this->m_data + this->size() - (this->m_rows - row + 1) * this->m_cols);
 }
 
-
+#ifdef SKEPU_PRECOMPILED
 
 /*!
- *  Please refer to the documentation of \p std::vector.
- *
  *  Returns a \p proxy_elem instead of an ordinary element. The \p proxy_elem usually
  *  behaves like an ordinary, but there might be exceptions.
  */
 template <typename T>
 typename Matrix<T>::proxy_elem Matrix<T>::at(size_type row, size_type col)
 {
-   return proxy_elem(*this, row*m_cols+col);
+   return proxy_elem(*this, row * this->m_cols + col);
 }
 
+#else
+
 /*!
- *  To initialize a matrix with soem scalar value.
+ *  Uses \p row and \p col instead of single index.
+ *  \param row Index of row to get.
+ *  \param col Index of column to get.
+ *  \return a const reference to T element at position identified by row,column index.
+ */
+template <typename T>
+T& Matrix<T>::at(size_type row, size_type col)
+{
+   updateHost();
+   if (row >= this->m_rows || col >= this->m_cols)
+      SKEPU_ERROR("ERROR! Row or Column index is out of bound!");
+
+   return this->m_data[row * this->m_cols + col];
+}
+
+#endif
+
+/*!
+ *  To initialize a matrix with some scalar value.
  *
  *  \param elem The element you want to assign to all matrix.
  */
 template <typename T>
 Matrix<T>& Matrix<T>::operator=(const T& elem)
 {
-   for(size_type i=0; i<size(); i++)
+   for (size_type i = 0; i < size(); i++)
    {
-      m_data[i]= elem;
+      this->m_data[i] = elem;
    }
    return *this;
 }
 
 
-/*!
- *  Please refer to the documentation of \p std::vector. Uses \p row and \p col instead of single index.
- *  \param row Index of row to get.
- *  \param col Index of column to get.
- *  \return a const reference to T element at position identified by row,column index.
- */
-template <typename T>
-const T& Matrix<T>::at(size_type row, size_type col ) const
-{
-   updateHost();
-   if(row >= this->total_rows() || col >= this->total_cols())
-      SKEPU_ERROR("ERROR! Row or Column index is out of bound!");
 
-   return m_data.at(row*m_cols+col);
-}
 
 /*!
- *  Please refer to the documentation of \p std::vector.
  * Updates and invalidate both Matrices before swapping.
  */
 template <typename T>
@@ -547,9 +531,10 @@ void Matrix<T>::swap(Matrix<T>& from)
    updateHostAndInvalidateDevice();
    from.updateHostAndInvalidateDevice();
 
-   item_swap<typename Matrix<T>::size_type>(m_rows, from.m_rows);
-   item_swap<typename Matrix<T>::size_type>(m_cols, from.m_cols);
-   item_swap<typename Matrix::container_type>(m_data, from.m_data);
+   std::swap(this->m_rows, from.m_rows);
+   std::swap(this->m_cols, from.m_cols);
+   std::swap(this->m_data, from.m_data);
+   std::swap(this->m_deallocEnabled, from.m_deallocEnabled);
 }
 
 ///////////////////////////////////////////////
@@ -683,10 +668,6 @@ T& Matrix<T>::operator[](const size_type index)
 ///////////////////////////////////////////////
 
 
-/*!
- *  Please refer to the documentation of \p std::vector.
- *
- */
 template <typename T>
 bool Matrix<T>::operator==(const Matrix<T>& c1)
 {
@@ -696,10 +677,6 @@ bool Matrix<T>::operator==(const Matrix<T>& c1)
    return (c1.m_data == m_data);
 }
 
-/*!
- *  Please refer to the documentation of \p std::vector.
- *
- */
 template <typename T>
 bool Matrix<T>::operator!=(const Matrix<T>& c1)
 {
@@ -710,3 +687,16 @@ bool Matrix<T>::operator!=(const Matrix<T>& c1)
 }
 
 } // end namespace skepu
+
+
+
+#include "matrix_iterator.inl"
+
+#ifdef SKEPU_PRECOMPILED
+
+#include "matrix_proxy.inl"
+#include "matrix_transpose.inl"
+#include "matrix_cl.inl"
+#include "matrix_cu.inl"
+
+#endif // SKEPU_PRECOMPILED

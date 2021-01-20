@@ -15,7 +15,7 @@ namespace skepu
 	
 	
 	template<typename T>
-	MatrixIterator<T>::MatrixIterator(parent_type *parent, const iterator_type std_iterator) : m_parent(parent), m_std_iterator(std_iterator)
+	MatrixIterator<T>::MatrixIterator(parent_type *parent, T *std_iterator) : m_parent(parent), m_std_iterator(std_iterator)
 	{}
 	
 	

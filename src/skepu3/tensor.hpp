@@ -98,6 +98,39 @@ namespace skepu
 		m_stride_1(sj * sk), m_stride_2(sk),
 		Vector<T>(si * sj * sk, val)
 		{}
+			
+		// Construct from pointer
+		Tensor3(T * const ptr, size_type si, size_type sj, size_type sk, bool deallocEnabled = true)
+		: m_size_i(si), m_size_j(sj), m_size_k(sk),
+		m_stride_1(sj * sk), m_stride_2(sk),
+		Vector<T>(ptr, si * sj * sk, deallocEnabled)
+		{}
+		
+		// Copy constructor	
+		Tensor3(const Tensor3& c)
+		: m_size_i(c.m_size_i), m_size_j(c.m_size_j), m_size_k(c.m_size_k),
+		m_stride_1(c.m_stride_1), m_stride_2(c.m_stride_2),
+		Vector<T>(c)
+		{}
+		
+		// Move constructor	
+		Tensor3(Tensor3&& c)
+		: m_size_i(0), m_size_j(0), m_size_k(0),
+		m_stride_1(0), m_stride_2(0),
+		Vector<T>()
+		{
+			this->swap(c);
+		}
+			
+		void swap(Tensor3<T>& from)
+		{
+			static_cast<Vector<T>&>(*this).swap(static_cast<Vector<T>&>(from));
+			std::swap(m_size_i, from.m_size_i);
+			std::swap(m_size_j, from.m_size_j);
+			std::swap(m_size_k, from.m_size_k);
+			std::swap(m_stride_1, from.m_stride_1);
+			std::swap(m_stride_2, from.m_stride_2);
+		}
 	
 		void init(size_type si, size_type sj, size_type sk)
 		{
@@ -394,6 +427,41 @@ namespace skepu
 		m_stride_1(sj * sk * sl), m_stride_2(sk * sl), m_stride_3(sl),
 		Vector<T>(si * sj * sk * sl, val)
 		{}
+			
+		// Construct from pointer
+		Tensor4(T * const ptr, size_type si, size_type sj, size_type sk, size_type sl, bool deallocEnabled = true)
+		: m_size_i(si), m_size_j(sj), m_size_k(sk), m_size_l(sl),
+		m_stride_1(sj * sk * sl), m_stride_2(sk * sl), m_stride_3(sl),
+		Vector<T>(ptr, si * sj * sk * sl, deallocEnabled)
+		{}
+		
+		// Copy constructor	
+		Tensor4(const Tensor4& c)
+		: m_size_i(c.m_size_i), m_size_j(c.m_size_j), m_size_k(c.m_size_k), m_size_l(c.m_size_l),
+		m_stride_1(c.m_stride_1), m_stride_2(c.m_stride_2), m_stride_3(c.m_stride_3),
+		Vector<T>(c)
+		{}
+		
+		// Move constructor	
+		Tensor4(Tensor4&& c)
+		: m_size_i(0), m_size_j(0), m_size_k(0), m_size_l(0),
+		m_stride_1(0), m_stride_2(0), m_stride_3(0),
+		Vector<T>()
+		{
+			this->swap(c);
+		}
+		
+		void swap(Tensor4<T>& from)
+		{
+			static_cast<Vector<T>&>(*this).swap(static_cast<Vector<T>&>(from));
+			std::swap(m_size_i, from.m_size_i);
+			std::swap(m_size_j, from.m_size_j);
+			std::swap(m_size_k, from.m_size_k);
+			std::swap(m_size_l, from.m_size_l);
+			std::swap(m_stride_1, from.m_stride_1);
+			std::swap(m_stride_2, from.m_stride_2);
+			std::swap(m_stride_3, from.m_stride_3);
+		}
 		
 		void init(size_type si, size_type sj, size_type sk, size_type sl)
 		{
