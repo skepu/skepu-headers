@@ -553,8 +553,8 @@ namespace skepu
 					SKEPU_ERROR("Non-matching input container sizes");
 				
 				// Remove later
-				auto res = get<0>(args...);
-				auto arg = get<outArity>(args...);
+				auto &res = get<0>(args...);
+				auto &arg = get<outArity>(args...);
 				// End remove
 				
 				this->selectBackend(get<0>(args...).size());
@@ -752,8 +752,8 @@ namespace skepu
 					SKEPU_ERROR("Non-matching input container sizes");
 				
 				// Remove later
-				auto res = get<0>(args...);
-				auto arg = get<outArity>(args...);
+				auto &res = get<0>(args...);
+				auto &arg = get<outArity>(args...);
 				// End remove
 				
 				this->selectBackend(get<0>(args...).size());
@@ -956,8 +956,8 @@ namespace skepu
 					SKEPU_ERROR("Non-matching input container sizes");
 				
 				// Remove later
-				auto res = get<0>(args...);
-				auto arg = get<outArity>(args...);
+				auto &res = get<0>(args...);
+				auto &arg = get<outArity>(args...);
 				// End remove
 				
 				this->selectBackend(get<0>(args...).size());

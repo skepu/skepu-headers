@@ -186,7 +186,13 @@ namespace skepu
 	template<> inline std::string getDataTypeCL<unsigned long> () { return "unsigned long";  }
 	template<> inline std::string getDataTypeCL<float>         () { return "float";          }
 	template<> inline std::string getDataTypeCL<double>        () { return "double";         }
-
+	
+	template<typename T>
+	inline std::string getDataTypeDefCL()
+	{
+		return "";
+	}
+	
 #endif
 
 	// Dummy base class for sequential skeleton classes.

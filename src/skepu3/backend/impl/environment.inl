@@ -580,7 +580,10 @@ template <typename T>
 		{
 			std::string kernelName = "transposeNoBankConflicts";
 			std::string datatype_CL = getDataTypeCL<T>();
+			std::string datatypedef_CL = getDataTypeDefCL<T>();
 			std::stringstream totalSource;
+			
+			totalSource << datatypedef_CL;
 			
 			if (datatype_CL == "double")
 				totalSource << "#pragma OPENCL EXTENSION cl_khr_fp64: enable\n";

@@ -28,7 +28,7 @@ namespace skepu
 			
 			// Sets the pad and edge policy values that are sent to the kernel
 			const int _poly = static_cast<int>(this->m_edge);
-			const T _pad = (this->m_edge == Edge::Pad) ? this->m_pad : 0;
+			const T _pad = (this->m_edge == Edge::Pad) ? this->m_pad : T{};
 			
 			// Constructs a wrap vector, which is used if cyclic edge policy is specified.
 			std::vector<T> wrap(2 * overlap);
@@ -91,7 +91,7 @@ namespace skepu
 			
 			// Sets the pad and edge policy values that are sent to the kernel
 			const int _poly = static_cast<int>(this->m_edge);
-			const T _pad = (this->m_edge == Edge::Pad) ? this->m_pad : 0;
+			const T _pad = (this->m_edge == Edge::Pad) ? this->m_pad : T{};
 			
 			// Constructs a wrap vector, which is used if cyclic edge policy is specified.
 			std::vector<T> wrap(2 * overlap);
@@ -270,7 +270,7 @@ namespace skepu
 			
 			// Sets the pad and edge policy values that are sent to the kernel
 			const int _poly = static_cast<int>(this->m_edge);
-			const T _pad = (this->m_edge == Edge::Pad) ? this->m_pad : 0;
+			const T _pad = (this->m_edge == Edge::Pad) ? this->m_pad : T{};
 			
 			// Constructs a wrap vector, which is used if cyclic edge policy is specified.
 			std::vector<T> wrap(2 * overlap * numrows);
@@ -358,7 +358,7 @@ namespace skepu
 			
 			// Sets the pad and edge policy values that are sent to the kernel
 			const int _poly = static_cast<int>(this->m_edge);
-			const T _pad = (this->m_edge == Edge::Pad) ? this->m_pad : 0;
+			const T _pad = (this->m_edge == Edge::Pad) ? this->m_pad : T{};
 			
 			const size_t numRowsPerSlice = numrows / numDevices;
 			const size_t numElemPerSlice = numRowsPerSlice * rowWidth;
@@ -503,7 +503,7 @@ namespace skepu
 			
 			// Sets the pad and edge policy values that are sent to the kernel
 			const int _poly = static_cast<int>(this->m_edge);
-			const T _pad = (this->m_edge == Edge::Pad) ? this->m_pad : 0;
+			const T _pad = (this->m_edge == Edge::Pad) ? this->m_pad : T{};
 			
 			// Constructs a wrap vector, which is used if cyclic edge policy is specified.
 			std::vector<T> wrap(overlap * 2 * (n / colWidth));
@@ -642,7 +642,7 @@ namespace skepu
 			
 			// Sets the pad and edge policy values that are sent to the kernel
 			const int _poly = static_cast<int>(this->m_edge);
-			const T _pad = (this->m_edge == Edge::Pad) ? this->m_pad : 0;
+			const T _pad = (this->m_edge == Edge::Pad) ? this->m_pad : T{};
 			
 			// we will divide the computation row-wise... copy data and do operation
 			for (size_t i = 0; i < numDevices; i++)

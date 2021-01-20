@@ -207,7 +207,7 @@ namespace skepu
 			pack_expand((get<AI, CallArgs...>(args...).getParent().invalidateDeviceData(hasWriteAccess(MapOverlapFunc::anyAccessMode[AI])), 0)...);
 			pack_expand((get<OI, CallArgs...>(args...).getParent().invalidateDeviceData(), 0)...);
 			
-			auto arg = get<outArity>(args...);
+			auto &arg = get<outArity>(args...);
 			
 			Region2D<T> region{arg, this->m_overlap_y, this->m_overlap_x, this->m_edge, this->m_pad};
 			
@@ -234,7 +234,7 @@ namespace skepu
 			pack_expand((get<AI, CallArgs...>(args...).getParent().invalidateDeviceData(hasWriteAccess(MapOverlapFunc::anyAccessMode[AI])), 0)...);
 			pack_expand((get<OI, CallArgs...>(args...).getParent().invalidateDeviceData(), 0)...);
 			
-			auto arg = get<outArity>(args...);
+			auto &arg = get<outArity>(args...);
 			
 			Region3D<T> region{arg, this->m_overlap_i, this->m_overlap_j, this->m_overlap_k, this->m_edge, this->m_pad};
 			
@@ -262,7 +262,7 @@ namespace skepu
 			pack_expand((get<AI, CallArgs...>(args...).getParent().invalidateDeviceData(hasWriteAccess(MapOverlapFunc::anyAccessMode[AI])), 0)...);
 			pack_expand((get<OI, CallArgs...>(args...).getParent().invalidateDeviceData(), 0)...);
 			
-			auto arg = get<outArity>(args...);
+			auto &arg = get<outArity>(args...);
 			
 			Region4D<T> region{arg, this->m_overlap_i, this->m_overlap_j, this->m_overlap_k, this->m_overlap_l, this->m_edge, this->m_pad};
 			

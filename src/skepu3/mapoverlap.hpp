@@ -143,6 +143,7 @@ namespace skepu
 					case Edge::Pad:
 						start[i] = this->m_pad;
 						end[3*overlap-1 - i] = this->m_pad;
+						break;
 					default:
 						SKEPU_ERROR("Edge mode not supported");
 					}
@@ -344,7 +345,10 @@ namespace skepu
 			
 		private:
 			MapFunc mapFunc;
-			MapOverlap1D(MapFunc map): mapFunc(map) {}
+			MapOverlap1D(MapFunc map): mapFunc(map)
+			{
+				this->m_edge = Edge::Duplicate;
+			}
 			
 			size_t m_overlap = 0;
 			
@@ -413,7 +417,7 @@ namespace skepu
 					(get<EI>(args...).size_j() - this->m_overlap_j*2 != size_j) ...))
 					SKEPU_ERROR("Non-matching input container sizes");
 			
-				auto arg = get<OutArity>(args...);
+				auto &arg = get<OutArity>(args...);
 				
 				RegionType region{arg, this->m_overlap_i, this->m_overlap_j, this->m_edge, this->m_pad};
 				
@@ -429,7 +433,7 @@ namespace skepu
 			template<typename... CallArgs>
 			auto operator()(CallArgs&&... args) -> decltype(get<0>(args...))
 			{
-				apply(out_indices, elwise_indices, any_indices, const_indices, args...);
+				apply(out_indices, elwise_indices, any_indices, const_indices, std::forward<CallArgs>(args)...);
 				return get<0>(args...);
 			}
 			
@@ -518,7 +522,7 @@ namespace skepu
 					(get<EI>(args...).size_k() - this->m_overlap_k*2 != size_k) ...))
 					SKEPU_ERROR("Non-matching input container sizes");
 			
-				auto arg = get<OutArity>(args...);
+				auto &arg = get<OutArity>(args...);
 				
 				RegionType region{arg, this->m_overlap_i, this->m_overlap_j, this->m_overlap_k, this->m_edge, this->m_pad};
 				
@@ -628,7 +632,7 @@ namespace skepu
 					(get<EI>(args...).size_l() - this->m_overlap_l*2 != size_l)...))
 					SKEPU_ERROR("Non-matching input container sizes");
 			
-				auto arg = get<OutArity>(args...);
+				auto &arg = get<OutArity>(args...);
 				
 				RegionType region{arg, this->m_overlap_i, this->m_overlap_j, this->m_overlap_k, this->m_overlap_l, this->m_edge, this->m_pad};
 				
