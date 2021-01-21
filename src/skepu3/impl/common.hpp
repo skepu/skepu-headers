@@ -23,11 +23,11 @@
 namespace skepu
 {
 	constexpr bool no_dealloc = false;
-	
+
 	// ----------------------------------------------------------------
 	// sizes and indices structures
 	// ----------------------------------------------------------------
-	
+
 	struct Index1D
 	{
 		size_t i;
@@ -37,7 +37,7 @@ namespace skepu
 	{
 		size_t row, col;
 	};
-	
+
 	struct Index3D
 	{
 		size_t i, j, k;
@@ -47,24 +47,24 @@ namespace skepu
 	{
 		size_t i, j, k, l;
 	};
-	
+
 	struct ProxyTag
 	{
 		struct Default {};
 		struct MatRow {};
 		struct MatCol {};
 	};
-	
+
 	inline Index1D make_index(std::integral_constant<int, 1>, size_t index, size_t, size_t, size_t)
 	{
 		return Index1D{index};
 	}
-	
+
 	inline Index2D make_index(std::integral_constant<int, 2>, size_t index, size_t size_j, size_t, size_t)
 	{
 		return Index2D{ index / size_j, index % size_j };
 	}
-	
+
 	inline Index3D make_index(std::integral_constant<int, 3>, size_t index, size_t size_j, size_t size_k, size_t)
 	{
 		size_t ci = index / (size_j * size_k);
@@ -73,7 +73,7 @@ namespace skepu
 		index = index % (size_k);
 		return Index3D{ ci, cj, index };
 	}
-	
+
 	inline Index4D make_index(std::integral_constant<int, 4>, size_t index, size_t size_j, size_t size_k, size_t size_l)
 	{
 		size_t ci = index / (size_j * size_k * size_l);
@@ -84,27 +84,27 @@ namespace skepu
 		index = index % (size_l);
 		return Index4D{ ci, cj, ck, index };
 	}
-	
+
 	inline std::ostream & operator<<(std::ostream &o, Index1D idx)
 	{
 		return o << "Index1D(" << idx.i << ")";
 	}
-	
+
 	inline std::ostream & operator<<(std::ostream &o, Index2D idx)
 	{
 		return o << "Index2D(" << idx.row << ", " << idx.col << ")";
 	}
-	
+
 	inline std::ostream & operator<<(std::ostream &o, Index3D idx)
 	{
 		return o << "Index3D(" << idx.i << ", "  << idx.j << ", " << idx.k << ")";
 	}
-	
+
 	inline std::ostream & operator<<(std::ostream &o, Index4D idx)
 	{
 		return o << "Index4D(" << idx.i << ", "  << idx.j << ", " << idx.k << ", " << idx.l << ")";
 	}
-	
+
 	/*!
 	 *  Enumeration of the different edge policies (what happens when a read outside the vector is performed) that the map overlap skeletons support.
 	 */
@@ -112,12 +112,12 @@ namespace skepu
 	{
 		None, Cyclic, Duplicate, Pad
 	};
-	
+
 	enum class Overlap
 	{
 		RowWise, ColWise, RowColWise, ColRowWise
 	};
-	
+
 	enum class AccessMode
 	{
 		Read,
@@ -125,17 +125,17 @@ namespace skepu
 		ReadWrite,
 		None
 	};
-	
+
 	static inline constexpr bool hasReadAccess(AccessMode m)
 	{
 		return m == AccessMode::Read || m == AccessMode::ReadWrite;
 	}
-	
+
 	static inline constexpr bool hasWriteAccess(AccessMode m)
 	{
 		return m == AccessMode::Write || m == AccessMode::ReadWrite;
 	}
-	
+
 	enum class SkeletonType
 	{
 		Map,
@@ -151,13 +151,13 @@ namespace skepu
 		MapOverlap4D,
 		Call,
 	};
-	
-	
+
+
 	// For multiple return Map variants
-	
+
 	template<typename... args>
 	using multiple = std::tuple<args...>;
-	
+
 	template <typename... Args>
 #ifdef SKEPU_CUDA
 		__host__ __device__
@@ -165,17 +165,17 @@ namespace skepu
 	auto ret(Args&&... args) -> decltype(std::make_tuple(std::forward<Args>(args)...)) {
 		return std::make_tuple(std::forward<Args>(args)...);
 	}
-	
-	
+
+
 #ifdef SKEPU_OPENCL
-	
+
 	/*!
 	 * helper to return data type in a string format using template specialication technique.
 	 * Compile-time error if no overload is found.
 	 */
 	template<typename T>
 	inline std::string getDataTypeCL();
-	
+
 	template<> inline std::string getDataTypeCL<char>          () { return "char";           }
 	template<> inline std::string getDataTypeCL<unsigned char> () { return "unsigned char";  }
 	template<> inline std::string getDataTypeCL<short>         () { return "short";          }
@@ -186,9 +186,9 @@ namespace skepu
 	template<> inline std::string getDataTypeCL<unsigned long> () { return "unsigned long";  }
 	template<> inline std::string getDataTypeCL<float>         () { return "float";          }
 	template<> inline std::string getDataTypeCL<double>        () { return "double";         }
-	
+
 #endif
-	
+
 	// Dummy base class for sequential skeleton classes.
 	// Includes empty member functions which has no meaning in a sequential context.
 	class SeqSkeletonBase
@@ -200,12 +200,12 @@ namespace skepu
 		{
 			return "N/A";
 		}
-		
+
 		void setExecPlan(ExecPlan *plan)
 		{
 			delete plan;
 		}
-		
+
 		template<typename... Args>
 		void tune(Args&&... args) { }
 	};
@@ -223,73 +223,78 @@ namespace skepu
 	inline size_t elwise_j(std::tuple<>) { return 0; }
 	inline size_t elwise_k(std::tuple<>) { return 0; }
 	inline size_t elwise_l(std::tuple<>) { return 0; }
-	
+
 	template<typename... Args>
 	inline size_t elwise_i(std::tuple<Args...> &t)
 	{
 		return std::get<0>(t).getParent().size_i();
 	}
-	
+
 	template<typename... Args>
 	inline size_t elwise_j(std::tuple<Args...> &t)
 	{
 		return std::get<0>(t).getParent().size_j();
 	}
-	
+
 	template<typename... Args>
 	inline size_t elwise_k(std::tuple<Args...> &t)
 	{
 		return std::get<0>(t).getParent().size_k();
 	}
-	
+
 	template<typename... Args>
 	inline size_t elwise_l(std::tuple<Args...> &t)
 	{
 		return std::get<0>(t).getParent().size_l();
 	}
-	
+
 	// ----------------------------------------------------------------
 	// is_skepu_{vector|matrix|container} trait classes
 	// ----------------------------------------------------------------
-	
+
 	template<typename T>
 	struct is_skepu_vector: std::false_type {};
-	
+
 	template<typename T>
 	struct is_skepu_vector<skepu::Vector<T>>: std::true_type {};
-	
-	
+
+
 	template<typename T>
 	struct is_skepu_matrix: std::false_type {};
-	
+
 	template<typename T>
 	struct is_skepu_matrix<skepu::Matrix<T>>: std::true_type {};
-	
+
 	template<typename T>
 	struct is_skepu_matrix<skepu::SparseMatrix<T>>: std::true_type {};
-	
-	
+
+
 	template<typename T>
 	struct is_skepu_tensor3: std::false_type {};
-	
+
 	template<typename T>
 	struct is_skepu_tensor3<skepu::Tensor3<T>>: std::true_type {};
-	
-	
+
+
 	template<typename T>
 	struct is_skepu_tensor4: std::false_type {};
-	
+
 	template<typename T>
 	struct is_skepu_tensor4<skepu::Tensor4<T>>: std::true_type {};
-	
-	
+
+
 	template<typename T>
 	struct is_skepu_container:
 		std::integral_constant<bool,
-			is_skepu_vector<typename std::remove_cv<typename std::remove_reference<T>::type>::type>::value ||
-			is_skepu_matrix<typename std::remove_cv<typename std::remove_reference<T>::type>::type>::value ||
-			is_skepu_tensor3<typename std::remove_cv<typename std::remove_reference<T>::type>::type>::value ||
-			is_skepu_tensor4<typename std::remove_cv<typename std::remove_reference<T>::type>::type>::value> {};
+			/* This is an or expression rewritten as an and expression because the
+			 * compiler Mercurium cannot parse an constexpr or expression with three
+			 * or more operands.
+			 */
+			!(!is_skepu_vector<typename std::remove_cv<typename std::remove_reference<T>::type>::type>::value &&
+				!is_skepu_matrix<typename std::remove_cv<typename std::remove_reference<T>::type>::type>::value &&
+				!is_skepu_tensor3<typename std::remove_cv<typename std::remove_reference<T>::type>::type>::value &&
+				!is_skepu_tensor4<typename std::remove_cv<typename std::remove_reference<T>::type>::type>::value)>
+		{};
 
 	/** Check that all parameters in a pack are SkePU containers. */
 	template<typename ...> struct are_skepu_containers;
@@ -307,59 +312,67 @@ namespace skepu
 
 	template<typename T>
 	struct is_skepu_vector_proxy: std::false_type {};
-	
+
 	template<typename T>
 	struct is_skepu_vector_proxy<skepu::Vec<T>>: std::true_type {};
-	
+
 	template<typename T>
 	struct is_skepu_matrix_proxy: std::false_type {};
-	
+
 	template<typename T>
 	struct is_skepu_matrix_proxy<skepu::Mat<T>>: std::true_type {};
-	
+
 	template<typename T>
 	struct is_skepu_matrix_proxy<skepu::MatRow<T>>: std::true_type {};
-	
+
 	template<typename T>
 	struct is_skepu_matrix_proxy<skepu::MatCol<T>>: std::true_type {};
-	
+
 	template<typename T>
 	struct is_skepu_matrix_proxy<skepu::SparseMat<T>>: std::true_type {};
-	
+
 	template<typename T>
 	struct is_skepu_tensor3_proxy: std::false_type {};
-	
+
 	template<typename T>
 	struct is_skepu_tensor3_proxy<skepu::Ten3<T>>: std::true_type {};
-	
+
 	template<typename T>
 	struct is_skepu_tensor4_proxy: std::false_type {};
-	
+
 	template<typename T>
 	struct is_skepu_tensor4_proxy<skepu::Ten4<T>>: std::true_type {};
-	
+
 	template<typename T>
-	struct is_skepu_container_proxy:
+	struct is_skepu_container_proxy :
 		std::integral_constant<bool,
-			is_skepu_vector_proxy<typename std::remove_cv<typename std::remove_reference<T>::type>::type>::value ||
-			is_skepu_matrix_proxy<typename std::remove_cv<typename std::remove_reference<T>::type>::type>::value ||
-			is_skepu_tensor3_proxy<typename std::remove_cv<typename std::remove_reference<T>::type>::type>::value ||
-			is_skepu_tensor4_proxy<typename std::remove_cv<typename std::remove_reference<T>::type>::type>::value>  {};
-	
-	
-	
+			/* This is an or expression rewritten as an and expression because the
+			 * compiler Mercurium cannot parse an constexpr or expression with three
+			 * or more operands.
+			 */
+			!(!is_skepu_vector_proxy<typename std::remove_cv<typename std::remove_reference<T>::type>::type>::value &&
+				!is_skepu_matrix_proxy<typename std::remove_cv<typename std::remove_reference<T>::type>::type>::value &&
+				!is_skepu_tensor3_proxy<typename std::remove_cv<typename std::remove_reference<T>::type>::type>::value &&
+				!is_skepu_tensor4_proxy<typename std::remove_cv<typename std::remove_reference<T>::type>::type>::value)>
+  {};
+
+
 	// ----------------------------------------------------------------
 	// is_skepu_iterator trait class
 	// ----------------------------------------------------------------
-	
+
 	template<typename T, typename Ret>
 	struct is_skepu_iterator: bool_constant<
-		std::is_same<T, typename Vector<Ret>::iterator>::value ||
-		std::is_same<T, typename Vector<Ret>::const_iterator>::value ||
-		std::is_same<T, typename Matrix<Ret>::iterator>::value
-	> {};
-	
-	
+		/* This is an or expression rewritten as an and expression because the
+		 * compiler Mercurium cannot parse an constexpr or expression with three
+		 * or more operands.
+		 */
+		!(!std::is_same<T, typename Vector<Ret>::iterator>::value &&
+			!std::is_same<T, typename Vector<Ret>::const_iterator>::value &&
+			!std::is_same<T, typename Matrix<Ret>::iterator>::value)>
+	{};
+
+
 	// ----------------------------------------------------------------
 	// index trait classes for skepu::IndexND (N in [1,2,3,4])
 	// ----------------------------------------------------------------
@@ -368,85 +381,85 @@ namespace skepu
 	// that is, if the type is skepu::IndexND, then returns N, else 0.
 	template<typename T>
 	struct index_dimension: std::integral_constant<int, 0>{};
-	
+
 	template<>
 	struct index_dimension<Index1D>: std::integral_constant<int, 1>{};
-	
+
 	template<>
 	struct index_dimension<Index2D>: std::integral_constant<int, 2>{};
-	
+
 	template<>
 	struct index_dimension<Index3D>: std::integral_constant<int, 3>{};
-	
+
 	template<>
 	struct index_dimension<Index4D>: std::integral_constant<int, 4>{};
-	
+
 	// true iff T is a SkePU index type
 	template<typename T>
 	struct is_skepu_index: bool_constant<index_dimension<T>::value != 0>{};
-	
+
 	// true iff first element of Args is SkePU index type
 	template<typename... Args>
 	struct is_indexed: bool_constant<is_skepu_index<typename first_element<Args...>::type>::value>{};
-	
+
 	template<>
 	struct is_indexed<>: std::false_type{};
-	
+
 	// ----------------------------------------------------------------
 	// matrix row proxy trait class
 	// ----------------------------------------------------------------
-	
+
 	template<typename T>
 	struct proxy_tag {
 		using type = ProxyTag::Default;
 	};
-	
+
 	template<typename T>
 	struct proxy_tag<MatRow<T>> {
 		using type = ProxyTag::MatRow;
 	};
-	
+
 	template<typename T>
 	struct proxy_tag<MatCol<T>> {
 		using type = ProxyTag::MatCol;
 	};
-	
+
 	// ----------------------------------------------------------------
 	// smart container size extractor
 	// ----------------------------------------------------------------
-	
+
 	inline std::tuple<size_t> size_info(index_dimension<skepu::Index1D>, size_t i, size_t, size_t, size_t)
 	{
 		return {i};
 	}
-	
+
 	inline std::tuple<size_t, size_t> size_info(index_dimension<skepu::Index2D>, size_t i, size_t j, size_t, size_t)
 	{
 		return {i, j};
 	}
-	
+
 	inline std::tuple<size_t, size_t, size_t> size_info(index_dimension<skepu::Index3D>, size_t i, size_t j, size_t k, size_t)
 	{
 		return {i, j, k};
 	}
-	
+
 	inline std::tuple<size_t, size_t, size_t, size_t> size_info(index_dimension<skepu::Index4D>, size_t i, size_t j, size_t k, size_t l)
 	{
 		return {i, j, k, l};
 	}
-	
+
 	template<typename Index, typename... Args>
 	inline auto size_info(Index, size_t, size_t, size_t, size_t, Args&&... args) -> decltype(get<0, Args...>(args...).getParent().size_info())
 	{
 		return get<0, Args...>(args...).getParent().size_info();
 	}
-	
-	
-	
+
+
+
 	// ----------------------------------------------------------------
 	// Arity deducer for Map user functions
 	// ----------------------------------------------------------------
-	
+
 	#define SKEPU_UNSET_ARITY -1
 
 	template<int DA, typename... Args>
@@ -461,13 +474,13 @@ namespace skepu
 	// ----------------------------------------------------------------
 	// Smart Container Coherency Helpers
 	// ----------------------------------------------------------------
-	
+
 	/*
 	 * Base case for recursive variadic flush.
 	 */
 	template<FlushMode mode>
 	void flush() {}
-	
+
 	/*
 	 *
 	 */
@@ -477,44 +490,44 @@ namespace skepu
 		first.flush(mode);
 		flush<mode>(std::forward<Args>(args)...);
 	}
-	
-	
+
+
 	// ----------------------------------------------------------------
 	// ConditionalIndexForwarder utility structure
 	// ----------------------------------------------------------------
-	
+
 	template<bool indexed, typename Func>
 	struct ConditionalIndexForwarder
 	{
 		using Ret = typename return_type<Func>::type;
-		
+
 		// Forward index
-		
+
 		template<typename Index, typename... CallArgs, REQUIRES(is_skepu_index<Index>::value && indexed)>
 		static Ret forward(Func func, Index i, CallArgs&&... args)
 		{
 			return func(i, std::forward<CallArgs>(args)...);
 		}
-		
+
 		template<typename Index, typename... CallArgs, REQUIRES(is_skepu_index<Index>::value && indexed)>
 		static Ret forward_device(Func func, Index i, CallArgs&&... args)
 		{
 			return func(i, std::forward<CallArgs>(args)...);
 		}
-		
+
 		// Do not forward index
-		
+
 		template<typename Index, typename... CallArgs, REQUIRES(is_skepu_index<Index>::value && !indexed)>
 		static Ret forward(Func func, Index, CallArgs&&... args)
 		{
 			return func(std::forward<CallArgs>(args)...);
 		}
-		
+
 		template<typename Index, typename... CallArgs, REQUIRES(is_skepu_index<Index>::value && !indexed)>
 		static Ret forward_device(Func func, Index, CallArgs&&... args)
 		{
 			return func(std::forward<CallArgs>(args)...);
 		}
 	};
-	
+
 }
