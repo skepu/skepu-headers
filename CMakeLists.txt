@@ -1,5 +1,9 @@
 cmake_minimum_required(VERSION 3.10)
 
+if(POLICY CMP0104)
+	cmake_policy(SET CMP0104 OLD)
+endif()
+
 if(CMAKE_PROJECT_NAME)
 	set(SKEPU_HEADERS_SUBPROJECT ${CMAKE_PROJECT_NAME})
 endif()

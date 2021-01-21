@@ -220,7 +220,9 @@ public:
 	index() const noexcept
 	-> Index1D
 	{
-		return Index1D{offset()};
+		Index1D idx;
+		idx.i = offset();
+		return idx;
 	}
 
 	auto inline

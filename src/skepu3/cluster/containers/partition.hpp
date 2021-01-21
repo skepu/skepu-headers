@@ -319,15 +319,20 @@ public:
 	handle_for(size_t pos) noexcept
 	-> starpu_data_handle_t
 	{
-		m_data_valid = false;
 		return m_handles[pos/m_part_size];
+	}
+
+	auto
+	invalidate_local_storage() noexcept
+	-> void
+	{
+		m_data_valid = false;
 	}
 
 	auto
 	local_storage_handle() noexcept
 	-> starpu_data_handle_t
 	{
-		m_part_valid = false;
 		return m_data_handle;
 	}
 

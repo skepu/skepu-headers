@@ -42,6 +42,9 @@ struct Ten4
 		size{i*j*k*l}
 	{}
 
+	#ifdef SKEPU_CUDA
+		__host__ __device__
+	#endif
 	auto
 	operator()(size_t const index)
 	-> T &
@@ -49,6 +52,9 @@ struct Ten4
 		return this->data[index];
 	}
 
+	#ifdef SKEPU_CUDA
+		__host__ __device__
+	#endif
 	auto
 	operator()(size_t const index) const
 	-> T const &
@@ -56,6 +62,9 @@ struct Ten4
 		return this->data[index];
 	}
 
+	#ifdef SKEPU_CUDA
+		__host__ __device__
+	#endif
 	auto
 	operator()(
 		size_t const i, size_t const j, size_t const k, size_t const l) noexcept
@@ -64,6 +73,9 @@ struct Ten4
 		return data[(i * size_jkl) + (j * size_kl) + (k * size_l) + l];
 	}
 
+	#ifdef SKEPU_CUDA
+		__host__ __device__
+	#endif
 	auto
 	operator()(
 		size_t const i,

@@ -141,28 +141,28 @@ public:
 
 	auto
 	size_i() const noexcept
-	-> size_t const &
+	-> size_t
 	{
 		return m_size_i;
 	}
 
 	auto
 	size_j() const noexcept
-	-> size_t const &
+	-> size_t
 	{
 		return m_size_j;
 	}
 
 	auto
 	size_k() const noexcept
-	-> size_t const &
+	-> size_t
 	{
 		return m_size_k;
 	}
 
 	auto
 	size_l() const noexcept
-	-> size_t const &
+	-> size_t
 	{
 		return m_size_l;
 	}
@@ -176,6 +176,7 @@ public:
 	using base::gather_to_root;
 	using base::local_storage_handle;
 	using base::handle_for;
+	using base::invalidate_local_storage;
 	using base::make_ext_w;
 	using base::partition;
 	using base::scatter_from_root;
@@ -195,8 +196,9 @@ private:
 
 		if(!base::m_external && !base::m_data_handle)
 		{
+			auto & handle = base::m_data_handle;
 			starpu_tensor_data_register(
-				&(base::m_data_handle),
+				&handle,
 				STARPU_MAIN_RAM,
 				(uintptr_t)(base::m_data),
 				m_size_l, m_size_kl, m_size_jkl,

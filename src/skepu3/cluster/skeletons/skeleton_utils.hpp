@@ -58,6 +58,8 @@ prepare_buffer(T const *, void * ptr)
 			return (T)STARPU_MATRIX_GET_PTR(ptr);
 		case STARPU_BLOCK_INTERFACE_ID:
 			return (T)STARPU_BLOCK_GET_PTR(ptr);
+		case STARPU_TENSOR_INTERFACE_ID:
+			return (T)STARPU_TENSOR_GET_PTR(ptr);
 		case STARPU_VECTOR_INTERFACE_ID:
 			return (T)STARPU_VECTOR_GET_PTR(ptr);
 		case STARPU_VARIABLE_INTERFACE_ID:
@@ -87,11 +89,9 @@ auto inline
 prepare_buffer(MatRow<T> const *, void * ptr)
 -> MatRow<T>
 {
-	MatRow<T> proxy;
-	proxy.data = (T *)STARPU_VECTOR_GET_PTR(ptr);
-	proxy.cols = STARPU_MATRIX_GET_NX(ptr);
-
-	return proxy;
+	return MatRow<T>(
+		(T *)STARPU_MATRIX_GET_PTR(ptr),
+		STARPU_MATRIX_GET_NX(ptr));
 }
 
 template<typename T>

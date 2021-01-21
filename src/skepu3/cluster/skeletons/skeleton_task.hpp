@@ -10,6 +10,7 @@
 #include "../helpers.hpp"
 #include "../handle_modes.hpp"
 #include "../task_schedule_wrapper.hpp"
+#include "skeleton_base.hpp"
 #include "skeleton_utils.hpp"
 
 namespace skepu {
@@ -39,6 +40,7 @@ template<
 	typename ContainerArgs,
 	typename UniformArgs>
 class skeleton_task
+: public backend::SkeletonBase
 {
 	starpu_codelet cl;
 	starpu_perfmodel perf_model;
@@ -89,10 +91,7 @@ protected:
 		cl.nbuffers = n_handles;
 		cl.max_parallelism = INT_MAX;
 		cl.type = STARPU_FORKJOIN; // For OpenMP
-		cl.where = STARPU_CPU;
-		//cl.cpu_funcs[0] = starpu_task_callback;
 		cl.cpu_funcs_name[0] = name;
-		cl.modes[0] = STARPU_RW;
 
 		// Performance model not needed?
 		// Creates a problem with starpu_shutdown if used with MPI.
@@ -100,7 +99,7 @@ protected:
 
 		helpers::set_codelet_read_only_modes(handle_indices, cl);
 		for(size_t i {}; i < n_result; ++i)
-			cl.modes[i] = STARPU_RW;
+			cl.modes[i] = STARPU_W;
 	}
 
 	template<typename Container, typename ProxyTag>
@@ -151,6 +150,41 @@ protected:
 	-> void
 	{
 		cl.cpu_funcs[0] = starpu_task_callback<CBArgs...>;
+
+		#ifdef SKEPU_CUDA
+		cl.cuda_funcs[0] = starpu_cu_callback<CBArgs...>;
+		#endif
+
+		auto bs = SkeletonBase::m_bs;
+		if(!bs)
+			bs = &internalGlobalBackendSpecAccessor();
+
+		if(bs)
+		{
+			using type = skepu::Backend::Type;
+			switch(bs->getType())
+			{
+			case type::CUDA:
+				cl.where = STARPU_CUDA;
+				break;
+			case type::OpenMP:
+			case type::CPU:
+				cl.where = STARPU_CPU;
+				break;
+			case type::Auto:
+				cl.where = 0;
+				break;
+			default:
+			{
+				std::cerr << "[SkePU][skeleton_task] ERROR: "
+					"Selected Backend::Type is not supported in the MPI-StarPU "
+					"backend.\n";
+				std::abort();
+			}};
+		}
+		else
+			std::cout << "[SkePU][skeleton_taks] No backend set.";
+
 		auto modes = helpers::modes_from_codelet(cl);
 		auto args_tuple =
 			std::make_tuple(std::get<CBAI>(cbargs)..., get<UI>(args...)...);
@@ -227,6 +261,77 @@ private:
 			std::get<CBAI>(cbargs)...,
 			std::get<UI>(uniform_args)...);
 	}
+
+	#ifdef SKEPU_CUDA
+	template<typename ... CBArgs>
+	auto static
+	starpu_cu_callback(void ** buffers, void * args) noexcept
+	-> void
+	{
+		auto static constexpr cbai =
+			typename make_pack_indices<sizeof...(CBArgs)>::type{};
+
+		handle_cu_callback<CBArgs...>(
+			handle_indices,
+			ri,
+			ei,
+			ci,
+			ui,
+			cbai,
+			buffers,
+			args);
+	}
+
+	template<
+		typename ... CBArgs,
+		size_t ... HI,
+		size_t ... RI,
+		size_t ... EI,
+		size_t ... CI,
+		size_t ... UI,
+		size_t ... CBAI>
+	auto static
+	handle_cu_callback(
+		pack_indices<HI...>,
+		pack_indices<RI...>,
+		pack_indices<EI...>,
+		pack_indices<CI...>,
+		pack_indices<UI...>,
+		pack_indices<CBAI...>,
+		void ** buffers,
+		void * args) noexcept
+	-> void
+	{
+		auto cbargs = std::tuple<CBArgs...>{};
+		UniformArgs uniform_args;
+		helpers::extract_constants(
+			args,
+			std::get<CBAI>(cbargs)...,
+			std::get<UI>(uniform_args)...);
+
+		typedef decltype(std::tuple_cat(
+				std::make_tuple(
+					typename std::add_pointer<
+						decltype(std::get<RI>(ResultArgs{}))>::type{}...),
+				std::make_tuple(
+					typename std::add_pointer<
+						decltype(std::get<EI>(ElwiseArgs{}))>::type{}...),
+				ContainerArgs{}))
+			buffers_type;
+
+		buffers_type containers(
+			prepare_buffer(
+				(typename std::tuple_element<HI, buffers_type>::type *)0,
+				buffers[HI])...);
+		CallBackFn::CUDA(
+			result_handle_indices,
+			elwise_handle_indices,
+			container_handle_indices,
+			std::forward<buffers_type>(containers),
+			std::get<CBAI>(cbargs)...,
+			std::get<UI>(uniform_args)...);
+	}
+	#endif
 };
 
 } // namespace cluster

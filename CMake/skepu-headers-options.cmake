@@ -68,6 +68,10 @@ else()
 	endif()
 endif()
 
+if(SKEPU_HEADERS_CUDA)
+	enable_language(CUDA)
+endif()
+
 macro(skepu_headers_print_config)
 	message("
    +=============================+

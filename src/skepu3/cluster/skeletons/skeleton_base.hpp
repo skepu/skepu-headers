@@ -15,11 +15,22 @@ public:
 
 	auto finishAll() noexcept -> void {};
 	auto setExecPlan(ExecPlan) noexcept -> void {};
-	auto setBackend(BackendSpec) noexcept -> void {};
+
+	auto setBackend(BackendSpec bs) noexcept -> void
+	{
+		if(m_bs)
+			delete m_bs;
+		m_bs = new BackendSpec(std::move(bs));
+	}
+
 	auto resetBackend() noexcept -> void {};
 
 protected:
-	SkeletonBase() noexcept {}
+	BackendSpec * m_bs;
+
+	SkeletonBase() noexcept
+	: m_bs(0)
+	{}
 }; // class SkeletonBase
 
 } // namespace backend

@@ -139,6 +139,34 @@ public:
 	}
 
 	auto
+	size_i() noexcept
+	-> size_t
+	{
+		return m_rows;
+	}
+
+	auto
+	size_j() noexcept
+	-> size_t
+	{
+		return m_cols;
+	}
+
+	auto
+	size_k() noexcept
+	-> size_t
+	{
+		return 0;
+	}
+
+	auto
+	size_l() noexcept
+	-> size_t
+	{
+		return 0;
+	}
+
+	auto
 	set(size_t const row, size_t const col, T const & val)
 	-> void
 	{
@@ -170,6 +198,7 @@ public:
 	using base::gather_to_root;
 	using base::local_storage_handle;
 	using base::handle_for;
+	using base::invalidate_local_storage;
 	using base::make_ext_w;
 	using base::partition;
 	using base::randomize;
@@ -189,8 +218,9 @@ private:
 
 		if(!base::m_external && !base::m_data_handle)
 		{
+			auto & handle = base::m_data_handle;
 			starpu_matrix_data_register(
-				&(base::m_data_handle),
+				&handle,
 				STARPU_MAIN_RAM,
 				(uintptr_t)(base::m_data),
 				m_cols,

@@ -20,6 +20,9 @@ struct Vec
 	: data{dataptr}, size{sizearg}
 	{}
 
+	#ifdef SKEPU_CUDA
+		__host__ __device__
+	#endif
 	auto
 	operator()(size_t index)
 	-> T &
@@ -27,6 +30,9 @@ struct Vec
 		return this->data[index];
 	}
 
+	#ifdef SKEPU_CUDA
+		__host__ __device__
+	#endif
 	auto
 	operator()(size_t index) const
 	-> T
@@ -34,6 +40,9 @@ struct Vec
 		return this->data[index];
 	}
 
+	#ifdef SKEPU_CUDA
+		__host__ __device__
+	#endif
 	auto
 	operator[](size_t index)
 	-> T &
@@ -41,6 +50,9 @@ struct Vec
 		return this->data[index];
 	}
 
+	#ifdef SKEPU_CUDA
+		__host__ __device__
+	#endif
 	auto
 	operator[](size_t index) const
 	-> T

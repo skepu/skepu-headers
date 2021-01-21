@@ -75,6 +75,34 @@ public:
 		return *this;
 	}
 
+	auto
+	size_i() const noexcept
+	-> size_t
+	{
+		return base::m_size;
+	}
+
+	auto
+	size_j() const noexcept
+	-> size_t
+	{
+		return 0;
+	}
+
+	auto
+	size_k() const noexcept
+	-> size_t
+	{
+		return 0;
+	}
+
+	auto
+	size_l() const noexcept
+	-> size_t
+	{
+		return 0;
+	}
+
 	using base::operator();
 	using base::allgather;
 	using base::block_count_from;
@@ -82,6 +110,7 @@ public:
 	using base::data;
 	using base::fill;
 	using base::gather_to_root;
+	using base::invalidate_local_storage;
 	using base::local_storage_handle;
 	using base::handle_for;
 	using base::make_ext_w;
@@ -104,8 +133,9 @@ private:
 
 		if(!base::m_external && !base::m_data_handle)
 		{
+			starpu_data_handle_t & handle = base::m_data_handle;
 			starpu_vector_data_register(
-				&(base::m_data_handle),
+				&handle,
 				STARPU_MAIN_RAM,
 				(uintptr_t)(base::m_data),
 				base::m_size,

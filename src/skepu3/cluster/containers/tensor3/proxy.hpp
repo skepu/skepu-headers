@@ -29,6 +29,9 @@ struct Ten3
 		size{i * size_jk}
 	{}
 
+	#ifdef SKEPU_CUDA
+		__host__ __device__
+	#endif
 	auto
 	operator()(size_t const index)
 	-> T &
@@ -36,6 +39,9 @@ struct Ten3
 		return this->data[index];
 	}
 
+	#ifdef SKEPU_CUDA
+		__host__ __device__
+	#endif
 	auto
 	operator()(size_t const index) const
 	-> T const &
@@ -43,6 +49,9 @@ struct Ten3
 		return this->data[index];
 	}
 
+	#ifdef SKEPU_CUDA
+		__host__ __device__
+	#endif
 	auto
 	operator()(size_t const i, size_t const j, size_t const k) noexcept
 	-> T &
@@ -50,6 +59,9 @@ struct Ten3
 		return data[(i * size_jk) + (j * size_k) + k];
 	}
 
+	#ifdef SKEPU_CUDA
+		__host__ __device__
+	#endif
 	auto
 	operator()(size_t const i, size_t const j, size_t const k) const noexcept
 	-> T const &
@@ -57,6 +69,9 @@ struct Ten3
 		return data[(i * size_jk) + (j * size_k) + k];
 	}
 
+	#ifdef SKEPU_CUDA
+		__host__ __device__
+	#endif
 	auto
 	operator[](size_t const index)
 	-> T &
@@ -64,6 +79,9 @@ struct Ten3
 		return this->data[index];
 	}
 
+	#ifdef SKEPU_CUDA
+		__host__ __device__
+	#endif
 	auto
 	operator[](size_t const index) const
 	-> T const &

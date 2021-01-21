@@ -14,10 +14,10 @@
 
 namespace skepu {
 namespace backend {
-namespace _starpu {
+namespace starpu {
 
-template<typename MapFunc>
-struct map_omp
+template<typename MapFunc, typename CUKernel>
+struct map
 {
 	typedef ConditionalIndexForwarder<MapFunc::indexed, decltype(&MapFunc::CPU)>
 		F;
@@ -55,15 +55,62 @@ struct map_omp
 			std::tie(std::get<RI>(buffers)[i]...) = res;
 		}
 	}
+
+	#ifdef SKEPU_CUDA
+	CUKernel static cu_kernel;
+
+	template<
+		typename Buffers,
+		typename Iterator,
+		size_t... RI,
+		size_t... EI,
+		size_t... CI,
+		typename... CallArgs>
+	auto static
+	CUDA(
+		pack_indices<RI...>,
+		pack_indices<EI...>,
+		pack_indices<CI...>,
+		Buffers && buffers,
+		Iterator begin,
+		size_t count,
+		CallArgs &&... args) noexcept
+	-> void
+	{
+		dim3 block{std::min<unsigned int>(count, 1024)};
+		dim3 grid{(unsigned int)ceil((double)count/1024)};
+		auto stream = starpu_cuda_get_local_stream();
+		size_t size_j = begin.getParent().size_j();
+		size_t size_k = begin.getParent().size_k();
+		size_t size_l = begin.getParent().size_l();
+
+		cu_kernel<<<grid, block, 0, stream>>>(
+			std::get<RI>(buffers)...,
+			std::get<EI>(buffers)...,
+			std::get<CI>(buffers)...,
+			args...,
+			size_j,
+			size_k,
+			size_l,
+			count,
+			begin.offset());
+
+		cudaStreamSynchronize(stream);
+	}
+	#endif
 };
+
+#ifdef SKEPU_CUDA
+template<typename MapFunc, typename CUKernel>
+CUKernel map<MapFunc, CUKernel>::cu_kernel = 0;
+#endif
 
 } // namespace _starpu
 
 template<size_t arity, typename MapFunc, typename CUDAKernel, typename CLKernel>
 class Map
-: public SkeletonBase,
-	private cluster::skeleton_task<
-		_starpu::map_omp<MapFunc>,
+: public cluster::skeleton_task<
+		starpu::map<MapFunc, CUDAKernel>,
 		typename cluster::result_tuple<typename MapFunc::Ret>::type,
 		typename MapFunc::ElwiseArgs,
 		typename MapFunc::ContainerArgs,
@@ -72,7 +119,7 @@ class Map
 	typedef typename MapFunc::Ret T;
 
 	typedef cluster::skeleton_task<
-			_starpu::map_omp<MapFunc>,
+			starpu::map<MapFunc, CUDAKernel>,
 			typename cluster::result_tuple<typename MapFunc::Ret>::type,
 			typename MapFunc::ElwiseArgs,
 			typename MapFunc::ContainerArgs,
@@ -88,8 +135,6 @@ class Map
 	static constexpr size_t anyArity =
 		std::tuple_size<typename MapFunc::ContainerArgs>::value;
 
-	CUDAKernel m_cuda_kernel;
-
 	static constexpr typename make_pack_indices<outArgs>::type out_indices{};
 	static constexpr
 		typename make_pack_indices<arity + outArgs, outArgs>::type elwise_indices{};
@@ -104,7 +149,13 @@ class Map
 		const_indices{};
 
 public:
-	Map(CUDAKernel kernel) : skeleton_task("SkePU Map"), m_cuda_kernel(kernel) {}
+	Map(CUDAKernel kernel)
+	: skeleton_task("SkePU Map")
+	{
+		#ifdef SKEPU_CUDA
+		starpu::map<MapFunc, CUDAKernel>::cu_kernel = kernel;
+		#endif
+	}
 
 	template<typename... Args>
 	auto tune(Args&&...) noexcept -> void {}
@@ -186,7 +237,9 @@ private:
 				std::get<PI>(pt)),0)...);
 
 		// The result will be partitioned.
-		pack_expand((cont::getParent(get<OI>(args...)).partition(),0)...);
+		pack_expand(
+			(cont::getParent(get<OI>(args...)).partition(),
+			(cont::getParent(get<OI>(args...)).invalidate_local_storage()),0)...);
 
 		// And the same goes for the elwise arguments.
 		// TODO: They should be realinged so that element i in the elwise is on the

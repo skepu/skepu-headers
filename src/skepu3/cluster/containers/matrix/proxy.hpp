@@ -13,6 +13,15 @@ struct Mat
 	size_t rows;
 	size_t cols;
 
+	Mat() : data{0}, rows{0}, cols{0} {}
+
+	Mat(T * data, size_t rows, size_t cols)
+	: data{data}, rows{rows}, cols{cols}
+	{}
+
+	#ifdef SKEPU_CUDA
+		__host__ __device__
+	#endif
 	auto
 	operator()(size_t pos) noexcept
 	-> T &
@@ -20,6 +29,9 @@ struct Mat
 		return this->data[pos];
 	}
 
+	#ifdef SKEPU_CUDA
+		__host__ __device__
+	#endif
 	auto
 	operator()(size_t pos) const noexcept
 	-> T const &
@@ -27,6 +39,9 @@ struct Mat
 		return this->data[pos];
 	}
 
+	#ifdef SKEPU_CUDA
+		__host__ __device__
+	#endif
 	auto
 	operator()(size_t i, size_t j) noexcept
 	-> T &
@@ -34,6 +49,9 @@ struct Mat
 		return this->data[i * this->cols + j];
 	}
 
+	#ifdef SKEPU_CUDA
+		__host__ __device__
+	#endif
 	auto
 	operator()(size_t i, size_t j) const noexcept
 	-> T const &
@@ -41,6 +59,9 @@ struct Mat
 		return this->data[i * this->cols + j];
 	}
 
+	#ifdef SKEPU_CUDA
+		__host__ __device__
+	#endif
 	auto
 	operator[](size_t pos) noexcept
 	-> T &
@@ -62,6 +83,18 @@ struct MatRow
 	T * data;
 	size_t cols;
 
+	MatRow() : data{0}, cols{0} {}
+
+	#ifdef SKEPU_CUDA
+	__host__ __device__
+	#endif
+	MatRow(T * data, size_t cols)
+	: data{data}, cols{cols}
+	{}
+
+	#ifdef SKEPU_CUDA
+		__host__ __device__
+	#endif
 	auto
 	operator()(size_t pos) noexcept
 	-> T &
@@ -69,6 +102,9 @@ struct MatRow
 		return data[pos];
 	}
 
+	#ifdef SKEPU_CUDA
+		__host__ __device__
+	#endif
 	auto
 	operator()(size_t pos) const noexcept
 	-> T const &
@@ -76,6 +112,9 @@ struct MatRow
 		return data[pos];
 	}
 
+	#ifdef SKEPU_CUDA
+		__host__ __device__
+	#endif
 	auto
 	operator[](size_t pos) noexcept
 	-> T &
@@ -83,6 +122,9 @@ struct MatRow
 		return data[pos];
 	}
 
+	#ifdef SKEPU_CUDA
+		__host__ __device__
+	#endif
 	auto
 	operator[](size_t pos) const noexcept
 	-> T const &
