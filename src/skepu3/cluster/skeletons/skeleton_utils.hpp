@@ -1,4 +1,5 @@
 #pragma once
+#include "skepu3/cluster/common.hpp"
 #ifndef SKEPU_CLUSTER_SKELETON_UTILS_HPP
 #define SKEPU_CLUSTER_SKELETON_UTILS_HPP 1
 
@@ -44,6 +45,39 @@ advance(skepu::MatRow<T> const & mr, size_t rows) noexcept
 	advanced.data = mr.data + (rows * mr.cols);
 	advanced.cols = mr.cols;
 	return advanced;
+}
+
+template<typename Container, typename ProxyTag>
+auto inline
+filter(Container &&, ProxyTag &&, size_t) noexcept
+-> void
+{}
+
+template<typename Container>
+auto inline
+filter(
+	Container && c,
+	ProxyTag::MatRow,
+	size_t parts) noexcept
+-> void
+{
+	c.filter(parts);
+}
+
+template<typename Container, typename ProxyTag>
+auto inline
+min_filter_parts_container_arg(Container &&, ProxyTag &&) noexcept
+-> size_t
+{
+	return 0;
+}
+
+template<typename Container>
+auto inline
+min_filter_parts_container_arg(Container && c, ProxyTag::MatRow) noexcept
+-> size_t
+{
+	return c.min_filter_parts();
 }
 
 template<typename T>

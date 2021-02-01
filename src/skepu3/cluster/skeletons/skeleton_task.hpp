@@ -172,7 +172,7 @@ protected:
 				cl.where = STARPU_CPU;
 				break;
 			case type::Auto:
-				cl.where = 0;
+				cl.where = STARPU_ANY_WORKER;
 				break;
 			default:
 			{

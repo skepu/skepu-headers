@@ -1,3 +1,4 @@
+#include "skepu3/cluster/containers/partition.hpp"
 #include <catch2/catch.hpp>
 
 #include <skepu3/cluster/skeletons/map/map.hpp>
@@ -41,12 +42,28 @@ TEST_CASE("Can create a simple map")
 
 TEST_CASE("Simple map to vector")
 {
-	skepu::Vector<int> v(10);
 	skepu::backend::Map<0, simple_map_fn, bool, void> map(false);
-	REQUIRE_NOTHROW(map(v));
-	v.flush();
-	for(auto & e : v)
-		CHECK(e == 10);
+
+	SECTION("Small input vector")
+	{
+		skepu::Vector<int> v(10);
+		REQUIRE_NOTHROW(map(v));
+		v.flush();
+		for(auto & e : v)
+			REQUIRE(e == 10);
+	}
+
+	SECTION("And with filters")
+	{
+		auto mfbs = skepu::max_filter_block_size;
+		skepu::max_filter_block_size = 10 * sizeof(int);
+		skepu::Vector<int> v(20 * skepu::cluster::mpi_size());
+		REQUIRE_NOTHROW(map(v));
+		v.flush();
+		for(size_t i = 0; i < v.size(); ++i)
+			REQUIRE(v(i) == 10);
+		skepu::max_filter_block_size = mfbs;
+	}
 }
 
 struct indexed_map_fn
@@ -84,13 +101,12 @@ TEST_CASE("Can create an indexed map")
 
 TEST_CASE("Can apply an indexed map to a vector.")
 {
-	skepu::Vector<int> v;
-	v.resize(10);
+	skepu::Vector<int> v(10);
 	skepu::backend::Map<0, indexed_map_fn, bool, void> map(false);
 	REQUIRE_NOTHROW(map(v));
 	v.flush();
 	for(int i = 0; i < 10; ++i)
-		CHECK(v(i) == i);
+		REQUIRE(v(i) == i);
 }
 
 struct elwise_mult_fn
@@ -147,7 +163,7 @@ TEST_CASE("Can apply an elwise Map to a Vector")
 	v1.flush();
 	v2.flush();
 	for(size_t i(0); i < res.size(); ++i)
-		CHECK(res(i) == (v1(i) * v2(i)));
+		REQUIRE(res(i) == (v1(i) * v2(i)));
 }
 
 struct indexed_elwise_mult_fn
@@ -189,7 +205,7 @@ TEST_CASE("Index and elwise Map.")
 	res.flush();
 	v.flush();
 	for(size_t i(0); i < res.size(); ++i)
-		CHECK(res(i) == (v(i) * i));
+		REQUIRE(res(i) == (v(i) * i));
 }
 
 struct vector_copy_fn
@@ -248,7 +264,7 @@ TEST_CASE("Map with container argument")
 
 		res.flush();
 		for(size_t i(0); i < v.size(); ++i)
-			CHECK(res(i) == expected);
+			REQUIRE(res(i) == expected);
 	}
 
 	SECTION("size 4")
@@ -267,7 +283,7 @@ TEST_CASE("Map with container argument")
 
 		res.flush();
 		for(size_t i(0); i < v.size(); ++i)
-			CHECK(res(i) == expected);
+			REQUIRE(res(i) == expected);
 	}
 
 	SECTION("size 10000")
@@ -286,7 +302,7 @@ TEST_CASE("Map with container argument")
 
 		res.flush();
 		for(size_t i(0); i < v.size(); ++i)
-			CHECK(res(i) == expected);
+			REQUIRE(res(i) == expected);
 	}
 }
 
@@ -333,12 +349,12 @@ TEST_CASE("Scaling vector using uniform argument.")
 	res.flush();
 	v.flush();
 	for(size_t i(0); i < v.size(); ++i)
-		CHECK(res(i) == (v(i) * factor));
+		REQUIRE(res(i) == (v(i) * factor));
 }
 
 TEST_CASE("Scaling small tensor3 using uniform argument")
 {
-	size_t N(skepu::cluster::mpi_size() / 2);
+	size_t N(skepu::cluster::mpi_size() * 10);
 	constexpr int factor(13);
 	skepu::Tensor3<int> tensor(N,N,N);
 	skepu::Tensor3<int> res(N,N,N);
@@ -349,7 +365,7 @@ TEST_CASE("Scaling small tensor3 using uniform argument")
 		for(size_t j(0); j < N; ++j)
 			for(size_t k(0); k < N; ++k)
 			{
-				tensor(i,j,k) = i*j*k;
+				tensor(i,j,k) = (i*N*N) + (j*N) + k;
 			}
 
 	scale(res, tensor, factor);
@@ -401,7 +417,7 @@ TEST_CASE("Mapping a matrix with index parameter.")
 		m.flush();
 		for(size_t i(0); i < m.size_i(); ++i)
 			for(size_t j(0); i < m.size_j(); ++i)
-				CHECK(m(i,j) == (i*j));
+				REQUIRE(m(i,j) == (i*j));
 	}
 }
 

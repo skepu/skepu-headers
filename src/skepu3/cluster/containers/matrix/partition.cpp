@@ -17,17 +17,20 @@ class matrix_partition : private partition_base<T>
 
 public:
 	matrix_partition() noexcept
-	: base(), m_rows(0), m_cols(0), m_part_rows(0)
+	: base(starpu_matrix_filter_vertical_block),
+		m_rows(0),
+		m_cols(0),
+		m_part_rows(0)
 	{}
 
 	matrix_partition(size_t rows, size_t cols) noexcept
-	: base(), m_part_rows(0)
+	: base(starpu_matrix_filter_vertical_block), m_part_rows(0)
 	{
 		init(rows, cols);
 	}
 
 	matrix_partition(matrix_partition const & other) noexcept
-	: base(),
+	: base(starpu_matrix_filter_vertical_block),
 		m_rows(other.m_rows),
 		m_cols(other.m_cols),
 		m_part_rows(other.m_part_rows)
@@ -106,8 +109,25 @@ public:
 	handle_for_row(size_t row)
 	-> starpu_data_handle_t
 	{
+		// Refer to base::handle_for for comments regarding implementation.
+		// The difference being that this function is based on rows rather than
+		// elements.
 		base::m_data_valid = false;
-		return base::m_handles[row / m_part_rows];
+
+		auto block_idx = row / m_part_rows;
+		if(!base::m_current_filter)
+			return base::m_handles[block_idx];
+
+		auto & filter = base::m_filters.at(base::m_current_filter);
+		auto & children = filter.children[block_idx];
+		auto block_row = row % m_part_rows;
+
+		auto rest_rows = filter.rest * (filter.blocks_per_child +1);
+		if(block_row < rest_rows)
+			return children[block_row / (filter.blocks_per_child +1)];
+
+		block_row -= rest_rows;
+		return children[(block_row / filter.blocks_per_child) + filter.rest];
 	}
 
 	auto
@@ -195,11 +215,13 @@ public:
 	using base::capacity;
 	using base::data;
 	using base::fill;
+	using base::filter;
 	using base::gather_to_root;
 	using base::local_storage_handle;
 	using base::handle_for;
 	using base::invalidate_local_storage;
 	using base::make_ext_w;
+	using base::min_filter_parts;
 	using base::partition;
 	using base::randomize;
 	using base::scatter_from_root;
@@ -277,7 +299,7 @@ private:
 			sizeof(size_arr));
 		starpu_mpi_data_register(size_handle, cluster::mpi_tag(), 0);
 		starpu_mpi_get_data_on_all_nodes_detached(MPI_COMM_WORLD, size_handle);
-		starpu_data_acquire(size_handle, STARPU_R);
+		starpu_data_acquire(size_handle, STARPU_RW);
 
 		m_rows = size_arr[0];
 		m_cols = size_arr[1];
@@ -303,6 +325,7 @@ private:
 		base::m_size = m_rows * m_cols;
 		base::m_part_size = part_size;
 		base::m_capacity = part_size * skepu::cluster::mpi_size();
+		base::m_filter_block_size = m_cols;
 	}
 
 	auto
@@ -345,8 +368,8 @@ private:
 	{
 		if(!other.m_data)
 			other.alloc_local_storage();
-		starpu_data_acquire(base::m_data_handle, STARPU_R);
-		starpu_data_acquire(other.m_data_handle, STARPU_W);
+		starpu_data_acquire(base::m_data_handle, STARPU_RW);
+		starpu_data_acquire(other.m_data_handle, STARPU_RW);
 
 		auto data_it = base::m_data;
 		for(size_t i(0); i < m_rows; ++i)

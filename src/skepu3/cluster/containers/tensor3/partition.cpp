@@ -25,11 +25,11 @@ public:
 	typedef skepu::Index3D index_type;
 
 	tensor3_partition() noexcept
-	: base()
+	: base(starpu_block_filter_depth_block)
 	{}
 
 	tensor3_partition(size_t i, size_t j, size_t k) noexcept
-	: base()
+	: base(starpu_block_filter_depth_block)
 	{
 		init(i, j, k);
 	}
@@ -148,11 +148,13 @@ public:
 	using base::capacity;
 	using base::data;
 	using base::fill;
+	using base::filter;
 	using base::gather_to_root;
 	using base::local_storage_handle;
 	using base::handle_for;
 	using base::invalidate_local_storage;
 	using base::make_ext_w;
+	using base::min_filter_parts;
 	using base::partition;
 	using base::scatter_from_root;
 	using base::set;
@@ -243,7 +245,7 @@ private:
 			3 * sizeof(size_t));
 		starpu_mpi_data_register(size_handle, cluster::mpi_tag(), 0);
 		starpu_mpi_get_data_on_all_nodes_detached(MPI_COMM_WORLD, size_handle);
-		starpu_data_acquire(size_handle, STARPU_R);
+		starpu_data_acquire(size_handle, STARPU_RW);
 
 		m_size_i = size_arr[0];
 		m_size_j = size_arr[1];
@@ -270,6 +272,7 @@ private:
 			if(m_size_i - (m_part_i * ranks))
 				++m_part_i;
 			base::m_part_size = m_part_i * m_size_j * m_size_k;
+			base::m_filter_block_size = m_size_jk;
 			base::m_capacity = base::m_part_size * ranks;
 		}
 	}

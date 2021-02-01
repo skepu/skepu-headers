@@ -2,17 +2,85 @@
 #ifndef SKEPU_STARPU_PARTITION_BASE_HPP
 #define SKEPU_STARPU_PARTITION_BASE_HPP 1
 
+#include <memory>
 #include <random>
 #include <vector>
 
 #include "../cluster.hpp"
 
 namespace skepu {
+namespace starpu {
+
+struct filter
+{
+	typedef decltype(starpu_data_filter::filter_func) fn_ptr;
+
+	size_t nchildren;
+	size_t blocks_per_child;
+	size_t rest;
+
+	std::vector<starpu_data_handle_t> parents;
+	std::vector<starpu_data_filter> data_filter;
+	std::vector<std::unique_ptr<starpu_data_handle_t[]>> children;
+
+	filter(
+		std::vector<starpu_data_handle_t> & parents,
+		unsigned int nchildren,
+		unsigned int blocks_per_part,
+		fn_ptr fn) noexcept
+	: nchildren(nchildren),
+		blocks_per_child(blocks_per_part / nchildren),
+		rest(blocks_per_part % nchildren),
+		parents(parents),
+		data_filter(parents.size())
+	{
+		children.reserve(parents.size());
+		for(size_t i(0); i < parents.size(); ++i)
+		{
+			memset(&data_filter[i], 0, sizeof(starpu_data_filter));
+			data_filter[i].filter_func = fn;
+			data_filter[i].nchildren = nchildren;
+			children.emplace_back(
+				std::unique_ptr<starpu_data_handle_t[]>(
+					new starpu_data_handle_t[nchildren]));
+			starpu_data_partition_plan(
+				parents[i],
+				&data_filter[i],
+				children[i].get());
+			auto * ch_ptr = children[i].get();
+
+			for(unsigned int j(0); j < nchildren; ++j)
+				starpu_mpi_data_register(
+					ch_ptr[j],
+					cluster::mpi_tag(),
+					starpu_mpi_data_get_rank(parents[i]));
+		}
+	}
+
+	filter(filter &&) = default;
+
+	~filter()
+	{
+		for(size_t i(0); i < parents.size(); ++i)
+			starpu_data_partition_clean(
+				parents[i],
+				data_filter[i].nchildren,
+				children[i].get());
+	}
+};
+
+} // namespace starpu
+
+// The children in the block should not have more data than can fit into
+// this amount of memory.
+static size_t max_filter_block_size{500 * 1024 * 1024};
 
 template<typename T>
 class partition_base
 {
 protected:
+	typedef decltype(starpu_data_filter::filter_func) filter_func;
+
 	T * m_data;
 	T * m_part_data;
 
@@ -26,6 +94,12 @@ protected:
 	starpu_data_handle_t m_data_handle;
 	std::vector<starpu_data_handle_t> m_handles;
 
+	unsigned int m_current_filter;
+	size_t m_filter_block_size;
+	filter_func m_filter_func;
+
+	std::map<unsigned int,starpu::filter> m_filters;
+
 	bool m_external;
 
 	partition_base() noexcept
@@ -38,6 +112,25 @@ protected:
 		m_capacity(0),
 		m_data_handle(0),
 		m_handles(cluster::mpi_size(), 0),
+		m_current_filter(0),
+		m_filter_block_size(0),
+		m_filter_func(0),
+		m_external(false)
+	{}
+
+	partition_base(filter_func fn) noexcept
+	: m_data(0),
+		m_part_data(0),
+		m_data_valid(false),
+		m_part_valid(false),
+		m_size(0),
+		m_part_size(0),
+		m_capacity(0),
+		m_data_handle(0),
+		m_handles(cluster::mpi_size(), 0),
+		m_current_filter(0),
+		m_filter_block_size(0),
+		m_filter_func(fn),
 		m_external(false)
 	{}
 
@@ -59,6 +152,8 @@ protected:
 
 	~partition_base() noexcept
 	{
+		// All filters need to be cleaned up befor unregistering other handles
+		m_filters.clear();
 		dealloc_local_storage();
 		dealloc_partitions();
 	}
@@ -69,8 +164,8 @@ protected:
 	{
 		if(other.m_part_valid)
 		{
-			starpu_data_acquire(other.m_handles[cluster::mpi_rank()], STARPU_R);
-			starpu_data_acquire(m_handles[cluster::mpi_rank()], STARPU_W);
+			starpu_data_acquire(other.m_handles[cluster::mpi_rank()], STARPU_RW);
+			starpu_data_acquire(m_handles[cluster::mpi_rank()], STARPU_RW);
 			std::copy(
 				other.m_part_data, other.m_part_data + m_part_size, m_part_data);
 			starpu_data_release(other.m_handles[cluster::mpi_rank()]);
@@ -82,8 +177,8 @@ protected:
 			if(!m_data)
 				alloc_local_storage();
 
-			starpu_data_acquire(other.m_data_handle, STARPU_R);
-			starpu_data_acquire(m_data_handle, STARPU_W);
+			starpu_data_acquire(other.m_data_handle, STARPU_RW);
+			starpu_data_acquire(m_data_handle, STARPU_RW);
 			std::copy(other.m_data, other.m_data + m_size, m_data);
 			starpu_data_release(m_data_handle);
 			starpu_data_release(other.m_data_handle);
@@ -108,7 +203,7 @@ protected:
 	}
 
 	auto
-	fill(size_t count, T const & value) noexcept
+	fill(size_t /* count */, T const & value) noexcept
 	-> void
 	{
 		if(m_external)
@@ -128,7 +223,7 @@ protected:
 			? m_size - (m_part_size * cluster::mpi_rank())
 			: m_part_size;
 
-		starpu_data_acquire(handle, STARPU_W);
+		starpu_data_acquire(handle, STARPU_RW);
 
 		std::fill(m_part_data, m_part_data + size, value);
 
@@ -164,7 +259,7 @@ protected:
 		if(starpu_mpi_data_get_rank(handle) == cluster::mpi_rank())
 		{
 			auto local_idx = pos % m_part_size;
-			starpu_data_acquire(handle, STARPU_W);
+			starpu_data_acquire(handle, STARPU_RW);
 			m_part_data[local_idx] = value;
 			starpu_data_release(handle);
 		}
@@ -190,7 +285,7 @@ protected:
 			if(end_part_idx > cluster::mpi_rank())
 				end = begin + m_part_size;
 
-			starpu_data_acquire(handle, STARPU_W);
+			starpu_data_acquire(handle, STARPU_RW);
 			std::copy(begin, end, m_part_data);
 			starpu_data_release(handle);
 		}
@@ -222,7 +317,7 @@ public:
 			if(m_size)
 			{
 				auto part_end_idx = (m_size -1) / m_part_size;
-				starpu_data_acquire(m_data_handle, STARPU_W);
+				starpu_data_acquire(m_data_handle, STARPU_RW);
 				auto data_it = m_data;
 				for(size_t i(0); i < part_end_idx; ++i)
 					data_it = gather(m_handles[i], m_part_size, data_it);
@@ -239,12 +334,26 @@ public:
 	block_count_from(size_t pos) const noexcept
 	-> size_t
 	{
-		auto block_idx = pos/m_part_size;
-		size_t block_count{
-			block_idx == cluster::mpi_size() -1
-			? block_count = m_size - pos
-			: block_count = m_part_size - (pos - (block_idx * m_part_size))};
-		return block_count;
+		// if no StarPU filter is applied
+		if(!m_current_filter)
+			return m_part_size - (pos % m_part_size);
+
+		auto block_pos = pos % m_part_size;
+		auto & filter = m_filters.at(m_current_filter);
+		auto block_size = filter.blocks_per_child * m_filter_block_size;
+
+		// The first "rest" number of children has one more block than the others
+		auto rest_size =
+			filter.rest * (block_size + m_filter_block_size);
+		if(block_pos < rest_size)
+			// so if block position is less than the number of elements in these
+			// child handles
+			block_size += m_filter_block_size;
+		else
+			// we can just remove those number of elements
+			block_pos -= rest_size;
+
+		return block_size - (block_pos % block_size);
 	}
 
 	auto
@@ -264,6 +373,47 @@ public:
 	}
 
 	auto
+	filter(size_t nchildren) noexcept
+	-> void
+	{
+		if(nchildren < 2)
+		{
+			m_current_filter = 0;
+			return;
+		}
+
+		// TODO: Handle if nchildren is larger than
+		//       m_part_size / m_filter_block_size
+		m_current_filter = nchildren;
+		if(m_filters.find(nchildren) == m_filters.end())
+		{
+			m_filters.emplace(
+				nchildren,
+				starpu::filter(
+					m_handles,
+					nchildren,
+					m_part_size / m_filter_block_size,
+					m_filter_func));
+		}
+	}
+
+	auto
+	min_filter_parts() noexcept
+	-> size_t
+	{
+		if(!m_size)
+			return 0;
+
+		// TODO: Cache result?
+		auto max_nr_blocks_per_child =
+			std::max<size_t>(
+				max_filter_block_size / (m_filter_block_size * sizeof(T)),
+				1);
+		return (m_part_size / m_filter_block_size) / max_nr_blocks_per_child;
+
+	}
+
+	auto
 	gather_to_root() noexcept
 	-> void
 	{
@@ -280,12 +430,12 @@ public:
 				auto rank = cluster::mpi_rank();
 				size_t end = m_size / m_part_size;
 				if(!rank)
-					starpu_data_acquire(m_data_handle, STARPU_W);
+					starpu_data_acquire(m_data_handle, STARPU_RW);
 
 				auto data_it = m_data;
 				if(!rank)
 				{
-					starpu_data_acquire(m_handles.front(), STARPU_R);
+					starpu_data_acquire(m_handles.front(), STARPU_RW);
 					size_t count = std::min(m_part_size, m_size);
 					data_it = std::copy(m_part_data, m_part_data + count, data_it);
 					starpu_data_release(m_handles.front());
@@ -300,7 +450,7 @@ public:
 					{
 						starpu_mpi_recv(m_handles[i], i, tag, MPI_COMM_WORLD, &recv_stat);
 						size_t count = std::min(m_part_size, m_size - (m_part_size * i));
-						starpu_data_acquire(m_handles[i], STARPU_R);
+						starpu_data_acquire(m_handles[i], STARPU_RW);
 						auto part_it = get_ptr(m_handles[i]);
 						data_it =
 							std::copy(part_it, part_it + count, data_it);
@@ -319,7 +469,24 @@ public:
 	handle_for(size_t pos) noexcept
 	-> starpu_data_handle_t
 	{
-		return m_handles[pos/m_part_size];
+		auto block_idx = pos / m_part_size;
+
+		if(!m_current_filter)
+			return m_handles[block_idx];
+
+		auto & filter = m_filters.at(m_current_filter);
+		auto & children = filter.children[block_idx];
+		auto block_pos = pos % m_part_size;
+
+		// First "filter.rest" number of children contain one more block than the
+		// others.
+		auto block_size = filter.blocks_per_child * m_filter_block_size;
+		auto rest_size = filter.rest * (block_size + m_filter_block_size);
+		if(block_pos < rest_size)
+			return children[block_pos / (block_size + m_filter_block_size)];
+
+		block_pos -= rest_size;
+		return children[(block_pos / block_size) + filter.rest];
 	}
 
 	auto
@@ -360,14 +527,14 @@ public:
 			/* Only ranks that have data should copy anything. */
 			if(rank <= end_rank)
 			{
-				starpu_data_acquire(m_data_handle, STARPU_R);
+				starpu_data_acquire(m_data_handle, STARPU_RW);
 				auto begin = m_data + (rank * m_part_size);
 				auto end =
 					rank == end_rank
 					? begin + (m_size - (rank * m_part_size))
 					: begin + m_part_size;
 
-				starpu_data_acquire(m_handles[rank], STARPU_W);
+				starpu_data_acquire(m_handles[rank], STARPU_RW);
 				std::copy(begin, end, m_part_data);
 				starpu_data_release(m_handles[rank]);
 				starpu_data_release(m_data_handle);
@@ -391,8 +558,8 @@ public:
 
 			if(!rank)
 			{
-				starpu_data_acquire(m_data_handle, STARPU_R);
-				starpu_data_acquire(m_handles.front(), STARPU_W);
+				starpu_data_acquire(m_data_handle, STARPU_RW);
+				starpu_data_acquire(m_handles.front(), STARPU_RW);
 				auto count = std::min(m_part_size, m_size);
 				std::copy(data_it, data_it + count, m_part_data);
 				starpu_data_release(m_handles.front());
@@ -405,6 +572,9 @@ public:
 
 				if(!rank)
 				{
+					// This one of the very few cases where STARPU_W is required.
+					// STARPU_RW will fail because the handle will not be initialized
+					// before this point.
 					starpu_data_acquire(handle, STARPU_W);
 					auto count = std::min(m_part_size, m_size - (i * m_part_size));
 					auto out_it = get_ptr(handle);
@@ -447,7 +617,7 @@ public:
 			auto end_it = start_it + std::min(m_part_size, m_size - start_idx);
 
 			auto handle = m_handles[cluster::mpi_rank()];
-			starpu_data_acquire(handle, STARPU_W);
+			starpu_data_acquire(handle, STARPU_RW);
 			for(; start_it != end_it; ++start_it)
 				*start_it = distributor(generator);
 			starpu_data_release(handle);
@@ -475,7 +645,7 @@ public:
 			auto end_it = start_it + std::min(m_part_size, m_size - start_idx);
 
 			auto handle = m_handles[cluster::mpi_rank()];
-			starpu_data_acquire(handle, STARPU_W);
+			starpu_data_acquire(handle, STARPU_RW);
 			for(; start_it != end_it; ++start_it)
 				*start_it = distributor(generator);
 			starpu_data_release(handle);
@@ -526,7 +696,7 @@ private:
 	-> Iterator
 	{
 		starpu_mpi_get_data_on_all_nodes_detached(MPI_COMM_WORLD, handle);
-		starpu_data_acquire(handle, STARPU_R);
+		starpu_data_acquire(handle, STARPU_RW);
 		auto part_it = (T *)get_ptr(handle);
 		data_it = std::copy(part_it, part_it + count, data_it);
 		starpu_data_release(handle);

@@ -16,11 +16,11 @@ class vector_partition : private partition_base<T>
 
 public:
 	vector_partition() noexcept
-	: base()
+	: base(starpu_vector_filter_block)
 	{}
 
 	vector_partition(size_t count) noexcept
-	: base()
+	: base(starpu_vector_filter_block)
 	{
 		init(count);
 	}
@@ -109,11 +109,13 @@ public:
 	using base::capacity;
 	using base::data;
 	using base::fill;
+	using base::filter;
 	using base::gather_to_root;
 	using base::invalidate_local_storage;
 	using base::local_storage_handle;
 	using base::handle_for;
 	using base::make_ext_w;
+	using base::min_filter_parts;
 	using base::partition;
 	using base::randomize;
 	using base::scatter_from_root;
@@ -190,7 +192,7 @@ private:
 			sizeof(size_t));
 		starpu_mpi_data_register(size_handle, cluster::mpi_tag(), 0);
 		starpu_mpi_get_data_on_all_nodes_detached(MPI_COMM_WORLD, size_handle);
-		starpu_data_acquire(size_handle, STARPU_R);
+		starpu_data_acquire(size_handle, STARPU_RW);
 
 		set_sizes(size);
 
@@ -206,6 +208,7 @@ private:
 	-> void
 	{
 		base::m_size = count;
+		base::m_filter_block_size = 1;
 		if(count)
 		{
 			base::m_part_size = count / cluster::mpi_size();

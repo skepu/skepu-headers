@@ -173,11 +173,13 @@ public:
 	using base::capacity;
 	using base::data;
 	using base::fill;
+	using base::filter;
 	using base::gather_to_root;
 	using base::local_storage_handle;
 	using base::handle_for;
 	using base::invalidate_local_storage;
 	using base::make_ext_w;
+	using base::min_filter_parts;
 	using base::partition;
 	using base::scatter_from_root;
 	using base::set;
@@ -267,7 +269,7 @@ private:
 			4 * sizeof(size_t));
 		starpu_mpi_data_register(size_handle, cluster::mpi_tag(), 0),
 		starpu_mpi_get_data_on_all_nodes_detached(MPI_COMM_WORLD, size_handle);
-		starpu_data_acquire(size_handle, STARPU_R);
+		starpu_data_acquire(size_handle, STARPU_RW);
 
 		m_size_i = size_arr[0];
 		m_size_j = size_arr[1];
@@ -300,6 +302,7 @@ private:
 				++m_part_i;
 			base::m_part_size = m_part_i * m_size_jkl;
 			base::m_capacity = base::m_part_size * ranks;
+			base::m_filter_block_size = m_size_jkl;
 		}
 	}
 };

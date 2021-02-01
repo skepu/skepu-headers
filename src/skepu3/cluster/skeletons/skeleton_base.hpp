@@ -16,14 +16,21 @@ public:
 	auto finishAll() noexcept -> void {};
 	auto setExecPlan(ExecPlan) noexcept -> void {};
 
-	auto setBackend(BackendSpec bs) noexcept -> void
+	auto virtual setBackend(BackendSpec bs) noexcept -> void
 	{
 		if(m_bs)
 			delete m_bs;
 		m_bs = new BackendSpec(std::move(bs));
 	}
 
-	auto resetBackend() noexcept -> void {};
+	auto virtual
+	resetBackend() noexcept
+	-> void
+	{
+		if(m_bs)
+			delete m_bs;
+		m_bs = 0;
+	}
 
 protected:
 	BackendSpec * m_bs;

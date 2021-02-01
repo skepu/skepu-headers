@@ -1,4 +1,5 @@
 #pragma once
+#include "skepu3/impl/backend.hpp"
 #ifndef SKEPU_STARPU_SKELETON_REDUCE_HPP
 #define SKEPU_STARPU_SKELETON_REDUCE_HPP 1
 
@@ -85,8 +86,7 @@ struct reduce1d
 
 template<typename ReduceFunc, typename CUDAKernel, typename CLKernel>
 class Reduce1D
-: public SkeletonBase,
-	protected cluster::skeleton_task<
+: public cluster::skeleton_task<
 		_starpu::reduce1d<ReduceFunc>,
 		std::tuple<typename ReduceFunc::Ret>,
 		std::tuple<
@@ -426,6 +426,22 @@ public:
 	{
 		// If we need backend dispatch in the future.
 		return STARPU(arg);
+	}
+
+	auto
+	setBackend(BackendSpec spec) noexcept
+	-> void override
+	{
+		skeleton_task::setBackend(spec);
+		row_reduce::setBackend(spec);
+	}
+
+	auto
+	resetBackend() noexcept
+	-> void override
+	{
+		skeleton_task::resetBackend();
+		row_reduce::resetBackend();
 	}
 
 private:

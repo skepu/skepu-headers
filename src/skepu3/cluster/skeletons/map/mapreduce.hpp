@@ -171,8 +171,7 @@ template<
 	typename CUDAReduceKernel,
 	typename CLKernel>
 class MapReduce
-: public SkeletonBase,
-	private cluster::skeleton_task<
+: public cluster::skeleton_task<
 		_starpu::map_reduce<MapFunc, ReduceFunc>,
 		std::tuple<typename MapFunc::Ret>,
 		typename MapFunc::ElwiseArgs,
@@ -456,7 +455,7 @@ private:
 		{
 			auto & handle = m_result_handles[rank];
 			starpu_mpi_get_data_on_all_nodes_detached(MPI_COMM_WORLD, handle);
-			starpu_data_acquire(handle, STARPU_R);
+			starpu_data_acquire(handle, STARPU_RW);
 			pack_expand((
 				get_or_return<OI>(res) =
 					ReduceFunc::CPU(
@@ -530,7 +529,7 @@ private:
 		{
 			auto handle = m_result_handles[rank];
 			starpu_mpi_get_data_on_all_nodes_detached(MPI_COMM_WORLD, handle);
-			starpu_data_acquire(handle, STARPU_R);
+			starpu_data_acquire(handle, STARPU_RW);
 			Ret part_res = *(Ret *)starpu_data_get_local_ptr(handle);
 			pack_expand((
 				get_or_return<OI>(res) =

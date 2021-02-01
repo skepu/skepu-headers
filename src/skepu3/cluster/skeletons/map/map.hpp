@@ -247,13 +247,31 @@ private:
 		// tasks generated is as low as possible.
 		pack_expand((cont::getParent(get<EI>(args...)).partition(),0)...);
 
+		auto filter_parts =
+			std::max<size_t>({
+				cont::getParent(get<OI>(args...)).min_filter_parts()...,
+				cont::getParent(get<EI>(args...)).min_filter_parts()...,
+				cluster::min_filter_parts_container_arg(
+					cont::getParent(get<AI>(args...)),
+					std::get<PI>(pt))...});
+
+		pack_expand(
+			(cont::getParent(get<OI>(args...)).filter(filter_parts), 0)...,
+			(cont::getParent(get<EI>(args...)).filter(filter_parts), 0)...,
+			(cluster::filter(
+				cont::getParent(get<AI>(args...)),
+				std::get<PI>(pt),
+				filter_parts), 0)...);
+
 		while(begin != end)
 		{
 			auto pos = begin.offset();
+
 			auto task_count = std::min({
 				(size_t)(end - begin),
 				begin.getParent().block_count_from(pos),
 				cont::getParent(get<EI>(args...)).block_count_from(pos)...});
+
 			auto handles =
 				std::make_tuple(
 					cont::getParent(get<OI>(args...)).handle_for(pos)...,

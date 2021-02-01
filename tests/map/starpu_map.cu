@@ -1,3 +1,4 @@
+#include "skepu3/cluster/containers/partition.hpp"
 #include "skepu3/impl/backend.hpp"
 #include <catch2/catch.hpp>
 
@@ -106,6 +107,21 @@ TEST_CASE("No args skeleton")
 
 		REQUIRE(simple_map_fn_cu_called == true);
 		for(auto & e : t4)
+			REQUIRE(e == 10);
+	}
+
+	SECTION("Small filter size")
+	{
+		REQUIRE(simple_map_fn_cu_called == false);
+		auto bls_tmp = skepu::max_filter_block_size;
+		skepu::max_filter_block_size = 10 * sizeof(int);
+		skepu::Vector<int> v(1000);
+		map(v);
+		v.flush();
+		skepu::max_filter_block_size = bls_tmp;
+
+		REQUIRE(simple_map_fn_cu_called == true);
+		for(auto & e : v)
 			REQUIRE(e == 10);
 	}
 }

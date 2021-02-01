@@ -31,11 +31,20 @@ if(SKEPU_HEADERS_MPI)
 		COMMAND starpu_mappairsreduce)
 	add_mpi_test(starpu_mappairsreduce_par starpu_mappairsreduce)
 
-	add_executable(starpu_map_cu starpu_map.cu)
-	target_link_libraries(starpu_map_cu
-		PRIVATE
-			catch2_main SkePU::SkePU MPI::MPI_CXX PkgConfig::STARPU OpenMP::OpenMP_CXX)
-	add_test(NAME starpu_map_seq_cu
-		COMMAND starpu_map_cu)
-	add_mpi_test(starpu_map_par_cu starpu_map_cu)
+	# Apparently there is an issue where -Xcompiler is not added before propagated
+	# cflags in cmake 3.10. Setting version 3.15 in the hope that it's fixed at
+	# that point.
+	if(CMAKE_VERSION VERSION_GREATER_EQUAL 3.15)
+		add_executable(starpu_map_cu starpu_map.cu)
+		target_link_libraries(starpu_map_cu
+			PRIVATE
+				catch2_main
+				SkePU::SkePU
+				MPI::MPI_CXX
+				PkgConfig::STARPU
+				OpenMP::OpenMP_CXX)
+		add_test(NAME starpu_map_seq_cu
+			COMMAND starpu_map_cu)
+		add_mpi_test(starpu_map_par_cu starpu_map_cu)
+	endif()
 endif()
