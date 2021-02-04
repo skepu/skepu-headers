@@ -316,13 +316,13 @@ public:
 
 			if(m_size)
 			{
-				auto part_end_idx = (m_size -1) / m_part_size;
+				auto last_part_idx = (m_size -1) / m_part_size;
 				starpu_data_acquire(m_data_handle, STARPU_RW);
 				auto data_it = m_data;
-				for(size_t i(0); i < part_end_idx; ++i)
+				for(size_t i(0); i < last_part_idx; ++i)
 					data_it = gather(m_handles[i], m_part_size, data_it);
-				auto last_part_count = m_size - (part_end_idx * m_part_size);
-				gather(m_handles[part_end_idx], last_part_count, data_it);
+				auto count = m_size - (last_part_idx * m_part_size);
+				gather(m_handles[last_part_idx], count, data_it);
 				starpu_data_release(m_data_handle);
 			}
 		}
@@ -428,7 +428,7 @@ public:
 			if(m_size)
 			{
 				auto rank = cluster::mpi_rank();
-				size_t end = m_size / m_part_size;
+				auto last_part_idx = (m_size  -1) / m_part_size;
 				if(!rank)
 					starpu_data_acquire(m_data_handle, STARPU_RW);
 
@@ -440,7 +440,7 @@ public:
 					data_it = std::copy(m_part_data, m_part_data + count, data_it);
 					starpu_data_release(m_handles.front());
 				}
-				for(size_t i(1); i < end; ++i)
+				for(size_t i(1); i < last_part_idx; ++i)
 				{
 					MPI_Status recv_stat;
 					auto tag = cluster::mpi_tag();
@@ -449,13 +449,35 @@ public:
 					else if(!rank)
 					{
 						starpu_mpi_recv(m_handles[i], i, tag, MPI_COMM_WORLD, &recv_stat);
-						size_t count = std::min(m_part_size, m_size - (m_part_size * i));
 						starpu_data_acquire(m_handles[i], STARPU_RW);
 						auto part_it = get_ptr(m_handles[i]);
 						data_it =
-							std::copy(part_it, part_it + count, data_it);
+							std::copy(part_it, part_it + m_part_size, data_it);
 						starpu_data_release(m_handles[i]);
 						starpu_mpi_cache_flush(MPI_COMM_WORLD, m_handles[i]);
+					}
+				}
+				if(last_part_idx)
+				{
+					MPI_Status recv_stat;
+					auto tag = cluster::mpi_tag();
+					if(last_part_idx == rank)
+						starpu_mpi_send(m_handles[last_part_idx], 0, tag, MPI_COMM_WORLD);
+					else if(!rank)
+					{
+						starpu_mpi_recv(
+							m_handles[last_part_idx],
+							last_part_idx,
+							tag,
+							MPI_COMM_WORLD,
+							&recv_stat);
+						auto count = m_size - (last_part_idx * m_part_size);
+						starpu_data_acquire(m_handles[last_part_idx], STARPU_RW);
+						auto part_it = get_ptr(m_handles[last_part_idx]);
+						data_it =
+							std::copy(part_it, part_it + count, data_it);
+						starpu_data_release(m_handles[last_part_idx]);
+						starpu_mpi_cache_flush(MPI_COMM_WORLD, m_handles[last_part_idx]);
 					}
 				}
 

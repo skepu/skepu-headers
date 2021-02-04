@@ -164,9 +164,11 @@ protected:
 			using type = skepu::Backend::Type;
 			switch(bs->getType())
 			{
+			#ifdef SKEPU_CUDA
 			case type::CUDA:
 				cl.where = STARPU_CUDA;
 				break;
+			#endif
 			case type::OpenMP:
 			case type::CPU:
 				cl.where = STARPU_CPU;
