@@ -50,9 +50,24 @@ else()
 		find_package(PkgConfig)
 		if(PkgConfig_FOUND)
 			pkg_check_modules(STARPU IMPORTED_TARGET
-				starpu-1.3 starpumpi-1.3)
+				starpumpi-1.3)
 			if(STARPU_FOUND)
 				set(SKEPU_HEADERS_MPI ON)
+				if(${CMAKE_VERSION} VERSION_LESS 3.18)
+					#message(STATUS "Fixing MPI + CUDA issue...")
+					get_target_property(_flags MPI::MPI_CXX INTERFACE_LINK_LIBRARIES)
+
+					# In versions previous to 3.18, this causes an issue when CMake tries
+					# to link cuda device code, so we disable -pthread.
+					string(REPLACE "-pthread" "" _flags "${_flags}")
+
+					# As a precaution, we do not search for " -pthread", but then we have
+					# to deal with a possible " ;" situation which CMake does not like.
+					string(REPLACE " ;" ";" _flags "${_flags}")
+					set_property(TARGET MPI::MPI_CXX PROPERTY
+						INTERFACE_LINK_LIBRARIES ${_flags})
+					unset(_flags)
+				endif()
 			endif()
 		endif()
 	endif()

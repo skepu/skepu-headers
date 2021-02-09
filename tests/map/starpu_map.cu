@@ -71,7 +71,8 @@ TEST_CASE("No args skeleton")
 		map(v);
 		v.flush();
 
-		REQUIRE(simple_map_fn_cu_called == true);
+		if(skepu::cluster::mpi_size() == 1)
+			REQUIRE(simple_map_fn_cu_called == true);
 		for(auto & e : v)
 			REQUIRE(e == 10);
 	}
@@ -82,7 +83,8 @@ TEST_CASE("No args skeleton")
 		map(m);
 		m.flush();
 
-		REQUIRE(simple_map_fn_cu_called == true);
+		if(skepu::cluster::mpi_size() == 1)
+			REQUIRE(simple_map_fn_cu_called == true);
 		for(auto & e : m)
 			REQUIRE(e == 10);
 	}
@@ -93,26 +95,26 @@ TEST_CASE("No args skeleton")
 		map(t3);
 		t3.flush();
 
-		REQUIRE(simple_map_fn_cu_called == true);
+		if(skepu::cluster::mpi_size() == 1)
+			REQUIRE(simple_map_fn_cu_called == true);
 		for(auto & e : t3)
 			REQUIRE(e == 10);
 	}
 
 	SECTION("using a vector")
 	{
-		REQUIRE(simple_map_fn_cu_called == false);
 		skepu::Tensor4<int> t4(10,10,10,10);
 		map(t4);
 		t4.flush();
 
-		REQUIRE(simple_map_fn_cu_called == true);
+		if(skepu::cluster::mpi_size() == 1)
+			REQUIRE(simple_map_fn_cu_called == true);
 		for(auto & e : t4)
 			REQUIRE(e == 10);
 	}
 
 	SECTION("Small filter size")
 	{
-		REQUIRE(simple_map_fn_cu_called == false);
 		auto bls_tmp = skepu::max_filter_block_size;
 		skepu::max_filter_block_size = 10 * sizeof(int);
 		skepu::Vector<int> v(1000);
@@ -120,7 +122,8 @@ TEST_CASE("No args skeleton")
 		v.flush();
 		skepu::max_filter_block_size = bls_tmp;
 
-		REQUIRE(simple_map_fn_cu_called == true);
+		if(skepu::cluster::mpi_size() == 1)
+			REQUIRE(simple_map_fn_cu_called == true);
 		for(auto & e : v)
 			REQUIRE(e == 10);
 	}
