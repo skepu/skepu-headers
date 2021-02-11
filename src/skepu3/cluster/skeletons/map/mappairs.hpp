@@ -13,7 +13,7 @@ namespace skepu {
 namespace backend {
 namespace _starpu {
 
-template<typename Func>
+template<typename Func, typename CUKernel>
 struct map_pairs
 {
 	typedef ConditionalIndexForwarder<
@@ -59,10 +59,61 @@ struct map_pairs
 				std::tie(
 					std::get<RHI>(buffers)[row_offset + j]...) = res;
 			}
-
 		}
 	}
+
+	#ifdef SKEPU_CUDA
+	CUKernel static cu_kernel;
+
+	template<
+		size_t ... RHI,
+		size_t ... HI,
+		size_t ... CI,
+		size_t ... VEI,
+		size_t ... HEI,
+		typename Buffers,
+		typename ... Args>
+	auto static
+	CUDA(
+		pack_indices<RHI...>,
+		pack_indices<HI...>,
+		pack_indices<CI...>,
+		Buffers && buffers,
+		pack_indices<VEI...>,
+		pack_indices<HEI...>,
+		size_t start_row,
+		size_t rows,
+		size_t width,
+		Args && ... args) noexcept
+	-> void
+	{
+		std::cerr << "[SkePU][MapPairs] CUDA kernel!\n";
+		unsigned int count = rows * width;
+		dim3 block{std::min<unsigned int>(count, 1024)};
+		dim3 grid{count / block.x};
+		if(count % grid.x)
+			++grid.x;
+		auto stream = starpu_cuda_get_local_stream();
+
+		cu_kernel<<<grid, block, 0, stream>>>(
+			std::get<RHI>(buffers)...,
+			std::get<VEI>(buffers)...,
+			std::get<HEI>(buffers)...,
+			std::get<CI>(buffers)...,
+			args...,
+			rows,
+			width,
+			start_row * width);
+
+		cudaStreamSynchronize(stream);
+	}
+	#endif
 };
+
+#ifdef SKEPU_CUDA
+template<typename MapFunc, typename CUKernel>
+CUKernel map_pairs<MapFunc, CUKernel>::cu_kernel = 0;
+#endif
 
 } // namespace _starpu
 
@@ -73,9 +124,8 @@ template<
 	typename CUDAKernel,
 	typename CLKernel>
 class MapPairs
-: public SkeletonBase,
-	private cluster::skeleton_task<
-		_starpu::map_pairs<MapPairsFunc>,
+:	private cluster::skeleton_task<
+		_starpu::map_pairs<MapPairsFunc, CUDAKernel>,
 		typename cluster::result_tuple<typename MapPairsFunc::Ret>::type,
 		typename MapPairsFunc::ElwiseArgs,
 		typename MapPairsFunc::ContainerArgs,
@@ -83,7 +133,7 @@ class MapPairs
 {
 	typedef typename MapPairsFunc::Ret T;
 	typedef cluster::skeleton_task<
-			_starpu::map_pairs<MapPairsFunc>,
+			_starpu::map_pairs<MapPairsFunc, CUDAKernel>,
 			typename cluster::result_tuple<typename MapPairsFunc::Ret>::type,
 			typename MapPairsFunc::ElwiseArgs,
 			typename MapPairsFunc::ContainerArgs,
@@ -95,8 +145,6 @@ class MapPairs
 		MapPairsFunc::totalArity - (MapPairsFunc::indexed ? 1 : 0) + outArity;
 	static constexpr size_t anyArity =
 		std::tuple_size<typename MapPairsFunc::ContainerArgs>::value;
-
-	CUDAKernel m_cuda_kernel;
 
 	typedef std::tuple<T> ResultArg;
 	typedef typename MapPairsFunc::ElwiseArgs ElwiseArgs;
@@ -126,9 +174,13 @@ class MapPairs
 public:
 	static constexpr auto skeletonType = SkeletonType::MapPairs;
 
-	MapPairs(CUDAKernel)
+	MapPairs(CUDAKernel kernel)
 	: skeleton_task("MapPairs")
-	{}
+	{
+		#ifdef SKEPU_CUDA
+		_starpu::map_pairs<MapPairsFunc, CUDAKernel>::cu_kernel = kernel;
+		#endif
+	}
 
 	template<typename... CallArgs>
 	auto
@@ -199,6 +251,24 @@ private:
 			(cont::getParent(get<OI>(args...)).invalidate_local_storage(),0)...,
 			(cont::getParent(get<VEI>(args...)).partition(),0)...,
 			(cont::getParent(get<HEI>(args...)).allgather(),0)...);
+
+		auto parts =
+			std::max<size_t>({
+				cont::getParent(get<OI>(args...)).min_filter_parts()...,
+				cont::getParent(get<VEI>(args...)).min_filter_parts()...,
+				cont::getParent(get<HEI>(args...)).min_filter_parts()...,
+				cluster::min_filter_parts_container_arg(
+					cont::getParent(get<AI>(args...)),
+					std::get<PI>(proxy_tags))...});
+
+		pack_expand(
+			(cont::getParent(get<OI>(args...)).filter(parts), 0)...,
+			(cont::getParent(get<VEI>(args...)).filter(parts), 0)...,
+			(cont::getParent(get<HEI>(args...)).filter(parts), 0)...,
+			(cluster::filter(
+				cont::getParent(get<AI>(args...)),
+				std::get<PI>(proxy_tags),
+				parts), 0)...);
 
 		auto cols = get<0>(args...).size_j();
 		for(size_t row = 0; row < Vsize;)

@@ -43,5 +43,17 @@ if(SKEPU_HEADERS_MPI)
 		add_test(NAME starpu_map_seq_cu
 			COMMAND starpu_map_cu)
 		add_mpi_test(starpu_map_par_cu starpu_map_cu)
+
+		add_executable(starpu_mappairs_cu starpu_map.cu)
+		target_link_libraries(starpu_mappairs_cu
+			PRIVATE
+				catch2_main
+				SkePU::SkePU
+				MPI::MPI_CXX
+				PkgConfig::STARPU
+				OpenMP::OpenMP_CXX)
+		add_test(NAME starpu_mappairs_seq_cu
+			COMMAND starpu_mappairs_cu)
+		add_mpi_test(starpu_mappairs_par_cu starpu_map_cu)
 	endif()
 endif()

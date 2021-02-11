@@ -1,6 +1,5 @@
-#include "skepu3/cluster/containers/partition.hpp"
-#include "skepu3/impl/backend.hpp"
 #include <catch2/catch.hpp>
+#include <cuda.h>
 
 #define SKEPU_CUDA
 #include <skepu3/cluster/skeletons/map/map.hpp>
