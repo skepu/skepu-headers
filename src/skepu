@@ -1,6 +1,6 @@
 #pragma once
 
-// Deprecated operators are still accessible in this version 
+// Deprecated operators are still accessible in this version
 #define SKEPU_ENABLE_DEPRECATED_OPERATOR
 
 #if defined(SKEPU_OPENMP) && (defined(SKEPU_CUDA) || defined(SKEPU_OPENCL))
@@ -19,7 +19,7 @@
 #undef __CUDACC__
 #endif
 
-#ifdef SKEPU_MPI_STARPU
+#ifdef SKEPU_STARPU_MPI
 
 #include "skepu3/cluster/cluster.hpp"
 #include "skepu3/cluster/external.hpp"
