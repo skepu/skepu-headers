@@ -35,7 +35,7 @@ struct Vec
 	#endif
 	auto
 	operator()(size_t index) const
-	-> T
+	-> T const &
 	{
 		return this->data[index];
 	}
@@ -55,7 +55,7 @@ struct Vec
 	#endif
 	auto
 	operator[](size_t index) const
-	-> T
+	-> T const &
 	{
 		return this->data[index];
 	}

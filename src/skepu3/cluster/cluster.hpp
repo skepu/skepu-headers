@@ -18,7 +18,10 @@ namespace skepu {
 					starpu_conf_init(&conf);
 					conf.sched_policy_name = "peager";
 					if(conf.ncpus > 1)
+					{
 						conf.reserve_ncpus = 1;
+						conf.single_combined_worker = 1;
+					}
 					// Not using starpu_mpi_init_conf because that makes
 					// starpu_mpi_shutdown segfault.
 					// TODO:As the performance models in the skeletons are not static in
