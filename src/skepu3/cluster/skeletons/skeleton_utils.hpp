@@ -1,12 +1,11 @@
 #pragma once
-#include "skepu3/cluster/common.hpp"
 #ifndef SKEPU_CLUSTER_SKELETON_UTILS_HPP
 #define SKEPU_CLUSTER_SKELETON_UTILS_HPP 1
 
 #include <cstddef>
 #include <starpu.h>
 
-#include "../containers/proxies.hpp"
+#include <skepu3/cluster/containers/proxies.hpp>
 
 namespace skepu {
 namespace cluster {
@@ -111,7 +110,7 @@ prepare_buffer(Mat<T> const *, void * ptr)
 -> Mat<T>
 {
 	Mat<T> proxy;
-	proxy.data = (T *)STARPU_VECTOR_GET_PTR(ptr);
+	proxy.data = (T *)STARPU_MATRIX_GET_PTR(ptr);
 	proxy.rows = STARPU_MATRIX_GET_NY(ptr);
 	proxy.cols = STARPU_MATRIX_GET_NX(ptr);
 

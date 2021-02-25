@@ -57,6 +57,7 @@ TEST_CASE("Sum of matrix")
 		m(i/N, i%N) = i;
 
 	int res(0);
+	//if(skepu::cluster::mpi_rank()) for(;;);
 	REQUIRE_NOTHROW(res = sum(m));
 	CHECK(res == EXPECTED);
 }

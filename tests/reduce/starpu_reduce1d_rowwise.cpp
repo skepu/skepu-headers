@@ -32,7 +32,7 @@ struct sum_fn
 TEST_CASE("Row wise sum of matrix")
 {
 	auto sum = skepu::backend::Reduce1D<sum_fn, bool, void>(false);
-	size_t constexpr N{900};
+	size_t const N{10 * skepu::cluster::mpi_size()};
 	auto expected = std::vector<int>(N);
 	auto m = skepu::Matrix<int>(N,N);
 	auto res = skepu::Vector<int>(N);
@@ -50,7 +50,7 @@ TEST_CASE("Row wise sum of matrix")
 		}
 	}
 
-	REQUIRE_NOTHROW(res = sum(res, m));
+	REQUIRE_NOTHROW(sum(res, m));
 
 	res.flush();
 	for(size_t i(0); i < N; ++i)

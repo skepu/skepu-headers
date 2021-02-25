@@ -2,11 +2,9 @@
 #ifndef SKEPU_STARPU_TENSOR3_HPP
 #define SKEPU_STARPU_TENSOR3_HPP 1
 
-#include "skepu3/cluster/common.hpp"
-
 #include "iterator.hpp"
 #include "proxy.hpp"
-#include "partition.cpp"
+#include "partition.hpp"
 
 namespace skepu
 {

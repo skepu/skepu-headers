@@ -2,8 +2,9 @@
 #ifndef SKEPU_CLUSTER_SKELETONS_SKELETON_TASK_HPP
 #define SKEPU_CLUSTER_SKELETONS_SKELETON_TASK_HPP 1
 
-#include <starpu.h>
 #include <tuple>
+
+#include <starpu.h>
 
 #include "../common.hpp"
 #include "../containers/proxies.hpp"
@@ -43,7 +44,7 @@ class skeleton_task
 : public backend::SkeletonBase
 {
 	starpu_codelet cl;
-	starpu_perfmodel perf_model;
+	//starpu_perfmodel perf_model;
 
 	using HandleT =
 		decltype(std::tuple_cat(ResultArgs{}, ElwiseArgs{}, ContainerArgs{}));
@@ -80,16 +81,18 @@ protected:
 	skeleton_task(char const * name)
 	{
 		// Initialize performance model
+		/*
 		memset(&perf_model, 0, sizeof(starpu_perfmodel));
 		starpu_perfmodel_init(&perf_model);
 		perf_model.type = STARPU_HISTORY_BASED;
+		*/
 
 		// Not really used for now.
-		perf_model.symbol = name;
+		//perf_model.symbol = name;
 
 		starpu_codelet_init(&cl);
 		cl.nbuffers = n_handles;
-		cl.max_parallelism = INT_MAX;
+		//cl.max_parallelism = INT_MAX;
 		cl.type = STARPU_FORKJOIN; // For OpenMP
 		cl.cpu_funcs_name[0] = name;
 
@@ -99,7 +102,7 @@ protected:
 
 		helpers::set_codelet_read_only_modes(handle_indices, cl);
 		for(size_t i {}; i < n_result; ++i)
-			cl.modes[i] = STARPU_W;
+			cl.modes[i] = STARPU_RW;
 	}
 
 	template<typename Container, typename ProxyTag>
@@ -174,18 +177,21 @@ protected:
 				cl.where = STARPU_CPU;
 				break;
 			case type::Auto:
-				cl.where = STARPU_ANY_WORKER;
+				cl.where = STARPU_CPU|STARPU_CUDA;
 				break;
 			default:
 			{
 				std::cerr << "[SkePU][skeleton_task] ERROR: "
-					"Selected Backend::Type is not supported in the MPI-StarPU "
-					"backend.\n";
+					"Selected Backend::Type is not supported with StarPU-MPI.\n";
 				std::abort();
 			}};
 		}
 		else
-			std::cout << "[SkePU][skeleton_taks] No backend set.";
+			#ifndef SKEPU_CUDA
+			cl.where = STARPU_CPU;
+			#else
+			cl.where = STARPU_CPU|STARPU_CUDA;
+			#endif
 
 		auto modes = helpers::modes_from_codelet(cl);
 		auto args_tuple =

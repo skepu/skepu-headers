@@ -9,7 +9,7 @@
 
 #include "../../common.hpp"
 #include "iterator.hpp"
-#include "partition.cpp"
+#include "partition.hpp"
 #include "proxy.hpp"
 
 namespace skepu {

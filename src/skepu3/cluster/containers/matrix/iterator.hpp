@@ -5,7 +5,7 @@
 #include <iterator>
 
 #include "../../common.hpp"
-#include "partition.cpp"
+#include "partition.hpp"
 
 namespace skepu {
 

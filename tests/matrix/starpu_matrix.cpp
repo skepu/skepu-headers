@@ -257,13 +257,16 @@ TEST_CASE("Can use float in matrices.")
 }
 TEST_CASE("Matrix transpose.")
 {
-	size_t constexpr N{100};
+	size_t const N{10 * skepu::cluster::mpi_size()};
 	skepu::Matrix<int> m(N,N);
 
 	m.flush();
 	for(size_t i(0); i < N; ++i)
+	{
+		int row_start = i * N;
 		for(size_t j(0); j < N; ++j)
-			m(i,j) = i*j;
+			m(i,j) = row_start + j;
+	}
 	skepu::Matrix<int> mt(m);
 
 	REQUIRE_NOTHROW(mt.transpose(0));

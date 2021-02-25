@@ -1,4 +1,4 @@
-if(SKEPU_MATRIX_MPI)
+if(SKEPU_HEADERS_MPI)
 	add_executable(starpu_reduce1d_elwise starpu_reduce1d_elwise.cpp)
 	target_link_libraries(starpu_reduce1d_elwise
 		PRIVATE
@@ -34,4 +34,18 @@ if(SKEPU_MATRIX_MPI)
 	add_test(NAME starpu_reduce2d_seq
 		COMMAND starpu_reduce2d)
 	add_mpi_test(starpu_reduce2d_par starpu_reduce2d)
+
+	if(SKEPU_HEADERS_CUDA)
+		add_executable(starpu_reduce_cu starpu_reduce.cu)
+		target_link_libraries(starpu_reduce_cu
+			PRIVATE
+				catch2_main
+				SkePU::SkePU
+				MPI::MPI_CXX
+				PkgConfig::STARPU
+				OpenMP::OpenMP_CXX)
+		add_test(NAME starpu_reduce_cu_seq
+			COMMAND starpu_reduce_cu)
+		add_mpi_test(starpu_reduce_cu_par starpu_reduce_cu)
+	endif()
 endif()

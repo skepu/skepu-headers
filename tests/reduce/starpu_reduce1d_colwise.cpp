@@ -1,3 +1,5 @@
+#include "skepu3/cluster/cluster.hpp"
+#include "skepu3/cluster/skeletons/reduce/reduce_mode.hpp"
 #include <catch2/catch.hpp>
 
 #include <skepu3/cluster/containers/matrix/matrix.hpp>
@@ -31,37 +33,19 @@ struct sum_fn
 
 TEST_CASE("Column wise sum of matrix")
 {
-	auto sum = skepu::backend::Reduce1D<sum_fn, bool, void>(false);
-	size_t constexpr N{900};
-	auto expected = std::vector<int>(N);
-	auto m = skepu::Matrix<int>(N,N);
-	auto res = skepu::Vector<int>(N);
+	size_t const N{10 * skepu::cluster::mpi_size()};
+	skepu::backend::Reduce1D<sum_fn, bool, void> sum(false);
+	skepu::Matrix<int> m(N,N);
+	skepu::Vector<int> res(N);
 
 	m.flush();
-	res.flush();
 	for(size_t i(0); i < N; ++i)
-	{
-		auto first = i * N;
 		for(size_t j(0); j < N; ++j)
-		{
-			m(i,j) = first + j;
-			expected[j] += first + j;
-		}
-	}
-	auto mt = m;
-	mt.transpose(0);
+			m(i,j) = j;
 
 	sum.setReduceMode(skepu::ReduceMode::ColWise);
-	REQUIRE_NOTHROW(res = sum(res, m));
-
+	REQUIRE_NOTHROW(sum(res, m));
 	res.flush();
-	m.flush();
-	mt.flush();
 	for(size_t i(0); i < N; ++i)
-	{
-		REQUIRE(res(i) == expected[i]);
-		for(size_t j(0); j < N; ++j)
-			REQUIRE(m(i,j) == mt(j,i));
-	}
-
+		REQUIRE(res(i) == N *i);
 }
