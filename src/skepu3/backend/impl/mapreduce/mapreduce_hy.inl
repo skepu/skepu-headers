@@ -96,7 +96,7 @@ namespace skepu
 			}
 			
 			// Final Reduce sequentially
-			for (Ret &parsum : parsums)
+			for (Ret const& parsum : parsums)
 				pack_expand((get_or_return<OI>(res) = ReduceFunc::OMP(get_or_return<OI>(res), get_or_return<OI>(parsum)), 0)...);
 			
 			return res;
@@ -185,7 +185,7 @@ namespace skepu
 			}
 			
 			// Final Reduce sequentially
-			for (Ret &parsum : parsums)
+			for (Ret const& parsum : parsums)
 				pack_expand((get_or_return<OI>(res) = ReduceFunc::OMP(get_or_return<OI>(res), get_or_return<OI>(parsum)), 0)...);
 			
 			return res;

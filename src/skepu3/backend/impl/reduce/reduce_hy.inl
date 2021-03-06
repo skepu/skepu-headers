@@ -286,8 +286,8 @@ namespace skepu
 			
 			
 			// Reduce result of each thread, sequentially
-			for (auto it = threadRes.begin(); it != threadRes.end(); ++it)
-				res = ReduceFuncColWise::OMP(res, *it);
+			for (auto const& el : threadRes)
+				res = ReduceFuncColWise::OMP(res, el);
 			
 			return res;
 		}

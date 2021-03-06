@@ -70,7 +70,7 @@ namespace skepu
 					parsums[myid] = ReduceFunc::OMP(parsums[myid], arg(i));
 			}
 			
-			for (auto& el : parsums)
+			for (auto const& el : parsums)
 				res = ReduceFunc::OMP(res, el);
 			
 			return res;
@@ -125,7 +125,7 @@ namespace skepu
 			}
 			
 			// Final col-wise sequential reduction
-			for (auto& el : parsums)
+			for (auto const& el : parsums)
 				res = ReduceFuncColWise::OMP(res, el);
 			
 			return res;
