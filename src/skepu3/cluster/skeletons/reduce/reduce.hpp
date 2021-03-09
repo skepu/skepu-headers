@@ -209,8 +209,8 @@ template<typename ReduceFunc, typename CUDAKernel, typename CLKernel>
 class Reduce1D
 : public cluster::skeleton_task<
 		_starpu::reduce1d<ReduceFunc, CUDAKernel>,
-		std::tuple<typename ReduceFunc::Ret>,
 		std::tuple<typename ReduceFunc::Ret, typename ReduceFunc::Ret>,
+		std::tuple<typename ReduceFunc::Ret>,
 		std::tuple<>,
 		std::tuple<>>
 {
@@ -218,8 +218,8 @@ public:
 	typedef typename ReduceFunc::Ret T;
 	typedef cluster::skeleton_task<
 			_starpu::reduce1d<ReduceFunc, CUDAKernel>,
-			std::tuple<T>,
 			std::tuple<T, T>,
+			std::tuple<T>,
 			std::tuple<>,
 			std::tuple<>>
 		skeleton_task;

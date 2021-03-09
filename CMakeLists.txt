@@ -35,7 +35,10 @@ target_include_directories(SkePU INTERFACE
 	$<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}/src>
 	$<INSTALL_INTERFACE:include>)
 
-install(DIRECTORY ${CMAKE_CURRENT_LIST_DIR}/src/skepu3
+install(
+	DIRECTORY
+		${CMAKE_CURRENT_LIST_DIR}/src/skepu3
+		${CMAKE_CURRENT_LIST_DIR}/src/skepu-lib
 	DESTINATION include)
 install(FILES ${CMAKE_CURRENT_LIST_DIR}/src/skepu
 	DESTINATION include)

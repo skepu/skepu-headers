@@ -336,9 +336,7 @@ public:
 	{
 		// if no StarPU filter is applied
 		if(!m_current_filter)
-			return (pos / m_part_size) == cluster::mpi_size() -1
-				? m_size - pos
-				: m_part_size - (pos % m_part_size);
+			return std::min(m_part_size - (pos % m_part_size), m_size - pos);
 
 		auto block_pos = pos % m_part_size;
 		auto & filter = m_filters.at(m_current_filter);
