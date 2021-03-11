@@ -36,7 +36,7 @@ TEST_CASE("Inclusive scan")
 	int const first_val = 1;
 	skepu::Vector<int> v(N);
 	skepu::Vector<int> res(N);
-	v.randomize<int>(0, 100);
+	v.randomize(0, 100);
 	v.flush();
 	v(0) = first_val;
 
@@ -81,7 +81,7 @@ TEST_CASE("Exclusive scan")
 	auto const N = size_t(10*skepu::cluster::mpi_size());
 	skepu::Vector<int> v(N);
 	skepu::Vector<int> res(N);
-	v.randomize<int>(0,98);
+	v.randomize(0,98);
 	if(N > 10)
 	{
 		v.flush();
@@ -154,7 +154,7 @@ TEST_CASE("Inclusive prefix sum")
 	int const first_val = 1;
 	skepu::Vector<int> v(N);
 	skepu::Vector<int> res(N);
-	v.randomize<int>(0, 100);
+	v.randomize(0, 100);
 	v.flush();
 	v(0) = first_val;
 
@@ -202,7 +202,7 @@ TEST_CASE("Exclusive prefix sum")
 	int const first_val = 1;
 	skepu::Vector<int> v(N);
 	skepu::Vector<int> res(N);
-	v.randomize<int>(0, 100);
+	v.randomize(0, 100);
 	v.flush();
 	v(0) = first_val;
 

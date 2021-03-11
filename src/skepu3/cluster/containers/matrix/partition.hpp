@@ -2,7 +2,8 @@
 #ifndef SKEPU_STARPU_MATRIX_PARTITION_HPP
 #define SKEPU_STARPU_MATRIX_PARTITION_HPP 1
 
-#include "../partition.hpp"
+#include <skepu3/cluster/common.hpp>
+#include <skepu3/cluster/containers/partition.hpp>
 
 namespace skepu {
 namespace util {
@@ -106,7 +107,50 @@ public:
 	}
 
 	auto
-	handle_for_row(size_t row)
+	block_count_row(size_t row) const noexcept
+	-> size_t
+	{
+		if(!base::m_current_filter)
+			return std::min(m_part_rows - (row % m_part_rows), m_rows - row);
+
+		std::cerr << "[SkePU][matrix_partition][block_count_row] "
+			"Using partitioned partitions is not supported with this function.\n";
+		std::abort();
+	}
+
+	auto
+	block_offset_row(size_t row) const noexcept
+	-> size_t
+	{
+		if(!base::m_current_filter)
+			return (row % m_part_rows) * m_cols;
+
+		std::cerr << "[SkePU][matrix_partition][block_offset_row] "
+			"Using partitioned partitions is not supported with this function.\n";
+		std::abort();
+	}
+
+	/* TODO: Fix flip dim bugs
+	 * - Remove the filters. They won't work anyways after the dim is flipped.
+	 * - Set sizes
+	 * - Update all the StarPU handles
+	 */
+	auto
+	flip_dim() noexcept
+	-> void
+	{
+		std::swap(m_rows, m_cols);
+	}
+
+	auto
+	getParent() noexcept
+	-> matrix_partition &
+	{
+		return *this;
+	}
+
+	auto
+	handle_for_row(size_t row) noexcept
 	-> starpu_data_handle_t
 	{
 		// Refer to base::handle_for for comments regarding implementation.
@@ -131,18 +175,15 @@ public:
 	}
 
 	auto
-	flip_dim() noexcept
-	-> void
+	index(size_t pos) const noexcept
+	-> Index2D
 	{
-		std::swap(m_rows, m_cols);
+		Index2D idx;
+		idx.row = pos / m_cols;
+		idx.col = pos - (idx.row * m_cols);
+		return idx;
 	}
 
-	auto
-	getParent() noexcept
-	-> matrix_partition &
-	{
-		return *this;
-	}
 
 	auto
 	rows() const noexcept
@@ -159,28 +200,28 @@ public:
 	}
 
 	auto
-	size_i() noexcept
+	size_i() const noexcept
 	-> size_t
 	{
 		return m_rows;
 	}
 
 	auto
-	size_j() noexcept
+	size_j() const noexcept
 	-> size_t
 	{
 		return m_cols;
 	}
 
 	auto
-	size_k() noexcept
+	size_k() const noexcept
 	-> size_t
 	{
 		return 0;
 	}
 
 	auto
-	size_l() noexcept
+	size_l() const noexcept
 	-> size_t
 	{
 		return 0;

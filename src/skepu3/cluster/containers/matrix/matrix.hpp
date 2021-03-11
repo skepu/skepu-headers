@@ -2,6 +2,7 @@
 #ifndef SKEPU_STARPU_MATRIX_HPP
 #define SKEPU_STARPU_MATRIX_HPP 1
 
+#include <iomanip>
 #include <iostream>
 
 #include "../../common.hpp"
@@ -290,9 +291,8 @@ public:
 		return m_data(row,col);
 	}
 
-	template<typename BackendSpec>
 	auto
-	transpose(BackendSpec const &)
+	transpose(BackendSpec const & = BackendSpec("CPU"))
 	-> Matrix &
 	{
 		partition_type tmp(m_data.cols(), m_data.rows());
@@ -302,11 +302,10 @@ public:
 		return *this;
 	}
 
-	template<typename U>
 	auto
 	randomize(
-		U const & min = 0,
-		U const & max = std::numeric_limits<U>::max()) noexcept
+		T const & min = 0,
+		T const & max = std::numeric_limits<T>::max()) noexcept
 	-> void
 	{
 		m_data.randomize(min, max);
@@ -338,13 +337,24 @@ auto inline
 operator<<(std::ostream & os, Matrix<T> const & m)
 -> std::ostream &
 {
-	os << "Matrix (" << m.size_i() << "," << m.size_j() << ")\n";
+	os << "skepu::Matrix (" << m.size_i() << "," << m.size_j() << ")\n";
+	std::vector<int> w(m.size_j(), 0);
+	for(int i(0); i < m.size_i(); ++i)
+	{
+		for(int j(0); j < m.size_j(); ++j)
+		{
+			std::stringstream ss;
+			ss << m(i,j);
+			w[j] =
+				std::max<int>(ss.str().size(), w[j]);
+		}
+	}
 
 	for(size_t i(0); i < m.size_i(); ++i)
 	{
-		os << m(i,0);
+		os << std::setw(w[0]) << m(i,0);
 		for(size_t j(1); j < m.size_j(); ++j)
-			os << ", " << m(i, j);
+			os << ", " << std::setw(w[j]) << m(i, j);
 		os << "\n";
 	}
 

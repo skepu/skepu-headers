@@ -84,6 +84,7 @@ public:
 	operator()(size_t i, size_t j, size_t k) noexcept
 	-> T &
 	{
+		base::m_part_valid = false;
 		return base::operator()((i * m_size_jk) + (j * m_size_k) + k);
 	}
 
@@ -95,10 +96,34 @@ public:
 	}
 
 	auto
+	block_count_i(size_t i_pos) const noexcept
+	-> size_t
+	{
+		return
+			std::min(
+				m_part_i - (i_pos % m_part_i),
+				m_size_i - i_pos);
+	}
+
+	auto
+	block_offset_i(size_t i_pos) const noexcept
+	-> size_t
+	{
+		return (i_pos % m_part_i) * m_size_jk;
+	}
+
+	auto
 	getParent() noexcept
 	-> tensor3_partition &
 	{
 		return *this;
+	}
+
+	auto
+	handle_for_i(size_t i_pos) noexcept
+	-> starpu_data_handle_t
+	{
+		return base::m_handles[i_pos / m_part_i];
 	}
 
 	auto
@@ -142,6 +167,13 @@ public:
 		return 0;
 	}
 
+	auto
+	stride_i() const noexcept
+	-> size_t
+	{
+		return m_size_jk;
+	}
+
 	using base::operator();
 	using base::allgather;
 	using base::block_count_from;
@@ -157,6 +189,7 @@ public:
 	using base::min_filter_parts;
 	using base::num_parts;
 	using base::partition;
+	using base::randomize;
 	using base::scatter_from_root;
 	using base::set;
 	using base::size;

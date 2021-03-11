@@ -134,8 +134,7 @@ template<
 		typename CUDAReduceKernel,
 		typename CLKernel>
 class MapPairsReduce
-: public SkeletonBase,
-	private cluster::skeleton_task<
+: private cluster::skeleton_task<
 		_starpu::map_pairs_reduce_rowwise<MapFunc, ReduceFunc>,
 		typename cluster::result_tuple<typename MapFunc::Ret>::type,
 		typename MapFunc::ElwiseArgs,

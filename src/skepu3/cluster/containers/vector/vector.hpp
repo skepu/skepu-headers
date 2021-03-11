@@ -347,11 +347,11 @@ public:
 	}
 
 	/* Utility functions */
-	template<typename U>
+
 	auto
 	randomize(
-		U const & min = 0,
-		U const & max = std::numeric_limits<U>::max()) noexcept
+		T const & min = 0,
+		T const & max = std::numeric_limits<T>::max()) noexcept
 	-> void
 	{
 		m_data.randomize(min, max);
@@ -394,7 +394,7 @@ auto inline
 operator<<(std::ostream & os, Vector<T> const & v)
 -> std::ostream &
 {
-	os << "Vector of size " << v.size() << "\n";
+	os << "skepu::Vector (" << v.size() << ")\n";
 	os << v(0);
 	for(int i(1); i < v.size(); ++i)
 		os << ", " << v(i);

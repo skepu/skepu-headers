@@ -17,9 +17,10 @@ namespace skepu {
 				internal_state() {
 					starpu_conf_init(&conf);
 					conf.sched_policy_name = "peager";
-					if(conf.ncpus > 1)
+					if(conf.reserve_ncpus == -1)
+						conf.reserve_ncpus = 0;
+					if(conf.ncpus - conf.reserve_ncpus > 1)
 					{
-						conf.reserve_ncpus = 1;
 						conf.single_combined_worker = 1;
 					}
 					// Not using starpu_mpi_init_conf because that makes

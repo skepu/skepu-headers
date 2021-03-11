@@ -372,8 +372,8 @@ protected:
 		{
 		case ReduceMode::ColWise:
 		{
-			auto argt = arg;
-			argt.transpose(0);
+			auto argt = Matrix(arg.size_j(), arg.size_i());
+			cont::getParent(arg).transpose_to(cont::getParent(argt));
 			STARPU(res, argt);
 			break;
 		}

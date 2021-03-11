@@ -236,15 +236,20 @@ private:
 		CallArgs && ... args) noexcept
 	-> void
 	{
-		auto constexpr static pt = typename MapFunc::ProxyTags{};
+		auto constexpr static proxy_tags = typename MapFunc::ProxyTags{};
 		auto static constexpr cbai = make_pack_indices<2>::type{};
+
+		// Since attribute maybe_unsed is not available until C++17, we use this
+		// trick instead to get rid of the unused variable warnings for proxy_tags.
+		if(sizeof proxy_tags)
+			;
 
 		// The proxy elements require the data to be gathered on all nodes.
 		// Except for MatRow, which will be partitioned.
 		pack_expand((
 			skeleton_task::handle_container_arg(
 				cont::getParent(get<AI>(args...)),
-				std::get<PI>(pt)),0)...);
+				std::get<PI>(proxy_tags)),0)...);
 
 		// The result will be partitioned.
 		pack_expand(
@@ -263,14 +268,14 @@ private:
 				cont::getParent(get<EI>(args...)).min_filter_parts()...,
 				cluster::min_filter_parts_container_arg(
 					cont::getParent(get<AI>(args...)),
-					std::get<PI>(pt))...});
+					std::get<PI>(proxy_tags))...});
 
 		pack_expand(
 			(cont::getParent(get<OI>(args...)).filter(filter_parts), 0)...,
 			(cont::getParent(get<EI>(args...)).filter(filter_parts), 0)...,
 			(cluster::filter(
 				cont::getParent(get<AI>(args...)),
-				std::get<PI>(pt),
+				std::get<PI>(proxy_tags),
 				filter_parts), 0)...);
 
 		while(begin != end)
@@ -288,7 +293,7 @@ private:
 					cont::getParent(get<EI>(args...)).handle_for(pos)...,
 					skeleton_task::container_handle(
 						cont::getParent(get<AI>(args...)),
-						std::get<PI>(pt),
+						std::get<PI>(proxy_tags),
 						pos)...);
 			auto call_back_args = std::make_tuple(begin, task_count);
 

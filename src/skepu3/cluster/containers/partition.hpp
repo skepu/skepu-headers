@@ -544,6 +544,13 @@ public:
 	}
 
 	auto
+	part_offset(size_t pos) noexcept
+	-> size_t
+	{
+		return pos % m_part_size;
+	}
+
+	auto
 	partition() noexcept
 	-> void
 	{
@@ -698,8 +705,6 @@ private:
 	{
 		if(m_data)
 		{
-			starpu_data_acquire(m_data_handle, STARPU_RW);
-			starpu_data_release(m_data_handle);
 			starpu_data_unregister_no_coherency(m_data_handle);
 			delete[] m_data;
 			m_data = 0;

@@ -269,7 +269,7 @@ TEST_CASE("Matrix transpose.")
 	}
 	skepu::Matrix<int> mt(m);
 
-	REQUIRE_NOTHROW(mt.transpose(0));
+	REQUIRE_NOTHROW(mt.transpose());
 
 	for(size_t i(0); i < N; ++i)
 		for(size_t j(0); j < N; ++j)

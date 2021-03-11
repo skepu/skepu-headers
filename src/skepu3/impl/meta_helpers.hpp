@@ -182,7 +182,7 @@ namespace future_std
 {
 	template <size_t... S>
 	using index_sequence = pack_indices<S...>;
-	
+
 	template <size_t Ep>
 	using make_index_sequence = make_pack_indices<Ep>;
 }
@@ -217,13 +217,13 @@ template<template<class> class Pred, template <class...> class Variadic, class T
 struct filter<Pred, Variadic, T, Ts...>
 {
 	template<class, class> struct Cons;
-	
+
 	template<class Head, class... Tail>
 	struct Cons<Head, Variadic<Tail...> >
 	{
 		using type = Variadic<Head, Tail...>;
 	};
-		
+
 	using rest = typename filter<Pred, Variadic, Ts...>::type;
 	using type = typename std::conditional<Pred<T>::value, typename Cons<T, rest>::type, rest>::type;
 };
@@ -319,24 +319,32 @@ inline void pack_expand(Parms...)
 //
 // While waiting for C++17 fold expressions...
 
-inline bool conjunction()
+auto inline constexpr
+conjunction() noexcept
+-> bool
 {
 	return true;
 }
 
 template<typename First, typename... Rest>
-inline bool conjunction(First&& first, Rest&&... rest)
+auto inline constexpr
+conjunction(First&& first, Rest&&... rest)
+-> bool
 {
 	return first && conjunction(rest...);
 }
 
-inline bool disjunction()
+auto inline constexpr
+disjunction()
+-> bool
 {
 	return false;
 }
 
 template<typename First, typename... Rest>
-inline bool disjunction(First&& first, Rest&&... rest)
+auto inline constexpr
+disjunction(First&& first, Rest&&... rest)
+-> bool
 {
 	return first || disjunction(rest...);
 }
@@ -423,7 +431,7 @@ struct select_if<false, T, F> { using type = F; };
 template<size_t Index, typename T>
 auto get_or_return(T &&arg) -> decltype(arg)
 {
-	return std::forward<T>(arg); 
+	return std::forward<T>(arg);
 }
 
 template<size_t Index, typename... Args>

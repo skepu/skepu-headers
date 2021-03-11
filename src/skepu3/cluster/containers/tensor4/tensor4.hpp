@@ -2,6 +2,9 @@
 #ifndef SKEPU_STARPU_TENSOR4_HPP
 #define SKEPU_STARPU_TENSOR4_HPP 1
 
+#include <iomanip>
+#include <string>
+
 #include "../tensor3/iterator.hpp"
 #include "proxy.hpp"
 #include "partition.hpp"
@@ -306,13 +309,13 @@ public:
 		m_partition.allgather();
 	}
 
-	/* Utility functions */
 	auto
-	randomize(int /* n */, int /* x */)
+	randomize(
+		T const & lower = 0,
+		T const & upper = std::numeric_limits<T>::max()) noexcept
 	-> void
 	{
-		throw std::logic_error{std::string(__PRETTY_FUNCTION__)
-			+ " Not implemented yet!\n"};
+		m_partition.randomize(lower, upper);
 	}
 
 	auto
@@ -351,6 +354,91 @@ private:
 
 template<typename T>
 struct is_skepu_tensor4<Tensor4<T>> : public std::true_type {};
+
+template<typename T>
+auto inline
+operator<<(std::ostream & os, skepu::Tensor4<T> const & t) noexcept
+-> std::ostream &
+{
+	if(cluster::mpi_rank())
+		return os;
+
+	std::cout << "skepu::Tensor4 "
+		<< "(" << t.size_i()
+		<< "," << t.size_j()
+		<< "," << t.size_k()
+		<< "," << t.size_l()
+		<< ") i\\j(k,l)\n";
+
+	std::vector<int> w(t.size_j() * t.size_l(), 0);
+	for(int i(0); i < t.size_i(); ++i)
+	{
+		for(int j(0); j < t.size_j(); ++j)
+		{
+			auto offset = j * t.size_l();
+			for(int k(0); k < t.size_k(); ++k)
+				for(int l(0); l < t.size_l(); ++l)
+				{
+					std::stringstream ss;
+					ss << t(i,j,k,l);
+					w[offset +l] =
+						std::max<int>(ss.str().size(), w[offset + l]);
+				}
+		}
+	}
+
+	auto last_i = t.size_i() -1;
+	for(size_t i(0); i < last_i; ++i)
+	{
+		for(size_t k(0); k < t.size_k(); ++k)
+		{
+			auto last_j = t.size_j() -1;
+			for(size_t j(0); j < last_j; ++j)
+			{
+				auto offset = j * t.size_l();
+				std::cout << std::setw(w[offset+0]) << t(i,j,k,0);
+				for(size_t l(1); l < t.size_l(); ++l)
+				{
+					std::cout << ", " << std::setw(w[offset+l]) << t(i,j,k,l);
+				}
+				std::cout << "    ";
+			}
+			auto offset = (t.size_j() -1) * t.size_l();
+			std::cout << std::setw(w[offset+0]) << t(i,last_j,k,0);
+			for(size_t l(1); l < t.size_l(); ++l)
+			{
+				std::cout << ", " << std::setw(w[offset+l]) << t(i,last_j,k,l);
+			}
+			std::cout << "\n";
+		}
+		std::cout << "\n";
+	}
+
+	auto last_k = t.size_k() -1;
+	for(size_t k(0); k < t.size_k(); ++k)
+	{
+		auto last_j = t.size_j() -1;
+		for(size_t j(0); j < last_j; ++j)
+		{
+			auto offset = j * t.size_l();
+			std::cout << std::setw(w[offset+0]) << t(last_i,j,k,0);
+			for(size_t l(1); l < t.size_l(); ++l)
+			{
+				std::cout << ", " << std::setw(w[offset+l]) << t(last_i,j,k,l);
+			}
+			std::cout << "    ";
+		}
+		auto offset = (t.size_j() -1) * t.size_l();
+		std::cout << std::setw(w[offset+0]) << t(last_i,last_j,k,0);
+		for(size_t l(1); l < t.size_l(); ++l)
+		{
+			std::cout << ", " << std::setw(w[offset+l]) << t(last_i,last_j,k,l);
+		}
+		std::cout << "\n";
+	}
+
+	return os;
+}
 
 } // namespace skepu
 

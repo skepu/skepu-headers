@@ -244,6 +244,14 @@ private:
 			std::get<CBAI>(cbargs)...,
 			std::get<UI>(uniform_args)...);
 
+		// Since attribute maybe_unsed is not available until C++17, we use this
+		// trick instead to get rid of the unused variable warnings for cbargs and
+		// uniform_args.
+		if(sizeof cbargs)
+			;
+		if(sizeof uniform_args)
+			;
+
 		typedef decltype(
 				std::make_tuple(
 					typename std::add_pointer<
@@ -318,6 +326,14 @@ private:
 			args,
 			std::get<CBAI>(cbargs)...,
 			std::get<UI>(uniform_args)...);
+
+		// Since attribute maybe_unsed is not available until C++17, we use this
+		// trick instead to get rid of the unused variable warnings for cbargs and
+		// uniform_args.
+		if(sizeof cbargs)
+			;
+		if(sizeof uniform_args)
+			;
 
 		typedef decltype(std::tuple_cat(
 				std::make_tuple(
