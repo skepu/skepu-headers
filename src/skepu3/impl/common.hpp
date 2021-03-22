@@ -20,6 +20,57 @@
 #include <cstdbool>
 #include <iomanip>
 
+
+namespace skepu_variadic_return
+{
+	template <typename T>
+	struct is_tuple_impl : std::false_type {};
+
+	template <typename... U>
+	struct is_tuple_impl<std::tuple <U...>> : std::true_type {};
+	
+	template <typename T>
+	struct is_tuple : is_tuple_impl<typename std::decay<T>::type> {};
+
+	template<typename ... Out, typename ... Res>
+	inline void bind(std::tuple<Out...> &&out, std::tuple<Res...> res) noexcept
+	{
+		out = res;
+	}
+
+	template<typename Out, typename Res, REQUIRES(!is_tuple<Res>::value)>
+	inline void bind(std::tuple<Out> &&out, Res && res) noexcept
+	{
+		std::get<0>(out) = res;
+	}
+
+	template<typename...Ts>
+	auto my_make_tuple(std::tuple<Ts...> &arg) -> std::tuple<Ts...>&
+	{
+		return arg;
+	}
+
+	template<typename T>
+	std::tuple<T&> my_make_tuple(T &&arg)
+	{
+		return std::tie(arg);
+	}
+}
+
+#ifndef SKEPU_VARIADIC_RETURN_IMPL
+#define SKEPU_VARIADIC_RETURN_IMPL 2
+#endif
+
+#if SKEPU_VARIADIC_RETURN_IMPL == 0
+#define SKEPU_VARIADIC_RETURN(lhs, rhs) std::tie(lhs) = (rhs);
+#elif SKEPU_VARIADIC_RETURN_IMPL == 1
+#define SKEPU_VARIADIC_RETURN(lhs, rhs) skepu_variadic_return::bind(std::tie(lhs), (rhs));
+#else
+#define SKEPU_VARIADIC_RETURN(lhs, rhs) std::tie(lhs) = skepu_variadic_return::my_make_tuple(rhs);
+#endif
+
+
+
 namespace skepu
 {
 	constexpr bool no_dealloc = false;
@@ -433,22 +484,22 @@ namespace skepu
 
 	inline std::tuple<size_t> size_info(index_dimension<skepu::Index1D>, size_t i, size_t, size_t, size_t)
 	{
-		return {i};
+		return std::tuple<size_t>{i};
 	}
 
 	inline std::tuple<size_t, size_t> size_info(index_dimension<skepu::Index2D>, size_t i, size_t j, size_t, size_t)
 	{
-		return {i, j};
+		return std::tuple<size_t, size_t>{i, j};
 	}
 
 	inline std::tuple<size_t, size_t, size_t> size_info(index_dimension<skepu::Index3D>, size_t i, size_t j, size_t k, size_t)
 	{
-		return {i, j, k};
+		return std::tuple<size_t, size_t, size_t>{i, j, k};
 	}
 
 	inline std::tuple<size_t, size_t, size_t, size_t> size_info(index_dimension<skepu::Index4D>, size_t i, size_t j, size_t k, size_t l)
 	{
-		return {i, j, k, l};
+		return std::tuple<size_t, size_t, size_t, size_t>{i, j, k, l};
 	}
 
 	template<typename Index, typename... Args>

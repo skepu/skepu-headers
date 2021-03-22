@@ -14,20 +14,20 @@ namespace skepu
 			DEBUG_TEXT_LEVEL1("CPU Map: size = " << size);
 			
 			// Sync with device data
-			pack_expand((get<EI, CallArgs...>(args...).getParent().updateHost(), 0)...);
-			pack_expand((get<AI, CallArgs...>(args...).getParent().updateHost(hasReadAccess(MapFunc::anyAccessMode[AI-arity-outArity])), 0)...);
-			pack_expand((get<AI, CallArgs...>(args...).getParent().invalidateDeviceData(hasWriteAccess(MapFunc::anyAccessMode[AI-arity-outArity])), 0)...);
-			pack_expand((get<OI, CallArgs...>(args...).getParent().invalidateDeviceData(), 0)...);
+			pack_expand((get<EI>(args...).getParent().updateHost(), 0)...);
+			pack_expand((get<AI>(args...).getParent().updateHost(hasReadAccess(MapFunc::anyAccessMode[AI-arity-outArity])), 0)...);
+			pack_expand((get<AI>(args...).getParent().invalidateDeviceData(hasWriteAccess(MapFunc::anyAccessMode[AI-arity-outArity])), 0)...);
+			pack_expand((get<OI>(args...).getParent().invalidateDeviceData(), 0)...);
 			
 			for (size_t i = 0; i < size; ++i)
 			{
-				auto index = (std::get<0>(std::make_tuple(get<OI, CallArgs...>(args...).begin()...)) + i).getIndex();
+				auto index = (std::get<0>(std::make_tuple(get<OI>(args...).begin()...)) + i).getIndex();
 				auto res = F::forward(MapFunc::CPU, index,
-					get<EI, CallArgs...>(args...)(i)..., 
-					get<AI, CallArgs...>(args...).hostProxy(std::get<AI-arity-outArity>(typename MapFunc::ProxyTags{}), index)...,
-					get<CI, CallArgs...>(args...)...
+					get<EI>(args...)(i)..., 
+					get<AI>(args...).hostProxy(std::get<AI-arity-outArity>(typename MapFunc::ProxyTags{}), index)...,
+					get<CI>(args...)...
 				);
-				std::tie(get<OI, CallArgs...>(args...)(i)...) = res;
+				SKEPU_VARIADIC_RETURN(get<OI>(args...)(i)..., res);
 			}
 		}
 	}

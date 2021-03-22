@@ -73,7 +73,7 @@ namespace skepu
 						std::get<HEI-Varity-OutArity>(HelwiseIterators)(j)...,
 						get<AI>(args...).hostProxy(typename pack_element<AI-OutArity+(indexed ? 1 : 0), typename proxy_tag<Args>::type...>::type{}, index)...,
 						get<CI>(args...)...);
-					std::tie(std::get<OI>(out)(i, j)...) = res;
+					SKEPU_VARIADIC_RETURN(std::get<OI>(out)(i, j)..., res);
 				}
 			}
 			

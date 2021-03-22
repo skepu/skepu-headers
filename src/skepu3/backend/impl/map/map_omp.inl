@@ -33,7 +33,7 @@ namespace skepu
 					get<AI, CallArgs...>(args...).hostProxy(std::get<AI-arity-outArity>(proxy_tags), index)...,
 					get<CI, CallArgs...>(args...)...
 				);
-				std::tie(get<OI, CallArgs...>(args...)(i)...) = res;
+				SKEPU_VARIADIC_RETURN(get<OI>(args...)(i)..., res);
 			}
 		}
 	}

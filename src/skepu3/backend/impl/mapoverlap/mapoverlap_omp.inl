@@ -62,7 +62,7 @@ namespace skepu
 			{
 				auto res = F::forward(MapOverlapFunc::OMP, Index1D{i}, Region1D<T>{overlap, stride, &start[i + overlap]},
 						get<AI, CallArgs...>(args...).hostProxy()..., get<CI, CallArgs...>(args...)...);
-				std::tie(get<OI>(args...)(i)...) = res;
+				SKEPU_VARIADIC_RETURN(get<OI>(args...)(i)..., res);
 			}
 				
 #pragma omp parallel for schedule(runtime)
@@ -70,14 +70,14 @@ namespace skepu
 			{
 				auto res = F::forward(MapOverlapFunc::OMP, Index1D{i}, Region1D<T>{overlap, stride, &arg(i)},
 					get<AI, CallArgs...>(args...).hostProxy()..., get<CI, CallArgs...>(args...)...);
-				std::tie(get<OI>(args...)(i)...) = res;
+				SKEPU_VARIADIC_RETURN(get<OI>(args...)(i)..., res);
 			}
 				
 			for (size_t i = size - overlap; i < size; ++i)
 			{
 				auto res = F::forward(MapOverlapFunc::OMP, Index1D{i}, Region1D<T>{overlap, stride, &end[i + 2 * overlap - size]},
 					get<AI, CallArgs...>(args...).hostProxy()..., get<CI, CallArgs...>(args...)...);
-				std::tie(get<OI>(args...)(i)...) = res;
+				SKEPU_VARIADIC_RETURN(get<OI>(args...)(i)..., res);
 			}
 		}
 		
@@ -143,20 +143,20 @@ namespace skepu
 				for (size_t i = 0; i < overlap; ++i)
 				{
 					auto res = F::forward(MapOverlapFunc::OMP, Index1D{i}, Region1D<T>{overlap, stride, &start[i + overlap]}, get<AI, CallArgs...>(args...).hostProxy()..., get<CI, CallArgs...>(args...)...);
-					std::tie(get<OI>(args...)(row, i)...) = res;
+					SKEPU_VARIADIC_RETURN(get<OI>(args...)(row, i)..., res);
 				}
 					
 #pragma omp parallel for schedule(runtime)
 				for (size_t i = overlap; i < rowWidth - overlap; ++i)
 				{
 					auto res = F::forward(MapOverlapFunc::OMP, Index1D{i}, Region1D<T>{overlap, stride, &inputBegin[i]}, get<AI, CallArgs...>(args...).hostProxy()..., get<CI, CallArgs...>(args...)...);
-					std::tie(get<OI>(args...)(row, i)...) = res;
+					SKEPU_VARIADIC_RETURN(get<OI>(args...)(row, i)..., res);
 				}
 					
 				for (size_t i = rowWidth - overlap; i < rowWidth; ++i)
 				{
 					auto res = F::forward(MapOverlapFunc::OMP, Index1D{i}, Region1D<T>{overlap, stride, &end[i + 2 * overlap - rowWidth]}, get<AI, CallArgs...>(args...).hostProxy()..., get<CI, CallArgs...>(args...)...);
-					std::tie(get<OI>(args...)(row, i)...) = res;
+					SKEPU_VARIADIC_RETURN(get<OI>(args...)(row, i)..., res);
 				}
 				
 				inputBegin += rowWidth;
@@ -227,7 +227,7 @@ namespace skepu
 				{
 					auto res = F::forward(MapOverlapFunc::OMP, Index1D{i}, Region1D<T>{overlap, 1, &start[i + overlap]},
 						get<AI, CallArgs...>(args...).hostProxy()..., get<CI, CallArgs...>(args...)...);
-					std::tie(get<OI>(args...)(i, col)...) = res;
+					SKEPU_VARIADIC_RETURN(get<OI>(args...)(i, col)..., res);
 				}
 					
 #pragma omp parallel for schedule(runtime)
@@ -235,14 +235,14 @@ namespace skepu
 				{
 					auto res = F::forward(MapOverlapFunc::OMP, Index1D{i}, Region1D<T>{overlap, stride, &inputBegin[i*stride]},
 						get<AI, CallArgs...>(args...).hostProxy()..., get<CI, CallArgs...>(args...)...);
-					std::tie(get<OI>(args...)(i, col)...) = res;
+					SKEPU_VARIADIC_RETURN(get<OI>(args...)(i, col)..., res);
 				}
 					
 				for (size_t i = colWidth - overlap; i < colWidth; ++i)
 				{
 					auto res = F::forward(MapOverlapFunc::OMP, Index1D{i}, Region1D<T>{overlap, 1, &end[i + 2 * overlap - colWidth]},
 						get<AI, CallArgs...>(args...).hostProxy()..., get<CI, CallArgs...>(args...)...);
-					std::tie(get<OI>(args...)(i, col)...) = res;
+					SKEPU_VARIADIC_RETURN(get<OI>(args...)(i, col)..., res);
 				}
 				
 				inputBegin += 1;
@@ -271,7 +271,7 @@ namespace skepu
 				{
 					region.idx = (this->m_edge != Edge::None) ? Index2D{i,j} : Index2D{i + this->m_overlap_y, j + this->m_overlap_x};
 					auto res = F::forward(MapOverlapFunc::OMP, Index2D{i,j}, region, get<AI>(args...).hostProxy()..., get<CI>(args...)...);
-					std::tie(get<OI>(args...)(i, j)...) = res;
+					SKEPU_VARIADIC_RETURN(get<OI>(args...)(i, j)..., res);
 				}
 		}
 		
@@ -297,7 +297,7 @@ namespace skepu
 						{
 							region.idx = (this->m_edge != Edge::None) ? Index3D{i,j,k} : Index3D{i + this->m_overlap_i, j + this->m_overlap_j, k + this->m_overlap_k};
 							auto res = F::forward(MapOverlapFunc::OMP, Index3D{i,j,k}, region, get<AI>(args...).hostProxy()..., get<CI>(args...)...);
-							std::tie(get<OI>(args...)(i, j, k)...) = res;
+							SKEPU_VARIADIC_RETURN(get<OI>(args...)(i, j, k)..., res);
 						}
 		}
 		
@@ -327,7 +327,7 @@ namespace skepu
 						{
 							region.idx = (this->m_edge != Edge::None) ? Index4D{i,j,k,l} : Index4D{i + this->m_overlap_i, j + this->m_overlap_j, k + this->m_overlap_k, l + this->m_overlap_l};
 							auto res = F::forward(MapOverlapFunc::OMP, Index4D{i,j,k,l}, region, get<AI>(args...).hostProxy()..., get<CI>(args...)...);
-							std::tie(get<OI>(args...)(i, j, k, l)...) = res;
+							SKEPU_VARIADIC_RETURN(get<OI>(args...)(i, j, k, l)..., res);
 						}
 		}
 		

@@ -30,7 +30,7 @@ namespace skepu
 						get<HEI, CallArgs...>(args...)(j)...,
 						get<AI, CallArgs...>(args...).hostProxy(std::get<AI-Varity-Harity-outArity>(typename MapPairsFunc::ProxyTags{}), index)...,
 						get<CI, CallArgs...>(args...)...);
-					std::tie(get<OI, CallArgs...>(args...)(i, j)...) = res;
+					SKEPU_VARIADIC_RETURN(get<OI>(args...)(i, j)..., res);
 				}
 			}
 		}
