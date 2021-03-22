@@ -30,7 +30,8 @@ namespace skepu
 		class MapOverlap1D: public SkeletonBase
 		{
 			using Ret = typename MapOverlapFunc::Ret;
-			using T = typename region_type<typename parameter_type<0, decltype(&MapOverlapFunc::CPU)>::type>::type;
+			using T = typename region_type<typename parameter_type<(MapOverlapFunc::indexed ? 1 : 0), decltype(&MapOverlapFunc::CPU)>::type>::type;
+			using F = ConditionalIndexForwarder<MapOverlapFunc::indexed, decltype(&MapOverlapFunc::CPU)>;
 			
 		public:
 			
@@ -40,6 +41,16 @@ namespace skepu
 			using ContainerArgs = typename MapOverlapFunc::ContainerArgs;
 			using UniformArgs = typename MapOverlapFunc::UniformArgs;
 			static constexpr bool prefers_matrix = false;
+			
+			static constexpr size_t arity = 1;
+			static constexpr size_t outArity = MapOverlapFunc::outArity;
+			static constexpr size_t numArgs = MapOverlapFunc::totalArity - (MapOverlapFunc::indexed ? 1 : 0) + outArity;
+			static constexpr size_t anyArity = std::tuple_size<typename MapOverlapFunc::ContainerArgs>::value;
+			
+			static constexpr typename make_pack_indices<outArity, 0>::type out_indices{};
+			static constexpr typename make_pack_indices<arity + outArity, outArity>::type elwise_indices{};
+			static constexpr typename make_pack_indices<arity + anyArity + outArity, arity + outArity>::type any_indices{};
+			static constexpr typename make_pack_indices<numArgs, arity + anyArity + outArity>::type const_indices{};
 			
 			MapOverlap1D(CUDAKernel kernel, C2 k2, C3 k3, C4 k4)
 			: m_cuda_kernel(kernel), m_cuda_rowwise_kernel(k2), m_cuda_colwise_kernel(k3), m_cuda_colwise_multi_kernel(k4)
@@ -96,26 +107,26 @@ namespace skepu
 		   
 		
 		private:
-			template<template<class> class Container, size_t... AnyIndx, size_t... ConstIndx, typename... CallArgs>
-			void vector_CPU(Container<Ret>& res, Container<T>& arg, pack_indices<AnyIndx...>, pack_indices<ConstIndx...>, CallArgs&&... args);
+			template<size_t... OI, size_t... EI, size_t... AI, size_t... CI, typename... CallArgs>
+			void vector_CPU(pack_indices<OI...>, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args);
 			
-			template<size_t... AnyIndx, size_t... ConstIndx, typename... CallArgs>
-			void rowwise_CPU(Matrix<Ret>& res, Matrix<T>& arg, pack_indices<AnyIndx...>, pack_indices<ConstIndx...>, CallArgs&&... args);
+			template<size_t... OI, size_t... EI, size_t... AI, size_t... CI, typename... CallArgs>
+			void rowwise_CPU(pack_indices<OI...>, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args);
 			
-			template<size_t... AnyIndx, size_t... ConstIndx, typename... CallArgs>
-			void colwise_CPU(Matrix<Ret>& res, Matrix<T>& arg, pack_indices<AnyIndx...>, pack_indices<ConstIndx...>, CallArgs&&... args);
+			template<size_t... OI, size_t... EI, size_t... AI, size_t... CI, typename... CallArgs>
+			void colwise_CPU(pack_indices<OI...>, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args);
 		   
 		
 #ifdef SKEPU_OPENMP
 		private:
-			template<template<class> class Container, size_t... AnyIndx, size_t... ConstIndx, typename... CallArgs>
-			void vector_OpenMP(Container<Ret>& res, Container<T>& arg, pack_indices<AnyIndx...>, pack_indices<ConstIndx...>, CallArgs&&... args);
+			template<size_t... OI, size_t... EI, size_t... AI, size_t... CI, typename... CallArgs>
+			void vector_OpenMP(pack_indices<OI...>, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args);
 			
-			template<size_t... AnyIndx, size_t... ConstIndx, typename... CallArgs>
-			void rowwise_OpenMP(Matrix<Ret>& res, Matrix<T>& arg, pack_indices<AnyIndx...>, pack_indices<ConstIndx...>, CallArgs&&... args);
+			template<size_t... OI, size_t... EI, size_t... AI, size_t... CI, typename... CallArgs>
+			void rowwise_OpenMP(pack_indices<OI...>, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args);
 			
-			template<size_t... AnyIndx, size_t... ConstIndx, typename... CallArgs>
-			void colwise_OpenMP(Matrix<Ret>& res, Matrix<T>& arg, pack_indices<AnyIndx...>, pack_indices<ConstIndx...>, CallArgs&&... args);
+			template<size_t... OI, size_t... EI, size_t... AI, size_t... CI, typename... CallArgs>
+			void colwise_OpenMP(pack_indices<OI...>, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args);
 		
 #endif
 		
@@ -124,34 +135,34 @@ namespace skepu
 		   
 		
 		private:
-			template<template<class> class Container, size_t... AI, size_t... CI, typename... CallArgs>
-			void mapOverlapSingleThread_CU(size_t deviceID, size_t startIdx, Container<Ret>& res, Container<T>& arg, pack_indices<AI...> ai, pack_indices<CI...> ci, CallArgs&&... args);
+			template<size_t... OI, size_t... EI, size_t... AI, size_t... CI, typename... CallArgs>
+			void mapOverlapSingleThread_CU(size_t deviceID, size_t startIdx, pack_indices<OI...>, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args);
 			
-			template<template<class> class Container, size_t... AI, size_t... CI, typename... CallArgs>
-			void mapOverlapNumDevices_CU(size_t numDevices, size_t startIdx, Container<Ret>& res, Container<T>& arg, pack_indices<AI...> ai, pack_indices<CI...> ci, CallArgs&&... args);
+			template<size_t... OI, size_t... EI, size_t... AI, size_t... CI, typename... CallArgs>
+			void mapOverlapNumDevices_CU(size_t numDevices, size_t startIdx, pack_indices<OI...>, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args);
 			
-			template<template<class> class Container, size_t... AI, size_t... CI, typename... CallArgs>
-			void vector_CUDA(size_t startIdx, Container<Ret>& res, Container<T>& arg, pack_indices<AI...> ai, pack_indices<CI...> ci, CallArgs&&... args);
-			
-			
-			template<size_t... AI, size_t... CI, typename... CallArgs>
-			void mapOverlapSingleThread_CU_Col(size_t deviceID, size_t numcols, Matrix<Ret>& res, Matrix<T>& arg, pack_indices<AI...> ai, pack_indices<CI...> ci, CallArgs&&... args);
-			
-			template<size_t... AI, size_t... CI, typename... CallArgs>
-			void mapOverlapMultiThread_CU_Col(size_t numDevices, size_t numcols, Matrix<Ret>& res, Matrix<T>& arg, pack_indices<AI...> ai, pack_indices<CI...> ci, CallArgs&&... args);
-			
-			template<size_t... AI, size_t... CI, typename... CallArgs>
-			void colwise_CUDA(size_t numcols, Matrix<Ret>& res, Matrix<T>& arg, pack_indices<AI...> ai, pack_indices<CI...> ci, CallArgs&&... args);
+			template<size_t... OI, size_t... EI, size_t... AI, size_t... CI, typename... CallArgs>
+			void vector_CUDA(size_t startIdx, pack_indices<OI...>, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args);
 			
 			
-			template<size_t... AI, size_t... CI, typename... CallArgs>
-			void mapOverlapSingleThread_CU_Row(size_t deviceID, size_t numrows, Matrix<Ret>& res, Matrix<T>& arg, pack_indices<AI...> ai, pack_indices<CI...> ci, CallArgs&&... args);
+			template<size_t... OI, size_t... EI, size_t... AI, size_t... CI, typename... CallArgs>
+			void mapOverlapSingleThread_CU_Col(size_t deviceID, size_t numcols, pack_indices<OI...>, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args);
 			
-			template<size_t... AI, size_t... CI, typename... CallArgs>
-			void mapOverlapMultiThread_CU_Row(size_t numDevices, size_t numrows, Matrix<Ret>& res, Matrix<T>& arg, pack_indices<AI...> ai, pack_indices<CI...> ci, CallArgs&&... args);
+			template<size_t... OI, size_t... EI, size_t... AI, size_t... CI, typename... CallArgs>
+			void mapOverlapMultiThread_CU_Col(size_t numDevices, size_t numcols, pack_indices<OI...>, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args);
 			
-			template<size_t... AI, size_t... CI, typename... CallArgs>
-			void rowwise_CUDA(size_t numrows, Matrix<Ret>& res, Matrix<T>& arg, pack_indices<AI...> ai, pack_indices<CI...> ci, CallArgs&&... args);
+			template<size_t... OI, size_t... EI, size_t... AI, size_t... CI, typename... CallArgs>
+			void colwise_CUDA(size_t numcols, pack_indices<OI...>, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args);
+			
+			
+			template<size_t... OI, size_t... EI, size_t... AI, size_t... CI, typename... CallArgs>
+			void mapOverlapSingleThread_CU_Row(size_t deviceID, size_t numrows, pack_indices<OI...>, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args);
+			
+			template<size_t... OI, size_t... EI, size_t... AI, size_t... CI, typename... CallArgs>
+			void mapOverlapMultiThread_CU_Row(size_t numDevices, size_t numrows, pack_indices<OI...>, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args);
+			
+			template<size_t... OI, size_t... EI, size_t... AI, size_t... CI, typename... CallArgs>
+			void rowwise_CUDA(size_t numrows, pack_indices<OI...>, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args);
 			
 			template <typename T>
 			size_t getThreadNumber_CU(size_t width, size_t &numThreads, size_t deviceID);
@@ -163,33 +174,33 @@ namespace skepu
 		
 #ifdef SKEPU_OPENCL
 		private:
-			template<template<class> class Container, size_t... AnyIndx, size_t... ConstIndx, typename... CallArgs>
-			void vector_OpenCL(size_t startIdx, Container<Ret>& res, Container<T>& arg, pack_indices<AnyIndx...>, pack_indices<ConstIndx...>, CallArgs&&... args);
+			template<size_t... OI, size_t... EI, size_t... AI, size_t... CI, typename... CallArgs>
+			void vector_OpenCL(size_t startIdx, pack_indices<OI...>, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args);
 			
-			template<size_t... AnyIndx, size_t... ConstIndx, typename... CallArgs>
-			void rowwise_OpenCL(size_t numrows, Matrix<Ret>& res, Matrix<T>& arg, pack_indices<AnyIndx...>, pack_indices<ConstIndx...>, CallArgs&&... args);
+			template<size_t... OI, size_t... EI, size_t... AI, size_t... CI, typename... CallArgs>
+			void rowwise_OpenCL(size_t numrows, pack_indices<OI...>, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args);
 			
-			template<size_t... AnyIndx, size_t... ConstIndx, typename... CallArgs>
-			void colwise_OpenCL(size_t numcols, Matrix<Ret>& res, Matrix<T>& arg, pack_indices<AnyIndx...>, pack_indices<ConstIndx...>, CallArgs&&... args);
+			template<size_t... OI, size_t... EI, size_t... AI, size_t... CI, typename... CallArgs>
+			void colwise_OpenCL(size_t numcols, pack_indices<OI...>, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args);
 		
 			
-			template<template<class> class Container, size_t... AI, size_t... CI, typename... CallArgs>
-			void mapOverlapSingle_CL(size_t deviceID, size_t startIdx, Container<Ret>& res, Container<T>& arg, pack_indices<AI...> ai, pack_indices<CI...> ci, CallArgs&&... args);
+			template<size_t... OI, size_t... EI, size_t... AI, size_t... CI, typename... CallArgs>
+			void mapOverlapSingle_CL(size_t deviceID, size_t startIdx, pack_indices<OI...>, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args);
 			
-			template<template<class> class Container, size_t... AnyIndx, size_t... ConstIndx, typename... CallArgs>
-			void mapOverlapNumDevices_CL(size_t numDevices, size_t startIdx, Container<Ret>& res, Container<T>& arg, pack_indices<AnyIndx...> ai, pack_indices<ConstIndx...> ci, CallArgs&&... args);
+			template<size_t... OI, size_t... EI, size_t... AI, size_t... CI, typename... CallArgs>
+			void mapOverlapNumDevices_CL(size_t numDevices, size_t startIdx, pack_indices<OI...>, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args);
 			
-			template<size_t... AI, size_t... CI, typename... CallArgs>
-			void mapOverlapSingle_CL_Row(size_t deviceID, size_t numrows, Matrix<Ret>& res, Matrix<T>& arg, pack_indices<AI...> ai, pack_indices<CI...> ci, CallArgs&&... args);
+			template<size_t... OI, size_t... EI, size_t... AI, size_t... CI, typename... CallArgs>
+			void mapOverlapSingle_CL_Row(size_t deviceID, size_t numrows, pack_indices<OI...>, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args);
 			
-			template<size_t... AI, size_t... CI, typename... CallArgs>
-			void mapOverlapSingle_CL_RowMulti(size_t numDevices, size_t numrows, Matrix<Ret>& res, Matrix<T>& arg, pack_indices<AI...> ai, pack_indices<CI...> ci, CallArgs&&... args);
+			template<size_t... OI, size_t... EI, size_t... AI, size_t... CI, typename... CallArgs>
+			void mapOverlapSingle_CL_RowMulti(size_t numDevices, size_t numrows, pack_indices<OI...>, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args);
 			
-			template<size_t... AI, size_t... CI, typename... CallArgs>
-			void mapOverlapSingle_CL_Col(size_t deviceID, size_t numcols, Matrix<Ret>& res, Matrix<T>& arg, pack_indices<AI...> ai, pack_indices<CI...> ci, CallArgs&&... args);
+			template<size_t... OI, size_t... EI, size_t... AI, size_t... CI, typename... CallArgs>
+			void mapOverlapSingle_CL_Col(size_t deviceID, size_t numcols, pack_indices<OI...>, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args);
 			
-			template<size_t... AI, size_t... CI, typename... CallArgs>
-			void mapOverlapSingle_CL_ColMulti(size_t numDevices, size_t numcols, Matrix<Ret>& res, Matrix<T>& arg, pack_indices<AI...> ai, pack_indices<CI...> ci, CallArgs&&... args);
+			template<size_t... OI, size_t... EI, size_t... AI, size_t... CI, typename... CallArgs>
+			void mapOverlapSingle_CL_ColMulti(size_t numDevices, size_t numcols, pack_indices<OI...>, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args);
 			
 			
 			template<typename T>
@@ -204,171 +215,131 @@ namespace skepu
 		
 #ifdef SKEPU_HYBRID
 		private:
-			template<template<class> class Container, size_t... AnyIndx, size_t... ConstIndx, typename... CallArgs>
-			void vector_Hybrid(Container<Ret>& res, Container<T>& arg, pack_indices<AnyIndx...>, pack_indices<ConstIndx...>, CallArgs&&... args);
+			template<size_t... OI, size_t... EI, size_t... AI, size_t... CI, typename... CallArgs>
+			void vector_Hybrid(pack_indices<OI...>, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args);
 			
-			template<size_t... AnyIndx, size_t... ConstIndx, typename... CallArgs>
-			void rowwise_Hybrid(Matrix<Ret>& res, Matrix<T>& arg, pack_indices<AnyIndx...>, pack_indices<ConstIndx...>, CallArgs&&... args);
+			template<size_t... OI, size_t... EI, size_t... AI, size_t... CI, typename... CallArgs>
+			void rowwise_Hybrid(pack_indices<OI...>, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args);
 			
-			template<size_t... AnyIndx, size_t... ConstIndx, typename... CallArgs>
-			void colwise_Hybrid(Matrix<Ret>& res, Matrix<T>& arg, pack_indices<AnyIndx...>, pack_indices<ConstIndx...>, CallArgs&&... args);
+			template<size_t... OI, size_t... EI, size_t... AI, size_t... CI, typename... CallArgs>
+			void colwise_Hybrid(pack_indices<OI...>, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args);
 		
 #endif
 		
 		public:
-			template<template<class> class Container, typename... CallArgs>
-			Container<Ret> &operator()(Container<Ret> &res, Container<T> &arg, CallArgs&&... args)
+			template<size_t... OI, size_t... EI, size_t... AI, size_t... CI, typename... CallArgs,
+				REQUIRES(is_skepu_vector<typename std::remove_reference<typename pack_element<0, CallArgs...>::type>::type>::value)>
+			auto backendDispatch(pack_indices<OI...>, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args) -> decltype(get<0>(args...))
 			{
-				static constexpr size_t anyCont = std::tuple_size<typename MapOverlapFunc::ContainerArgs>::value;
-				typename make_pack_indices<anyCont, 0>::type any_indices;
-				typename make_pack_indices<sizeof...(CallArgs), anyCont>::type const_indices;
+				auto &res = get<0>(args...);
+				auto size = get<outArity>(args...).size();
 				
-				this->selectBackend(arg.size());
+				// Verify overlap radius is valid
+				if (this->m_edge != Edge::None && size < this->m_overlap * 2)
+					SKEPU_ERROR("Non-matching overlap radius");
+				
+				if (disjunction(get<OI>(args...).size() < size...))
+					SKEPU_ERROR("Non-matching output container sizes");
+					
+				if (this->m_edge != Edge::None && disjunction(get<EI>(args...).size() != size...))
+					SKEPU_ERROR("Non-matching input container sizes");
+				
+				if (this->m_edge == Edge::None && disjunction(get<EI>(args...).size() - this->m_overlap*2 != size...))
+					SKEPU_ERROR("Non-matching input container sizes");
+				
+				
+				this->selectBackend(size);
 					
 				switch (this->m_selected_spec->activateBackend())
 				{
 				case Backend::Type::Hybrid:
 #ifdef SKEPU_HYBRID
-					this->vector_Hybrid(res, arg, any_indices, const_indices, std::forward<CallArgs>(args)...);
+					this->vector_Hybrid(out_indices, elwise_indices, any_indices, const_indices, std::forward<CallArgs>(args)...);
 					break;
 #endif
 				case Backend::Type::CUDA:
 #ifdef SKEPU_CUDA
-					this->vector_CUDA(0, res, arg, any_indices, const_indices, std::forward<CallArgs>(args)...);
+					this->vector_CUDA(0, out_indices, elwise_indices, any_indices, const_indices, std::forward<CallArgs>(args)...);
 					break;
 #endif
 				case Backend::Type::OpenCL:
 #ifdef SKEPU_OPENCL
-					this->vector_OpenCL(0, res, arg, any_indices, const_indices, std::forward<CallArgs>(args)...);
+					this->vector_OpenCL(0, out_indices, elwise_indices, any_indices, const_indices, std::forward<CallArgs>(args)...);
 					break;
 #endif
 				case Backend::Type::OpenMP:
 #ifdef SKEPU_OPENMP
-					this->vector_OpenMP(res, arg, any_indices, const_indices, std::forward<CallArgs>(args)...);
+					this->vector_OpenMP(out_indices, elwise_indices, any_indices, const_indices, std::forward<CallArgs>(args)...);
 					break;
 #endif
 				default:
-					this->vector_CPU(res, arg, any_indices, const_indices, std::forward<CallArgs>(args)...);
+					this->vector_CPU(out_indices, elwise_indices, any_indices, const_indices, std::forward<CallArgs>(args)...);
 					break;
 				}
 				
-				return res;
+				return get<0>(args...);
 			}
 			
-			template<typename... CallArgs>
-			Matrix<Ret> &operator()(Matrix<Ret> &res, Matrix<T> &arg, CallArgs&&... args)
+			template<size_t... OI, size_t... EI, size_t... AI, size_t... CI, typename... CallArgs,
+				REQUIRES(is_skepu_matrix<typename std::remove_reference<typename pack_element<0, CallArgs...>::type>::type>::value)>
+			auto backendDispatch(pack_indices<OI...>, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args) -> decltype(get<0>(args...))
 			{
-				if (arg.total_rows() != res.total_rows() || arg.total_cols() != res.total_cols())
-					SKEPU_ERROR("MapOverlap 1D: Non-matching container sizes");
+				size_t size_i = get<0>(args...).size_i();
+				size_t size_j = get<0>(args...).size_j();
 				
-				static constexpr size_t anyCont = std::tuple_size<typename MapOverlapFunc::ContainerArgs>::value;
-				typename make_pack_indices<anyCont, 0>::type any_indices;
-				typename make_pack_indices<sizeof...(CallArgs), anyCont>::type const_indices;
-				
-				this->selectBackend(arg.size());
-				
-				size_t numrows = arg.total_rows();
-				size_t numcols = arg.total_cols();
+				if (disjunction(
+					(get<OI>(args...).size_i() < size_i) &&
+					(get<OI>(args...).size_j() < size_j) ...))
+					SKEPU_ERROR("Non-matching output container sizes");
 					
+				if (this->m_edge != Edge::None && disjunction(
+					(get<EI>(args...).size_i() != size_i) &&
+					(get<EI>(args...).size_j() != size_j) ...))
+					SKEPU_ERROR("Non-matching input container sizes");
+				
+				if (this->m_edge == Edge::None && disjunction(
+					(get<EI>(args...).size_i() - this->m_overlap*2 != size_i) &&
+					(get<EI>(args...).size_j() - this->m_overlap*2 != size_j) ...))
+					SKEPU_ERROR("Non-matching input container sizes");
+					
+				// Verify overlap radius is valid
+				if (this->m_overlapPolicy == Overlap::RowWise && this->m_edge != Edge::None && size_j < this->m_overlap * 2)
+					SKEPU_ERROR("Non-matching overlap radius");
+				
+				// Verify overlap radius is valid
+				if (this->m_overlapPolicy == Overlap::ColWise && this->m_edge != Edge::None && size_i < this->m_overlap * 2)
+					SKEPU_ERROR("Non-matching overlap radius");
+				
+				
+				this->selectBackend(get<outArity>(args...).size());
+				
 				switch (this->m_overlapPolicy)
-				{
-					case Overlap::RowColWise: {
-						Matrix<Ret> tmp(res.total_rows(), res.total_cols());
-						switch (this->m_selected_spec->activateBackend())
-						{
-						case Backend::Type::Hybrid:
-#ifdef SKEPU_HYBRID
-							this->rowwise_Hybrid(tmp, arg, any_indices, const_indices, std::forward<CallArgs>(args)...);
-							this->colwise_Hybrid(res, tmp, any_indices, const_indices, std::forward<CallArgs>(args)...);
-							break;
-#endif
-						case Backend::Type::CUDA:
-#ifdef SKEPU_CUDA
-							this->rowwise_CUDA(numrows, tmp, arg, any_indices, const_indices, std::forward<CallArgs>(args)...);
-							this->colwise_CUDA(numcols, res, tmp, any_indices, const_indices, std::forward<CallArgs>(args)...);
-							break;
-#endif
-						case Backend::Type::OpenCL:
-#ifdef SKEPU_OPENCL
-							this->rowwise_OpenCL(numrows, tmp, arg, any_indices, const_indices, std::forward<CallArgs>(args)...);
-							this->colwise_OpenCL(numcols, res, tmp, any_indices, const_indices, std::forward<CallArgs>(args)...);
-							break;
-#endif
-						case Backend::Type::OpenMP:
-#ifdef SKEPU_OPENMP
-							this->rowwise_OpenMP(tmp, arg, any_indices, const_indices, std::forward<CallArgs>(args)...);
-							this->colwise_OpenMP(res, tmp, any_indices, const_indices, std::forward<CallArgs>(args)...);
-							break;
-#endif
-						default:
-							this->rowwise_CPU(tmp, arg, any_indices, const_indices, std::forward<CallArgs>(args)...);
-							this->colwise_CPU(res, tmp, any_indices, const_indices, std::forward<CallArgs>(args)...);
-							break;
-						}
-						break;
-					}
-					
-					case Overlap::ColRowWise: {
-						Matrix<Ret> tmp(res.total_rows(), res.total_cols());
-						switch (this->m_selected_spec->activateBackend())
-						{
-						case Backend::Type::Hybrid:
-#ifdef SKEPU_HYBRID
-							this->colwise_Hybrid(tmp, arg, any_indices, const_indices, std::forward<CallArgs>(args)...);
-							this->rowwise_Hybrid(res, tmp, any_indices, const_indices, std::forward<CallArgs>(args)...);
-							break;
-#endif
-						case Backend::Type::CUDA:
-#ifdef SKEPU_CUDA
-							this->colwise_CUDA(numcols, tmp, arg, any_indices, const_indices, std::forward<CallArgs>(args)...);
-							this->rowwise_CUDA(numrows, res, tmp, any_indices, const_indices, std::forward<CallArgs>(args)...);
-							break;
-#endif
-						case Backend::Type::OpenCL:
-#ifdef SKEPU_OPENCL
-							this->colwise_OpenCL(numcols, tmp, arg, any_indices, const_indices, std::forward<CallArgs>(args)...);
-							this->rowwise_OpenCL(numrows, res, tmp, any_indices, const_indices, std::forward<CallArgs>(args)...);
-							break;
-#endif
-						case Backend::Type::OpenMP:
-#ifdef SKEPU_OPENMP
-							this->colwise_OpenMP(tmp, arg, any_indices, const_indices, std::forward<CallArgs>(args)...);
-							this->rowwise_OpenMP(res, tmp, any_indices, const_indices, std::forward<CallArgs>(args)...);
-							break;
-#endif
-						default:
-							this->colwise_CPU(tmp, arg, any_indices, const_indices, std::forward<CallArgs>(args)...);
-							this->rowwise_CPU(res, tmp, any_indices, const_indices, std::forward<CallArgs>(args)...);
-							break;
-						}
-						break;
-					}
-					
+				{	
 					case Overlap::ColWise:
 						switch (this->m_selected_spec->activateBackend())
 						{
 						case Backend::Type::Hybrid:
 #ifdef SKEPU_HYBRID
-							this->colwise_Hybrid(res, arg, any_indices, const_indices, std::forward<CallArgs>(args)...);
+							this->colwise_Hybrid(out_indices, elwise_indices, any_indices, const_indices, std::forward<CallArgs>(args)...);
 							break;
 #endif
 						case Backend::Type::CUDA:
 #ifdef SKEPU_CUDA
-							this->colwise_CUDA(numcols, res, arg, any_indices, const_indices, std::forward<CallArgs>(args)...);
+							this->colwise_CUDA(size_j, out_indices, elwise_indices, any_indices, const_indices, std::forward<CallArgs>(args)...);
 							break;
 #endif
 						case Backend::Type::OpenCL:
 #ifdef SKEPU_OPENCL
-							this->colwise_OpenCL(numcols, res, arg, any_indices, const_indices, std::forward<CallArgs>(args)...);
+							this->colwise_OpenCL(size_j, out_indices, elwise_indices, any_indices, const_indices, std::forward<CallArgs>(args)...);
 							break;
 #endif
 						case Backend::Type::OpenMP:
 #ifdef SKEPU_OPENMP
-							this->colwise_OpenMP(res, arg, any_indices, const_indices, std::forward<CallArgs>(args)...);
+							this->colwise_OpenMP(out_indices, elwise_indices, any_indices, const_indices, std::forward<CallArgs>(args)...);
 							break;
 #endif
 						default:
-							this->colwise_CPU(res, arg, any_indices, const_indices, std::forward<CallArgs>(args)...);
+							this->colwise_CPU(out_indices, elwise_indices, any_indices, const_indices, std::forward<CallArgs>(args)...);
 							break;
 						}
 						break;
@@ -378,26 +349,26 @@ namespace skepu
 						{
 						case Backend::Type::Hybrid:
 #ifdef SKEPU_HYBRID
-							this->rowwise_Hybrid(res, arg, any_indices, const_indices, std::forward<CallArgs>(args)...);
+							this->rowwise_Hybrid(out_indices, elwise_indices, any_indices, const_indices, std::forward<CallArgs>(args)...);
 							break;
 #endif
 						case Backend::Type::CUDA:
 #ifdef SKEPU_CUDA
-							this->rowwise_CUDA(numrows, res, arg, any_indices, const_indices, std::forward<CallArgs>(args)...);
+							this->rowwise_CUDA(size_i, out_indices, elwise_indices, any_indices, const_indices, std::forward<CallArgs>(args)...);
 							break;
 #endif
 						case Backend::Type::OpenCL:
 #ifdef SKEPU_OPENCL
-							this->rowwise_OpenCL(numrows, res, arg, any_indices, const_indices, std::forward<CallArgs>(args)...);
+							this->rowwise_OpenCL(size_i, out_indices, elwise_indices, any_indices, const_indices, std::forward<CallArgs>(args)...);
 							break;
 #endif
 						case Backend::Type::OpenMP:
 #ifdef SKEPU_OPENMP
-							this->rowwise_OpenMP(res, arg, any_indices, const_indices, std::forward<CallArgs>(args)...);
+							this->rowwise_OpenMP(out_indices, elwise_indices, any_indices, const_indices, std::forward<CallArgs>(args)...);
 							break;
 #endif
 						default:
-							this->rowwise_CPU(res, arg, any_indices, const_indices, std::forward<CallArgs>(args)...);
+							this->rowwise_CPU(out_indices, elwise_indices, any_indices, const_indices, std::forward<CallArgs>(args)...);
 							break;
 						}
 						break;
@@ -406,9 +377,18 @@ namespace skepu
 						SKEPU_ERROR("MapOverlap: Invalid overlap mode");
 				}
 				
-				return res;
+				return get<0>(args...);
+			}
+			
+			template<typename... CallArgs>
+			auto operator()(CallArgs&&... args) -> decltype(get<0>(args...))
+			{
+				return this->backendDispatch(out_indices, elwise_indices, any_indices, const_indices, std::forward<CallArgs>(args)...);
 			}
 		};
+		
+		
+		
 		
 		
 		template<typename MapOverlapFunc, typename CUDAKernel, typename CLKernel>

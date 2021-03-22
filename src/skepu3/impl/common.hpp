@@ -115,7 +115,7 @@ namespace skepu
 
 	enum class Overlap
 	{
-		RowWise, ColWise, RowColWise, ColRowWise
+		RowWise, ColWise
 	};
 
 	enum class AccessMode

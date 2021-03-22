@@ -14,15 +14,16 @@ namespace skepu
 		 *  Performs the MapOverlap on a range of elements using \em OpenMP as backend and a seperate output range.
 		 */
 		template<typename MapOverlapFunc, typename CUDAKernel, typename C2, typename C3, typename C4, typename CLKernel>
-		template<template<class> class Container, size_t... AI, size_t... CI, typename... CallArgs>
+		template<size_t... OI, size_t... EI, size_t... AI, size_t... CI, typename... CallArgs>
 		void MapOverlap1D<MapOverlapFunc, CUDAKernel, C2, C3, C4, CLKernel>
-		::vector_OpenMP(Container<Ret>& res, Container<T>& arg, pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args)
+		::vector_OpenMP(pack_indices<OI...>, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args)
 		{
+			auto &arg = get<outArity>(args...);
 			// Sync with device data
 			arg.updateHost();
-			pack_expand((get<AI, CallArgs...>(args...).getParent().updateHost(hasReadAccess(MapOverlapFunc::anyAccessMode[AI])), 0)...);
-			pack_expand((get<AI, CallArgs...>(args...).getParent().invalidateDeviceData(hasWriteAccess(MapOverlapFunc::anyAccessMode[AI])), 0)...);
-			res.invalidateDeviceData();
+			pack_expand((get<AI, CallArgs...>(args...).getParent().updateHost(hasReadAccess(MapOverlapFunc::anyAccessMode[AI-arity-outArity])), 0)...);
+			pack_expand((get<AI, CallArgs...>(args...).getParent().invalidateDeviceData(hasWriteAccess(MapOverlapFunc::anyAccessMode[AI-arity-outArity])), 0)...);
+			pack_expand((get<OI, CallArgs...>(args...).getParent().invalidateDeviceData(), 0)...);
 			
 			const int overlap = (int)this->m_overlap;
 			const size_t size = arg.size();
@@ -58,17 +59,26 @@ namespace skepu
 				end[i] = arg(j + size - 2*overlap);
 			
 			for (size_t i = 0; i < overlap; ++i)
-				res(i) = MapOverlapFunc::OMP({overlap, stride, &start[i + overlap]},
+			{
+				auto res = F::forward(MapOverlapFunc::OMP, Index1D{i}, Region1D<T>{overlap, stride, &start[i + overlap]},
 						get<AI, CallArgs...>(args...).hostProxy()..., get<CI, CallArgs...>(args...)...);
+				std::tie(get<OI>(args...)(i)...) = res;
+			}
 				
 #pragma omp parallel for schedule(runtime)
 			for (size_t i = overlap; i < size - overlap; ++i)
-				res(i) = MapOverlapFunc::OMP({overlap, stride, &arg(i)},
+			{
+				auto res = F::forward(MapOverlapFunc::OMP, Index1D{i}, Region1D<T>{overlap, stride, &arg(i)},
 					get<AI, CallArgs...>(args...).hostProxy()..., get<CI, CallArgs...>(args...)...);
+				std::tie(get<OI>(args...)(i)...) = res;
+			}
 				
 			for (size_t i = size - overlap; i < size; ++i)
-				res(i) = MapOverlapFunc::OMP({overlap, stride, &end[i + 2 * overlap - size]},
+			{
+				auto res = F::forward(MapOverlapFunc::OMP, Index1D{i}, Region1D<T>{overlap, stride, &end[i + 2 * overlap - size]},
 					get<AI, CallArgs...>(args...).hostProxy()..., get<CI, CallArgs...>(args...)...);
+				std::tie(get<OI>(args...)(i)...) = res;
+			}
 		}
 		
 		
@@ -77,15 +87,16 @@ namespace skepu
 		 *  Used internally by other methods to apply row-wise mapoverlap operation.
 		 */
 		template<typename MapOverlapFunc, typename CUDAKernel, typename C2, typename C3, typename C4, typename CLKernel>
-		template<size_t... AI, size_t... CI, typename... CallArgs>
+		template<size_t... OI, size_t... EI, size_t... AI, size_t... CI, typename... CallArgs>
 		void MapOverlap1D<MapOverlapFunc, CUDAKernel, C2, C3, C4, CLKernel>
-		::rowwise_OpenMP(skepu::Matrix<Ret>& res, skepu::Matrix<T>& arg, pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args)
+		::rowwise_OpenMP(pack_indices<OI...>, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args)
 		{
+			auto &arg = get<outArity>(args...);
 			// Sync with device data
 			arg.updateHost();
-			pack_expand((get<AI, CallArgs...>(args...).getParent().updateHost(hasReadAccess(MapOverlapFunc::anyAccessMode[AI])), 0)...);
-			pack_expand((get<AI, CallArgs...>(args...).getParent().invalidateDeviceData(hasWriteAccess(MapOverlapFunc::anyAccessMode[AI])), 0)...);
-			res.invalidateDeviceData();
+			pack_expand((get<AI, CallArgs...>(args...).getParent().updateHost(hasReadAccess(MapOverlapFunc::anyAccessMode[AI-arity-outArity])), 0)...);
+			pack_expand((get<AI, CallArgs...>(args...).getParent().invalidateDeviceData(hasWriteAccess(MapOverlapFunc::anyAccessMode[AI-arity-outArity])), 0)...);
+			pack_expand((get<OI, CallArgs...>(args...).getParent().invalidateDeviceData(), 0)...);
 			
 			int overlap = (int)this->m_overlap;
 			size_t size = arg.size();
@@ -94,9 +105,8 @@ namespace skepu
 			size_t rowWidth = arg.total_cols();
 			size_t stride = 1;
 			
-			const Ret *inputBegin = arg.getAddress();
-			const Ret *inputEnd = inputBegin + size;
-			Ret *out = res.getAddress();
+			const T *inputBegin = arg.getAddress();
+			const T *inputEnd = inputBegin + size;
 			
 			omp_set_num_threads(this->m_selected_spec->CPUThreads());
 			
@@ -131,17 +141,25 @@ namespace skepu
 					end[i] = inputEnd[j - 2*overlap];
 				
 				for (size_t i = 0; i < overlap; ++i)
-					out[i] = MapOverlapFunc::OMP({overlap, stride, &start[i + overlap]}, get<AI, CallArgs...>(args...).hostProxy()..., get<CI, CallArgs...>(args...)...);
+				{
+					auto res = F::forward(MapOverlapFunc::OMP, Index1D{i}, Region1D<T>{overlap, stride, &start[i + overlap]}, get<AI, CallArgs...>(args...).hostProxy()..., get<CI, CallArgs...>(args...)...);
+					std::tie(get<OI>(args...)(row, i)...) = res;
+				}
 					
 #pragma omp parallel for schedule(runtime)
 				for (size_t i = overlap; i < rowWidth - overlap; ++i)
-					out[i] = MapOverlapFunc::OMP({overlap, stride, &inputBegin[i]}, get<AI, CallArgs...>(args...).hostProxy()..., get<CI, CallArgs...>(args...)...);
+				{
+					auto res = F::forward(MapOverlapFunc::OMP, Index1D{i}, Region1D<T>{overlap, stride, &inputBegin[i]}, get<AI, CallArgs...>(args...).hostProxy()..., get<CI, CallArgs...>(args...)...);
+					std::tie(get<OI>(args...)(row, i)...) = res;
+				}
 					
 				for (size_t i = rowWidth - overlap; i < rowWidth; ++i)
-					out[i] = MapOverlapFunc::OMP({overlap, stride, &end[i + 2 * overlap - rowWidth]}, get<AI, CallArgs...>(args...).hostProxy()..., get<CI, CallArgs...>(args...)...);
+				{
+					auto res = F::forward(MapOverlapFunc::OMP, Index1D{i}, Region1D<T>{overlap, stride, &end[i + 2 * overlap - rowWidth]}, get<AI, CallArgs...>(args...).hostProxy()..., get<CI, CallArgs...>(args...)...);
+					std::tie(get<OI>(args...)(row, i)...) = res;
+				}
 				
 				inputBegin += rowWidth;
-				out += rowWidth;
 			}
 		}
 		
@@ -151,15 +169,16 @@ namespace skepu
 		 *  Used internally by other methods to apply column-wise mapoverlap operation.
 		 */
 		template<typename MapOverlapFunc, typename CUDAKernel, typename C2, typename C3, typename C4, typename CLKernel>
-		template<size_t... AI, size_t... CI, typename... CallArgs>
+		template<size_t... OI, size_t... EI, size_t... AI, size_t... CI, typename... CallArgs>
 		void MapOverlap1D<MapOverlapFunc, CUDAKernel, C2, C3, C4, CLKernel>
-		::colwise_OpenMP(skepu::Matrix<Ret>& res, skepu::Matrix<T>& arg, pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args)
+		::colwise_OpenMP(pack_indices<OI...>, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args)
 		{
+			auto &arg = get<outArity>(args...);
 			// Sync with device data
 			arg.updateHost();
-			pack_expand((get<AI, CallArgs...>(args...).getParent().updateHost(hasReadAccess(MapOverlapFunc::anyAccessMode[AI])), 0)...);
-			pack_expand((get<AI, CallArgs...>(args...).getParent().invalidateDeviceData(hasWriteAccess(MapOverlapFunc::anyAccessMode[AI])), 0)...);
-			res.invalidateDeviceData();
+			pack_expand((get<AI, CallArgs...>(args...).getParent().updateHost(hasReadAccess(MapOverlapFunc::anyAccessMode[AI-arity-outArity])), 0)...);
+			pack_expand((get<AI, CallArgs...>(args...).getParent().invalidateDeviceData(hasWriteAccess(MapOverlapFunc::anyAccessMode[AI-arity-outArity])), 0)...);
+			pack_expand((get<OI, CallArgs...>(args...).getParent().invalidateDeviceData(), 0)...);
 			
 			int overlap = (int)this->m_overlap;
 			size_t size = arg.size();
@@ -169,8 +188,8 @@ namespace skepu
 			size_t colWidth = arg.total_rows();
 			size_t stride = rowWidth;
 			
-			const Ret *inputBegin = arg.getAddress();
-			const Ret *inputEnd = inputBegin + size;
+			const T *inputBegin = arg.getAddress();
+			const T *inputEnd = inputBegin + size;
 			
 			omp_set_num_threads(this->m_selected_spec->CPUThreads());
 			
@@ -205,17 +224,26 @@ namespace skepu
 					end[i] = inputEnd[(j - 2*overlap + 1)*stride];
 				
 				for (size_t i = 0; i < overlap; ++i)
-					res(i * stride + col) = MapOverlapFunc::OMP({overlap, 1, &start[i + overlap]},
+				{
+					auto res = F::forward(MapOverlapFunc::OMP, Index1D{i}, Region1D<T>{overlap, 1, &start[i + overlap]},
 						get<AI, CallArgs...>(args...).hostProxy()..., get<CI, CallArgs...>(args...)...);
+					std::tie(get<OI>(args...)(i, col)...) = res;
+				}
 					
 #pragma omp parallel for schedule(runtime)
 				for (size_t i = overlap; i < colWidth - overlap; ++i)
-					res(i * stride + col) = MapOverlapFunc::OMP({overlap, stride, &inputBegin[i*stride]},
+				{
+					auto res = F::forward(MapOverlapFunc::OMP, Index1D{i}, Region1D<T>{overlap, stride, &inputBegin[i*stride]},
 						get<AI, CallArgs...>(args...).hostProxy()..., get<CI, CallArgs...>(args...)...);
+					std::tie(get<OI>(args...)(i, col)...) = res;
+				}
 					
 				for (size_t i = colWidth - overlap; i < colWidth; ++i)
-					res(i * stride + col) = MapOverlapFunc::OMP({overlap, 1, &end[i + 2 * overlap - colWidth]},
+				{
+					auto res = F::forward(MapOverlapFunc::OMP, Index1D{i}, Region1D<T>{overlap, 1, &end[i + 2 * overlap - colWidth]},
 						get<AI, CallArgs...>(args...).hostProxy()..., get<CI, CallArgs...>(args...)...);
+					std::tie(get<OI>(args...)(i, col)...) = res;
+				}
 				
 				inputBegin += 1;
 			}
@@ -229,8 +257,8 @@ namespace skepu
 		{
 			// Sync with device data
 			pack_expand((get<EI, CallArgs...>(args...).getParent().updateHost(), 0)...);
-			pack_expand((get<AI, CallArgs...>(args...).getParent().updateHost(hasReadAccess(MapOverlapFunc::anyAccessMode[AI])), 0)...);
-			pack_expand((get<AI, CallArgs...>(args...).getParent().invalidateDeviceData(hasWriteAccess(MapOverlapFunc::anyAccessMode[AI])), 0)...);
+			pack_expand((get<AI, CallArgs...>(args...).getParent().updateHost(hasReadAccess(MapOverlapFunc::anyAccessMode[AI-arity-outArity])), 0)...);
+			pack_expand((get<AI, CallArgs...>(args...).getParent().invalidateDeviceData(hasWriteAccess(MapOverlapFunc::anyAccessMode[AI-arity-outArity])), 0)...);
 			pack_expand((get<OI, CallArgs...>(args...).getParent().invalidateDeviceData(), 0)...);
 			
 			auto &arg = get<outArity>(args...);

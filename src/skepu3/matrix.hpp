@@ -260,6 +260,16 @@ namespace skepu
 			return {this->m_rows, this->m_cols};
 		}
 		
+		std::tuple<size_type> row_size_info() const
+		{
+			return {this->m_cols};
+		}
+		
+		std::tuple<size_type> col_size_info() const
+		{
+			return {this->m_rows};
+		}
+		
 		// highly dangerous, use with care.
 		T *getAddress()
 		{
