@@ -82,8 +82,6 @@ namespace skepu
 			// Default initial value is a default-initialized value
 			T m_initial {};
 			
-			
-#pragma mark - Backend agnostic
 		public:
 			
 			template<typename Iterator, typename In>
@@ -140,7 +138,6 @@ namespace skepu
 			}
 			
 			
-#pragma mark - CPU
 			template<typename OutIterator, typename InIterator>
 			void CPU(size_t size, OutIterator res, InIterator arg, ScanMode mode, T initial);
 			

@@ -68,8 +68,6 @@ namespace skepu
 
 			Ret m_start{};
 
-#pragma mark - Backend agnostic
-
 		public:
 			void setStartValue(Ret val)
 			{

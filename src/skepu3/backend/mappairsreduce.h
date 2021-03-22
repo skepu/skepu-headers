@@ -62,7 +62,6 @@ namespace skepu
 			Ret m_start{};
 			ReduceMode m_mode = ReduceMode::RowWise;
 			
-#pragma mark - Backend agnostic
 			
 		public:
 			void setStartValue(Ret val)
