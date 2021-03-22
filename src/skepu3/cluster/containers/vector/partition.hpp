@@ -116,6 +116,7 @@ public:
 	using base::handle_for;
 	using base::make_ext_w;
 	using base::min_filter_parts;
+	using base::num_parts;
 	using base::partition;
 	using base::randomize;
 	using base::scatter_from_root;

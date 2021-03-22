@@ -535,6 +535,15 @@ public:
 	}
 
 	auto
+	num_parts() noexcept
+	-> size_t
+	{
+		if(m_current_filter)
+			return m_current_filter * cluster::mpi_size();
+		return cluster::mpi_size();
+	}
+
+	auto
 	partition() noexcept
 	-> void
 	{

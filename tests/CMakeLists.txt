@@ -27,3 +27,4 @@ add_subdirectory(tensor4)
 # Skeletons
 add_subdirectory(map)
 add_subdirectory(reduce)
+add_subdirectory(scan)

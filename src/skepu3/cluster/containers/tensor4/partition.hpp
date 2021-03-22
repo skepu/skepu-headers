@@ -180,6 +180,7 @@ public:
 	using base::invalidate_local_storage;
 	using base::make_ext_w;
 	using base::min_filter_parts;
+	using base::num_parts;
 	using base::partition;
 	using base::scatter_from_root;
 	using base::set;

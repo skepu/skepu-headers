@@ -41,7 +41,7 @@ template<
 	typename ContainerArgs,
 	typename UniformArgs>
 class skeleton_task
-: public backend::SkeletonBase
+: public virtual backend::SkeletonBase
 {
 	starpu_codelet cl;
 	//starpu_perfmodel perf_model;
@@ -92,7 +92,7 @@ protected:
 
 		starpu_codelet_init(&cl);
 		cl.nbuffers = n_handles;
-		//cl.max_parallelism = INT_MAX;
+		cl.max_parallelism = INT_MAX;
 		cl.type = STARPU_FORKJOIN; // For OpenMP
 		cl.cpu_funcs_name[0] = name;
 
@@ -265,7 +265,7 @@ private:
 			result_handle_indices,
 			elwise_handle_indices,
 			container_handle_indices,
-			std::forward<buffers_type>(containers),
+			containers,
 			std::get<CBAI>(cbargs)...,
 			std::get<UI>(uniform_args)...);
 	}
