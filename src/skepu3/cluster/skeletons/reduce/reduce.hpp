@@ -2,10 +2,10 @@
 #ifndef SKEPU_STARPU_SKELETON_REDUCE_HPP
 #define SKEPU_STARPU_SKELETON_REDUCE_HPP 1
 
-#include <omp.h>
 #include <set>
 #include <vector>
 
+#include <omp.h>
 #include <starpu_mpi.h>
 
 #include <skepu3/cluster/cluster.hpp>

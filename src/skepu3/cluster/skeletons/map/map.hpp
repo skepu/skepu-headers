@@ -2,9 +2,14 @@
 #ifndef SKEPU_CLUSTER_MAP_HPP
 #define SKEPU_CLUSTER_MAP_HPP 1
 
-#include <omp.h>
 #include <tuple>
 #include <starpu_mpi.h>
+
+#include <omp.h>
+
+#ifdef SKEPU_CUDA
+#include <cuda.h>
+#endif // SKEPU_CUDA
 
 #include "../../cluster.hpp"
 #include "../../common.hpp"

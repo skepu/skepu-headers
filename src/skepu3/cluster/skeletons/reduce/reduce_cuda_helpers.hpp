@@ -4,7 +4,9 @@
 
 #include <tuple>
 
+#ifdef SKEPU_CUDA
 #include <cuda.h>
+#endif // SKEPU_CUDA
 
 #include <starpu.h>
 
