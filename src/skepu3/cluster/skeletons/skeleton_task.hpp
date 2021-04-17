@@ -46,9 +46,6 @@ class skeleton_task
 	starpu_codelet cl;
 	//starpu_perfmodel perf_model;
 
-	using HandleT =
-		decltype(std::tuple_cat(ResultArgs{}, ElwiseArgs{}, ContainerArgs{}));
-
 	static constexpr size_t n_result = std::tuple_size<ResultArgs>::value;
 	static constexpr size_t n_elwise = std::tuple_size<ElwiseArgs>::value;
 	static constexpr size_t n_container = std::tuple_size<ContainerArgs>::value;
@@ -247,14 +244,19 @@ private:
 			std::get<CBAI>(cbargs)...,
 			std::get<UI>(uniform_args)...);
 
-		typedef decltype(std::tuple_cat(
+		typedef decltype(
 				std::make_tuple(
 					typename std::add_pointer<
-						decltype(std::get<RI>(ResultArgs{}))>::type{}...),
-				std::make_tuple(
+							typename base_type<
+									typename std::tuple_element<RI, ResultArgs>::type>
+								::type>
+						::type{}...,
 					typename std::add_pointer<
-						decltype(std::get<EI>(ElwiseArgs{}))>::type{}...),
-				ContainerArgs{}))
+							typename base_type<
+									typename std::tuple_element<EI, ElwiseArgs>::type>
+								::type>
+						::type{}...,
+					typename std::tuple_element<CI, ContainerArgs>::type{}...))
 			buffers_type;
 
 		buffers_type containers(

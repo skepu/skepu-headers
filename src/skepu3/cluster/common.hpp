@@ -57,32 +57,38 @@ namespace skepu
 		struct MatRow {};
 	};
 
-Index1D make_index(
+auto inline
+make_index(
 	std::integral_constant<int, 1>,
 	size_t index,
 	size_t,
 	size_t,
 	size_t)
+-> Index1D
 {
 	return Index1D{index};
 }
 
-Index2D make_index(
+auto inline
+make_index(
 	std::integral_constant<int, 2>,
 	size_t index,
 	size_t size_j,
 	size_t,
 	size_t)
+-> Index2D
 {
 	return Index2D{ index / size_j, index % size_j };
 }
 
-Index3D make_index(
+auto inline
+make_index(
 	std::integral_constant<int, 3>,
 	size_t index,
 	size_t size_j,
 	size_t size_k,
 	size_t)
+-> Index3D
 {
 	size_t ci = index / (size_j * size_k);
 	index = index % (size_j * size_k);
@@ -91,12 +97,14 @@ Index3D make_index(
 	return Index3D{ ci, cj, index };
 }
 
-Index4D make_index(
+auto inline
+make_index(
 	std::integral_constant<int, 4>,
 	size_t index,
 	size_t size_j,
 	size_t size_k,
 	size_t size_l)
+-> Index4D
 {
 	size_t ci = index / (size_j * size_k * size_l);
 	index = index % (size_j * size_k * size_l);
@@ -107,22 +115,30 @@ Index4D make_index(
 	return Index4D{ ci, cj, ck, index };
 }
 
-std::ostream & operator<<(std::ostream &o, Index1D idx)
+auto inline
+operator<<(std::ostream &o, Index1D idx)
+-> std::ostream &
 {
 	return o << "Index1D(" << idx.i << ")";
 }
 
-std::ostream & operator<<(std::ostream &o, Index2D idx)
+auto inline
+operator<<(std::ostream &o, Index2D idx)
+-> std::ostream &
 {
 	return o << "Index2D(" << idx.row << ", " << idx.col << ")";
 }
 
-std::ostream & operator<<(std::ostream &o, Index3D idx)
+auto inline
+operator<<(std::ostream &o, Index3D idx)
+-> std::ostream &
 {
 	return o << "Index3D(" << idx.i << ", "  << idx.j << ", " << idx.k << ")";
 }
 
-std::ostream & operator<<(std::ostream &o, Index4D idx)
+auto inline
+operator<<(std::ostream &o, Index4D idx)
+-> std::ostream &
 {
 	return o
 		<< "Index4D("
@@ -509,6 +525,18 @@ struct cont
  			return func(std::forward<CallArgs>(args)...);
  		}
  	};
+
+	template<typename T>
+	struct base_type
+	{
+		typedef T type;
+	};
+
+	template<typename T>
+	struct base_type<T &&>
+	{
+		typedef T type;
+	};
 
 } // namespace skepu
 
