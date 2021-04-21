@@ -83,12 +83,16 @@ namespace skepu {
 		barrier()
 		-> void
 		{
-			starpu_mpi_wait_for_all(MPI_COMM_WORLD);
+			if(starpu_is_initialized())
+			{
+				starpu_mpi_wait_for_all(MPI_COMM_WORLD);
+				starpu_mpi_barrier(MPI_COMM_WORLD);
+			}
 		}
 	}
 
 	inline void wait_for_all_tasks() {
-		if(starpu_task_nsubmitted()) {
+		if(starpu_is_initialized() && starpu_task_nsubmitted()) {
 			starpu_task_wait_for_all();
 		}
 	}
