@@ -4,10 +4,10 @@
 
 #include <skepu3/cluster/cluster.hpp>
 #include <skepu3/cluster/common.hpp>
-#include "../reduce/reduce_mode.hpp"
-#include "../skeleton_base.hpp"
-#include "../skeleton_task.hpp"
-#include "../skeleton_utils.hpp"
+#include "skepu3/cluster/skeletons/reduce/reduce_mode.hpp"
+#include "skepu3/cluster/skeletons/skeleton_base.hpp"
+#include "skepu3/cluster/skeletons/skeleton_task.hpp"
+#include "skepu3/cluster/skeletons/skeleton_utils.hpp"
 
 namespace skepu {
 namespace backend {
@@ -219,6 +219,11 @@ public:
 		m_mode(ReduceMode::RowWise),
 		m_start(Ret())
 	{}
+
+	~MapPairsReduce() noexcept
+	{
+		skepu::cluster::barrier();
+	}
 
 	void setStartValue(Ret val)
 	{

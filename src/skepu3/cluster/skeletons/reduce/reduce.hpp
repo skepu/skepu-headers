@@ -302,6 +302,8 @@ public:
 			starpu_data_unregister_no_coherency(handle);
 		for(auto & handle : m_buffer_handles)
 			starpu_data_unregister_no_coherency(handle);
+
+		skepu::cluster::barrier();
 	}
 
 	auto
@@ -488,6 +490,11 @@ public:
 	Reduce2D(CUDARowWise row_kernel, CUDAColWise col_kernel)
 	: row_reduce(row_kernel), col_reduce(col_kernel)
 	{}
+
+	~Reduce2D()
+	{
+		skepu::cluster::barrier();
+	}
 
 	template<template<typename>class Container,
 		REQUIRES(

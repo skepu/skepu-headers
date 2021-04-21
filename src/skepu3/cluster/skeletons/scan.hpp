@@ -320,6 +320,11 @@ public:
 	{
 	}
 
+	~Scan() noexcept
+	{
+		skepu::cluster::barrier();
+	}
+
 	template<
 		template<typename>class Container,
 		REQUIRES_VALUE(is_skepu_container<Container<T>>)>

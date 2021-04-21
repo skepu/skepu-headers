@@ -11,11 +11,11 @@
 #include <cuda.h>
 #endif // SKEPU_CUDA
 
-#include "../../cluster.hpp"
-#include "../../common.hpp"
-#include "../skeleton_base.hpp"
-#include "../skeleton_task.hpp"
-#include "../skeleton_utils.hpp"
+#include "skepu3/cluster/cluster.hpp"
+#include "skepu3/cluster/common.hpp"
+#include "skepu3/cluster/skeletons/skeleton_base.hpp"
+#include "skepu3/cluster/skeletons/skeleton_task.hpp"
+#include "skepu3/cluster/skeletons/skeleton_utils.hpp"
 
 namespace skepu {
 namespace backend {
@@ -160,6 +160,11 @@ public:
 		#ifdef SKEPU_CUDA
 		starpu::map<MapFunc, CUDAKernel>::cu_kernel = kernel;
 		#endif
+	}
+
+	~Map() noexcept
+	{
+		skepu::cluster::barrier();
 	}
 
 	template<typename... Args>

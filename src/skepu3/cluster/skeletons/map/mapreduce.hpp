@@ -8,9 +8,9 @@
 
 #include <skepu3/cluster/common.hpp>
 #include <skepu3/cluster/cluster.hpp>
-#include "../skeleton_base.hpp"
-#include "../skeleton_task.hpp"
-#include "../skeleton_utils.hpp"
+#include "skepu3/cluster/skeletons/skeleton_base.hpp"
+#include "skepu3/cluster/skeletons/skeleton_task.hpp"
+#include "skepu3/cluster/skeletons/skeleton_utils.hpp"
 
 namespace skepu {
 namespace backend {
@@ -249,6 +249,7 @@ public:
 	{
 		for(auto & handle : m_result_handles)
 			starpu_data_unregister_no_coherency(handle);
+		skepu::cluster::barrier();
 	}
 
 	void setStartValue(Ret val)

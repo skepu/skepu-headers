@@ -4,10 +4,11 @@
 
 #include <omp.h>
 
+#include <skepu3/cluster/cluster.hpp>
 #include <skepu3/cluster/common.hpp>
-#include "../skeleton_base.hpp"
-#include "../skeleton_task.hpp"
-#include "../skeleton_utils.hpp"
+#include "skepu3/cluster/skeletons/skeleton_base.hpp"
+#include "skepu3/cluster/skeletons/skeleton_task.hpp"
+#include "skepu3/cluster/skeletons/skeleton_utils.hpp"
 
 namespace skepu {
 namespace backend {
@@ -180,6 +181,11 @@ public:
 		#ifdef SKEPU_CUDA
 		_starpu::map_pairs<MapPairsFunc, CUDAKernel>::cu_kernel = kernel;
 		#endif
+	}
+
+	~MapPairs() noexcept
+	{
+		skepu::cluster::barrier();
 	}
 
 	template<typename... CallArgs>
