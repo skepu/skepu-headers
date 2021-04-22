@@ -135,7 +135,7 @@ namespace skepu
 			skepu::cluster::barrier();
 			#endif
 
-			auto t1 = std::chrono::high_resolution_clock::now();
+			auto t1 = std::chrono::steady_clock::now();
 			f(std::forward<Args>(args)...);
 
 			/* Make sure that all skeletons that have submitted tasks to StarPU has
@@ -144,7 +144,7 @@ namespace skepu
 			skepu::cluster::barrier();
 			#endif
 
-			auto t2 = std::chrono::high_resolution_clock::now();
+			auto t2 = std::chrono::steady_clock::now();
 			return std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1);
 		}
 
@@ -159,7 +159,7 @@ namespace skepu
 			skepu::cluster::barrier();
 			#endif
 
-			auto t1 = std::chrono::high_resolution_clock::now();
+			auto t1 = std::chrono::steady_clock::now();
 			f(std::forward<Args>(args)...);
 
 			/* Make sure that all skeletons that have submitted tasks to StarPU has
@@ -168,7 +168,7 @@ namespace skepu
 			skepu::cluster::barrier();
 			#endif
 
-			auto t2 = std::chrono::high_resolution_clock::now();
+			auto t2 = std::chrono::steady_clock::now();
 			return std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1);
 		}
 
