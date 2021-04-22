@@ -19,19 +19,22 @@
 #undef __CUDACC__
 #endif
 
+
 #ifdef SKEPU_STARPU_MPI
 
-#include "skepu3/cluster/cluster.hpp"
-#include "skepu3/cluster/external.hpp"
-#include "skepu3/cluster/containers/matrix/matrix.hpp"
-#include "skepu3/cluster/containers/vector/vector.hpp"
-#include "skepu3/cluster/containers/tensor3/tensor3.hpp"
-#include "skepu3/cluster/skeletons/map/map.hpp"
-#include "skepu3/cluster/skeletons/map/mapreduce.hpp"
-#include "skepu3/cluster/skeletons/map/mappairs.hpp"
-#include "skepu3/cluster/skeletons/map/mappairsreduce.hpp"
-#include "skepu3/cluster/skeletons/reduce/reduce.hpp"
-#include "skepu3/cluster/skeletons/scan.hpp"
+#include <skepu3/backend/benchmark.h>
+#include <skepu3/cluster/cluster.hpp>
+#include <skepu3/cluster/external.hpp>
+#include <skepu3/cluster/containers/matrix/matrix.hpp>
+#include <skepu3/cluster/containers/vector/vector.hpp>
+#include <skepu3/cluster/containers/tensor3/tensor3.hpp>
+#include <skepu3/cluster/containers/tensor4/tensor4.hpp>
+#include <skepu3/cluster/skeletons/map/map.hpp>
+#include <skepu3/cluster/skeletons/map/mappairs.hpp>
+#include <skepu3/cluster/skeletons/map/mappairsreduce.hpp>
+#include <skepu3/cluster/skeletons/map/mapreduce.hpp>
+#include <skepu3/cluster/skeletons/reduce/reduce.hpp>
+#include <skepu3/cluster/skeletons/scan.hpp>
 
 #else
 
