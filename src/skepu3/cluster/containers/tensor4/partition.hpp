@@ -167,6 +167,16 @@ public:
 		return m_size_l;
 	}
 
+	auto inline
+	min_filter_parts() noexcept
+	-> size_t
+	{
+		#ifdef DEBUG
+		std::cerr << "[SkePU][Tensor4] Filtering not supported yet.\n";
+		#endif
+		return 0;
+	}
+
 	using base::operator();
 	using base::allgather;
 	using base::block_count_from;
@@ -179,7 +189,6 @@ public:
 	using base::handle_for;
 	using base::invalidate_local_storage;
 	using base::make_ext_w;
-	using base::min_filter_parts;
 	using base::num_parts;
 	using base::partition;
 	using base::scatter_from_root;
