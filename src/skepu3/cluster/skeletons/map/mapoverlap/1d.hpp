@@ -20,9 +20,7 @@ struct map_overlap_1d
 	typedef ConditionalIndexForwarder<UserFunc::indexed, decltype(&UserFunc::CPU)>
 		F;
 	typedef typename UserFunc::Ret out_t;
-	typedef typename region_type<
-			typename parameter_type<0, decltype(&UserFunc::OMP)>::type>::type
-		in_t;
+	typedef typename util::MapOverlapBaseType<UserFunc>::type in_t;
 
 	template<
 		size_t ... RI,
@@ -110,9 +108,7 @@ struct map_overlap_1d_rowwise
 	typedef ConditionalIndexForwarder<UserFunc::indexed, decltype(&UserFunc::CPU)>
 		F;
 	typedef typename UserFunc::Ret out_t;
-	typedef typename region_type<
-			typename parameter_type<0, decltype(&UserFunc::OMP)>::type>::type
-		in_t;
+	typedef typename util::MapOverlapBaseType<UserFunc>::type in_t;
 
 	template<
 		size_t ... RI,
@@ -209,28 +205,20 @@ class MapOverlap1D
 		_starpu::map_overlap_1d<UserFunc>,
 		typename cluster::result_tuple<typename UserFunc::Ret>::type,
 		std::tuple<
-			typename region_type<
-				typename parameter_type<0, decltype(&UserFunc::CPU)>::type>::type,
-			typename region_type<
-				typename parameter_type<0, decltype(&UserFunc::CPU)>::type>::type,
-			typename region_type<
-				typename parameter_type<0, decltype(&UserFunc::CPU)>::type>::type>,
+			typename util::MapOverlapBaseType<UserFunc>::type,
+			typename util::MapOverlapBaseType<UserFunc>::type,
+			typename util::MapOverlapBaseType<UserFunc>::type>,
 		typename UserFunc::ContainerArgs,
 		typename UserFunc::UniformArgs>,
 	public cluster::skeleton_task<
 		_starpu::map_overlap_1d_rowwise<UserFunc>,
 		typename cluster::result_tuple<typename UserFunc::Ret>::type,
-		std::tuple<
-			typename region_type<
-				typename parameter_type<0, decltype(&UserFunc::CPU)>::type>::type>,
+		std::tuple<typename util::MapOverlapBaseType<UserFunc>::type>,
 		typename UserFunc::ContainerArgs,
 		typename UserFunc::UniformArgs>
 {
 	typedef typename UserFunc::Ret out_t;
-	typedef
-			typename region_type<
-				typename parameter_type<0, decltype(&UserFunc::CPU)>::type>::type
-		in_t;
+	typedef typename util::MapOverlapBaseType<UserFunc>::type in_t;
 	typedef util::MapOverlapBase<out_t> base;
 
 	typedef

@@ -420,3 +420,56 @@ TEST_CASE("Smoothing filter with overlap on multiple ranks")
 				REQUIRE(res(i,j) == 0);
 	}
 }
+
+struct indexed_uf
+{
+	constexpr static size_t totalArity = 3;
+	constexpr static size_t outArity = 1;
+	constexpr static bool indexed = 1;
+	using IndexType = skepu::Index2D;
+	using ElwiseArgs = std::tuple<>;
+	using ContainerArgs = std::tuple<>;
+	using UniformArgs = std::tuple<size_t>;
+	typedef std::tuple<> ProxyTags;
+	constexpr static skepu::AccessMode anyAccessMode[] = {};
+
+	using Ret = int;
+
+	constexpr static bool prefersMatrix = 0;
+
+	auto static
+	CPU(skepu::Index2D idx, skepu::Region2D<int>, size_t const N) noexcept
+	-> int
+	{
+		return idx.row * N + idx.col;
+	}
+
+	auto static
+	OMP(skepu::Index2D idx, skepu::Region2D<int>, size_t N) noexcept
+	-> int
+	{
+		return idx.row * N + idx.col;
+	}
+};
+
+TEST_CASE("Indexed 1d userfunction.")
+{
+	skepu::backend::MapOverlap2D<indexed_uf, bool, void>
+		moi(false);
+	moi.setOverlap(0);
+
+	size_t const N{10 * skepu::cluster::mpi_size()};
+	skepu::Matrix<int> m(N, N);
+	skepu::Matrix<int> res(N, N);
+
+	moi(res, m, N);
+
+	m.flush();
+	res.flush();
+	for(size_t i(0); i < m.size_i(); ++i)
+	{
+		int const offset_i = i * N;
+		for(size_t j(0); j < m.size_j(); ++j)
+			REQUIRE(res(i, j) == offset_i + (int)j);
+	}
+}

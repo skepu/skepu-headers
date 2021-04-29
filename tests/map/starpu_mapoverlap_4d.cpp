@@ -642,3 +642,71 @@ TEST_CASE("Smoothing filter with overlap on multiple ranks")
 						REQUIRE(res(i,j,k,l) == 0);
 	}
 }
+
+struct indexed_uf
+{
+	constexpr static size_t totalArity = 5;
+	constexpr static size_t outArity = 1;
+	constexpr static bool indexed = 1;
+	using IndexType = skepu::Index4D;
+	using ElwiseArgs = std::tuple<>;
+	using ContainerArgs = std::tuple<>;
+	using UniformArgs = std::tuple<size_t, size_t, size_t>;
+	typedef std::tuple<> ProxyTags;
+	constexpr static skepu::AccessMode anyAccessMode[] = {};
+
+	using Ret = int;
+
+	constexpr static bool prefersMatrix = 0;
+
+	auto static
+	CPU(
+		skepu::Index4D idx,
+		skepu::Region4D<int>,
+		size_t const J,
+		size_t const K,
+		size_t const L) noexcept
+	-> int
+	{
+		return idx.i * J*K*L + idx.j * K*L + idx.k * L + idx.l;
+	}
+
+	auto static
+	OMP(
+		skepu::Index4D idx,
+		skepu::Region4D<int>,
+		size_t const J,
+		size_t const K,
+		size_t const L) noexcept
+	-> int
+	{
+		return idx.i * J*K*L + idx.j * K*L + idx.k * L + idx.l;
+	}
+};
+
+TEST_CASE("Indexed 1d userfunction.")
+{
+	skepu::backend::MapOverlap4D<indexed_uf, bool, void>
+		moi(false);
+	moi.setOverlap(0);
+
+	size_t const I{10 * skepu::cluster::mpi_size()};
+	size_t const J{10};
+	size_t const K{10};
+	size_t const L{10};
+	skepu::Tensor4<int> t4(I, J, K, L);
+	skepu::Tensor4<int> res(I, J, K, L);
+
+	moi(res, t4, J, K, L);
+
+	t4.flush();
+	res.flush();
+	for(size_t i(0); i < t4.size_i(); ++i)
+		for(size_t j(0); j < t4.size_j(); ++j)
+			for(size_t k(0); k < t4.size_k(); ++k)
+			{
+				int const offset_k = i * J*K*L + j * K*L + k * L;
+				for(size_t l(0); l < t4.size_l(); ++l)
+					REQUIRE(res(i, j, k, l) == offset_k + (int)l);
+			}
+}

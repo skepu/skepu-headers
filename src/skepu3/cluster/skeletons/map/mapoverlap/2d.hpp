@@ -260,7 +260,7 @@ public:
 			result_indices,
 			elwise_indices,
 			container_indices,
-			typename make_pack_indices<0>::type{},
+			uniform_indices,
 			std::forward<Args>(args)...);
 
 		return get<0>(args...);
