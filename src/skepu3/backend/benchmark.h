@@ -208,7 +208,7 @@ namespace skepu
 		// Runs a skeleton instance with the currently set ExecPlan and BackendSpec ´repeats´ times
 		// and returns the median execution time
 		template<typename BF>
-		inline TimeSpan basicBenchmark(size_t repeats, size_t size, BF f, Callback callback)
+		inline TimeSpan basicBenchmark(size_t repeats, size_t size, BF f, Callback callback = nullCallbackFn)
 		{
 			std::vector<TimeSpan> durations(repeats);
 

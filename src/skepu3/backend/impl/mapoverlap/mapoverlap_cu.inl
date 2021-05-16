@@ -17,7 +17,7 @@ namespace skepu
 		template<typename MapOverlapFunc, typename CUDAKernel, typename C2, typename C3, typename C4, typename CLKernel>
 		template<size_t... OI, size_t... EI, size_t... AI, size_t... CI, typename... CallArgs>
 		void MapOverlap1D<MapOverlapFunc, CUDAKernel, C2, C3, C4, CLKernel>
-		::mapOverlapSingleThread_CU(size_t deviceID, size_t startIdx, pack_indices<OI...>, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args)
+		::mapOverlapSingleThread_CU(size_t deviceID, size_t startIdx, Parity p, pack_indices<OI...>, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args)
 		{
 			cudaSetDevice(deviceID);
 			auto &res = get<0>(args...);
@@ -113,7 +113,7 @@ namespace skepu
 		template <typename MapOverlapFunc, typename CUDAKernel, typename C2, typename C3, typename C4, typename CLKernel>
 		template<size_t... OI, size_t... EI, size_t... AI, size_t... CI, typename... CallArgs>
 		void MapOverlap1D<MapOverlapFunc, CUDAKernel, C2, C3, C4, CLKernel>
-		::mapOverlapNumDevices_CU(size_t numDevices, size_t startIdx, pack_indices<OI...>, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args)
+		::mapOverlapNumDevices_CU(size_t numDevices, size_t startIdx, Parity p, pack_indices<OI...>, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args)
 		{
 			DEBUG_TEXT_LEVEL1("MAPOVERLAP CUDA\n")
 			auto &res = get<0>(args...);
@@ -332,7 +332,7 @@ namespace skepu
 		template<typename MapOverlapFunc, typename CUDAKernel, typename C2, typename C3, typename C4, typename CLKernel>
 		template<size_t... OI, size_t... EI, size_t... AI, size_t... CI, typename... CallArgs>
 		void MapOverlap1D<MapOverlapFunc, CUDAKernel, C2, C3, C4, CLKernel>
-		::mapOverlapSingleThread_CU_Col(size_t deviceID, size_t _numcols, pack_indices<OI...>, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args)
+		::mapOverlapSingleThread_CU_Col(size_t deviceID, size_t _numcols, Parity p, pack_indices<OI...>, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args)
 		{
 			cudaSetDevice(deviceID);
 			auto &res = get<0>(args...);
@@ -419,7 +419,7 @@ namespace skepu
 		template<typename MapOverlapFunc, typename CUDAKernel, typename C2, typename C3, typename C4, typename CLKernel>
 		template<size_t... OI, size_t... EI, size_t... AI, size_t... CI, typename... CallArgs>
 		void MapOverlap1D<MapOverlapFunc, CUDAKernel, C2, C3, C4, CLKernel>
-		::mapOverlapMultiThread_CU_Col(size_t numDevices, size_t _numcols, pack_indices<OI...>, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args)
+		::mapOverlapMultiThread_CU_Col(size_t numDevices, size_t _numcols, Parity p, pack_indices<OI...>, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args)
 		{
 			auto &res = get<0>(args...);
 			auto &arg = get<outArity>(args...);
@@ -616,7 +616,7 @@ namespace skepu
 		template<typename MapOverlapFunc, typename CUDAKernel, typename C2, typename C3, typename C4, typename CLKernel>
 		template<size_t... OI, size_t... EI, size_t... AI, size_t... CI, typename... CallArgs>
 		void MapOverlap1D<MapOverlapFunc, CUDAKernel, C2, C3, C4, CLKernel>
-		::mapOverlapSingleThread_CU_Row(size_t deviceID, size_t numrows, pack_indices<OI...>, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args)
+		::mapOverlapSingleThread_CU_Row(size_t deviceID, size_t numrows, Parity p, pack_indices<OI...>, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args)
 		{
 			auto &res = get<0>(args...);
 			auto &arg = get<outArity>(args...);
@@ -704,7 +704,7 @@ namespace skepu
 		template<typename MapOverlapFunc, typename CUDAKernel, typename C2, typename C3, typename C4, typename CLKernel>
 		template<size_t... OI, size_t... EI, size_t... AI, size_t... CI, typename... CallArgs>
 		void MapOverlap1D<MapOverlapFunc, CUDAKernel, C2, C3, C4, CLKernel>
-		::mapOverlapMultiThread_CU_Row(size_t numDevices, size_t numrows, pack_indices<OI...>, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args)
+		::mapOverlapMultiThread_CU_Row(size_t numDevices, size_t numrows, Parity p, pack_indices<OI...>, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args)
 		{
 			auto &res = get<0>(args...);
 			auto &arg = get<outArity>(args...);
@@ -856,7 +856,7 @@ namespace skepu
 		template<typename MapOverlapFunc, typename CUDAKernel, typename CLKernel>
 		template<size_t... OI, size_t... EI, size_t... AI, size_t... CI, typename... CallArgs>
 		void MapOverlap2D<MapOverlapFunc, CUDAKernel, CLKernel>
-		::mapOverlapSingleThread_CU(size_t deviceID, pack_indices<OI...>, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args)
+		::mapOverlapSingleThread_CU(size_t deviceID, Parity p, pack_indices<OI...>, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args)
 		{
 			auto &res = get<0>(args...);
 			auto &arg = get<outArity>(args...);
@@ -913,7 +913,7 @@ namespace skepu
 		template<typename MapOverlapFunc, typename CUDAKernel, typename CLKernel>
 		template<size_t... OI, size_t... EI, size_t... AI, size_t... CI, typename... CallArgs>
 		void MapOverlap2D<MapOverlapFunc, CUDAKernel, CLKernel>
-		::mapOverlapMultipleThread_CU(size_t numDevices, pack_indices<OI...>, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args)
+		::mapOverlapMultipleThread_CU(size_t numDevices, Parity p, pack_indices<OI...>, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args)
 		{
 			auto &res = get<0>(args...);
 			auto &arg = get<outArity>(args...);

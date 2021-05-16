@@ -1,6 +1,7 @@
 #pragma once
 
 #define REQUIRES(...) typename std::enable_if<(__VA_ARGS__), bool>::type = 0
+#define REQUIRES_B(...) typename std::enable_if<(__VA_ARGS__), bool>::type
 #define REQUIRES_VALUE(...) typename std::enable_if<__VA_ARGS__::value, bool>::type = 0
 #define REQUIRES_DEF(...) typename std::enable_if<(__VA_ARGS__), bool>::type
 
@@ -155,6 +156,7 @@ namespace skepu
 	{
 		return o << "Index4D(" << idx.i << ", "  << idx.j << ", " << idx.k << ", " << idx.l << ")";
 	}
+	
 
 	/*!
 	 *  Enumeration of the different edge policies (what happens when a read outside the vector is performed) that the map overlap skeletons support.
@@ -167,6 +169,11 @@ namespace skepu
 	enum class Overlap
 	{
 		RowWise, ColWise
+	};
+	
+	enum class UpdateMode
+	{
+		Normal, RedBlack, Red, Black
 	};
 
 	enum class AccessMode
@@ -213,6 +220,23 @@ namespace skepu
 	auto ret(Args&&... args) -> decltype(std::make_tuple(std::forward<Args>(args)...)) {
 		return std::make_tuple(std::forward<Args>(args)...);
 	}
+	
+	// Parity for MapOverlap
+	
+	enum class Parity: int
+	{
+		None = -1, Even = 0, Odd = 1
+	};
+	
+	constexpr static bool index_is_odd(size_t i, size_t j = 0, size_t k = 0, size_t l = 0)
+	{
+		return ((i + j + k + l) % 2) != 0;
+	}
+	
+	constexpr static bool index_parity(Parity p, size_t i, size_t j = 0, size_t k = 0, size_t l = 0)
+	{
+		return ((i + j + k + l) % 2) == static_cast<int>(p);
+	}
 
 
 #ifdef SKEPU_OPENCL
@@ -242,6 +266,19 @@ namespace skepu
 	}
 	
 #endif
+}
+
+
+
+#include "meta_helpers.hpp"
+#include "skepu3/vector.hpp"
+#include "skepu3/matrix.hpp"
+#include "skepu3/tensor.hpp"
+#include "skepu3/sparse_matrix.hpp"
+#include "random.hpp"
+
+namespace skepu
+{
 
 	// Dummy base class for sequential skeleton classes.
 	// Includes empty member functions which has no meaning in a sequential context.
@@ -262,14 +299,17 @@ namespace skepu
 
 		template<typename... Args>
 		void tune(Args&&... args) { }
+		
+		void setPRNG(PRNG &prng, size_t iterations = 1)
+		{
+			this->m_prng = &prng;
+			this->m_prng->registerInstance(this, iterations);
+		}
+		
+	protected:
+		PRNG *m_prng = nullptr;
 	};
 }
-
-#include "meta_helpers.hpp"
-#include "skepu3/vector.hpp"
-#include "skepu3/matrix.hpp"
-#include "skepu3/tensor.hpp"
-#include "skepu3/sparse_matrix.hpp"
 
 namespace skepu
 {

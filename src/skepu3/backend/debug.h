@@ -7,6 +7,8 @@
 
 #include <assert.h>
 #include <sstream>
+#include <iomanip>
+#include <chrono>
 
 #ifndef SKEPU_DEBUG
 #define SKEPU_DEBUG 0
@@ -34,19 +36,19 @@
 #endif
 
 #if SKEPU_DEBUG > 0
-#define DEBUG_TEXT_LEVEL1(skepu_macro_text) std::cerr << "[SKEPU_DEBUG_L1 " << __FILE__ << ":" << __LINE__ << "] " << skepu_macro_text << "\n";
+#define DEBUG_TEXT_LEVEL1(skepu_macro_text) std::cerr << "[" << debug_timestamp() << "][SKEPU_DEBUG_L1 " << __FILE__ << ":" << __LINE__ << "] " << skepu_macro_text << "\n";
 #else
 #define DEBUG_TEXT_LEVEL1(skepu_macro_text)
 #endif
 
 #if SKEPU_DEBUG > 1
-#define DEBUG_TEXT_LEVEL2(skepu_macro_text) std::cerr << "[SKEPU_DEBUG_L2 " << __FILE__ << ":" << __LINE__ << "] " << skepu_macro_text << "\n";
+#define DEBUG_TEXT_LEVEL2(skepu_macro_text) std::cerr << "[" << debug_timestamp() << "][SKEPU_DEBUG_L2 " << __FILE__ << ":" << __LINE__ << "] " << skepu_macro_text << "\n";
 #else
 #define DEBUG_TEXT_LEVEL2(skepu_macro_text)
 #endif
 
 #if SKEPU_DEBUG > 2
-#define DEBUG_TEXT_LEVEL3(skepu_macro_text) std::cerr << "[SKEPU_DEBUG_L3 " << __FILE__ << ":" << __LINE__ << "] " << skepu_macro_text << "\n";
+#define DEBUG_TEXT_LEVEL3(skepu_macro_text) std::cerr << "[" << debug_timestamp() << "][SKEPU_DEBUG_L3 " << __FILE__ << ":" << __LINE__ << "] " << skepu_macro_text << "\n";
 #else
 #define DEBUG_TEXT_LEVEL3(skepu_macro_text)
 #endif
@@ -115,5 +117,15 @@ CL_CHECK_ERROR(ERROR_T const & err, MESSAGE_T const & ... m)
 	}
 }
 #endif
+
+inline std::string debug_timestamp()
+{
+	std::stringstream s;
+/*	auto now = std::chrono::system_clock::now();
+	auto now_c = std::chrono::system_clock::to_time_t(now);
+	s << std::put_time(std::localtime(&now_c), "%H:%M:%S.");*/
+	s << std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
+	return s.str();
+}
 
 #endif

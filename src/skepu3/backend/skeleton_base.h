@@ -56,6 +56,11 @@ namespace skepu
 				return *this->m_selected_spec;
 			}
 			
+			void setPRNG(PRNG &prng)
+			{
+				this->m_prng = &prng;
+			}
+			
 		protected:
 			SkeletonBase()
 			{
@@ -95,6 +100,8 @@ namespace skepu
 			const BackendSpec *m_user_spec = nullptr;
 			
 			const BackendSpec *m_selected_spec = nullptr;
+			
+			PRNG *m_prng = nullptr;
 			
 		}; // class SkeletonBase
 		

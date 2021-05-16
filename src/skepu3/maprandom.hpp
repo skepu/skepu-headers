@@ -4,34 +4,34 @@
 
 namespace skepu
 {
-	template<int, int, typename, typename...>
-	class MapImpl;
+	template<int, int, size_t, typename, typename...>
+	class MapRandomImpl;
 	
-	template<int GivenArity, typename Ret, typename... Args>
-	MapImpl<resolve_map_arity<GivenArity, Args...>::value, GivenArity, Ret, Args...>
-	MapWrapper(std::function<Ret(Args...)> map)
+	template<int GivenArity, size_t RandomCount, typename Ret, typename... Args>
+	MapRandomImpl<resolve_map_arity<GivenArity, Args...>::value, GivenArity, RandomCount, Ret, Args...>
+	MapRandomWrapper(std::function<Ret(skepu::Random<RandomCount> &, Args...)> map)
 	{
-		return MapImpl<resolve_map_arity<GivenArity, Args...>::value, GivenArity, Ret, Args...>(map);
+		return MapRandomImpl<resolve_map_arity<GivenArity, Args...>::value, GivenArity, RandomCount, Ret, Args...>(map);
 	}
 	
 	// For function pointers
-	template<int GivenArity = SKEPU_UNSET_ARITY, typename Ret, typename... Args>
-	auto Map(Ret(*map)(Args...))
-		-> decltype(MapWrapper<GivenArity>((std::function<Ret(Args...)>)map))
+	template<int GivenArity = SKEPU_UNSET_ARITY, size_t RandomCount, typename Ret, typename... Args>
+	auto Map(Ret(*map)(skepu::Random<RandomCount> &, Args...))
+		-> decltype(MapRandomWrapper<GivenArity>((std::function<Ret(skepu::Random<RandomCount> &, Args...)>)map))
 	{
-		return MapWrapper<GivenArity>((std::function<Ret(Args...)>)map);
+		return MapRandomWrapper<GivenArity>((std::function<Ret(skepu::Random<RandomCount> &, Args...)>)map);
 	}
 	
 	// For lambdas and functors
-	template<int GivenArity = SKEPU_UNSET_ARITY, typename T, REQUIRES(!lambda_has_random<decltype(&T::operator())>::value)>
+	template<int GivenArity = SKEPU_UNSET_ARITY, typename T, REQUIRES(lambda_has_random<decltype(&T::operator())>::value)>
 	auto Map(T map)
-		-> decltype(MapWrapper<GivenArity>(lambda_cast(map)))
+		-> decltype(MapRandomWrapper<GivenArity>(lambda_cast(map)))
 	{
-		return MapWrapper<GivenArity>(lambda_cast(map));
+		return MapRandomWrapper<GivenArity>(lambda_cast(map));
 	}
 	
-	template<int InArity, int GivenArity, typename Ret, typename... Args>
-	class MapImpl: public SeqSkeletonBase
+	template<int InArity, int GivenArity, size_t RandomCount, typename Ret, typename... Args>
+	class MapRandomImpl: public SeqSkeletonBase
 	{
 		static constexpr bool indexed = is_indexed<Args...>::value;
 		static constexpr size_t OutArity = out_size<Ret>::value;
@@ -44,7 +44,7 @@ namespace skepu
 		static constexpr typename make_pack_indices<InArity + OutArity + anyCont, InArity + OutArity>::type any_indices{};
 		static constexpr typename make_pack_indices<numArgs, InArity + OutArity + anyCont>::type const_indices{};
 		
-		using MapFunc = std::function<Ret(Args...)>;
+		using MapFunc = std::function<Ret(skepu::Random<RandomCount> &, Args...)>;
 		using F = ConditionalIndexForwarder<indexed, MapFunc>;
 		
 		// For iterators
@@ -60,10 +60,15 @@ namespace skepu
 			auto out = std::make_tuple(get<OI>(args...).begin()...);
 			auto in  = std::make_tuple(get<EI>(args...).begin()...);
 			
+			if (this->m_prng == nullptr)
+				SKEPU_ERROR("No random stream set in skeleton instance");
+			
+			auto random = this->m_prng->template asRandom<RandomCount>(size);
+			
 			while (size --> 0)
 			{
 				auto index = std::get<0>(out).getIndex();
-				auto res = F::forward(mapFunc, index,
+				auto res = F::forward(mapFunc, index, random,
 					*std::get<EI-OutArity>(in)++...,
 					get<AI>(args...).hostProxy(typename pack_element<AI-OutArity+(indexed ? 1 : 0), typename proxy_tag<Args>::type...>::type{}, index)...,
 					get<CI>(args...)...
@@ -93,10 +98,10 @@ namespace skepu
 		
 	private:
 		MapFunc mapFunc;
-		MapImpl(MapFunc map): mapFunc(map) {}
+		MapRandomImpl(MapFunc map): mapFunc(map) {}
 		
-		friend MapImpl<InArity, GivenArity, Ret, Args...> MapWrapper<GivenArity, Ret, Args...>(MapFunc);
+		friend MapRandomImpl<InArity, GivenArity, RandomCount, Ret, Args...> MapRandomWrapper<GivenArity, RandomCount, Ret, Args...>(MapFunc);
 		
-	}; // end class MapImpl
+	}; // end class MapRandomImpl
 	
 } // end namespace skepu

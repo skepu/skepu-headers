@@ -3,13 +3,14 @@
 // Deprecated operators are still accessible in this version
 #define SKEPU_ENABLE_DEPRECATED_OPERATOR
 
+/*
 #if defined(SKEPU_OPENMP) && (defined(SKEPU_CUDA) || defined(SKEPU_OPENCL))
 # define SKEPU_HYBRID
 
 # if defined(SKEPU_CUDA) && !(defined(SKEPU_OPENCL) && defined(SKEPU_HYBRID_FORCE_OPENCL))
 #  define SKEPU_HYBRID_USE_CUDA
 # endif
-#endif
+#endif*/
 
 /* TODO: Get rid of this hack if possible. */
 #ifdef SKEPU_MERCURIUM_CUDA
@@ -59,6 +60,10 @@
 #include "skepu3/mappairs.hpp"
 #include "skepu3/mappairsreduce.hpp"
 #include "skepu3/call.hpp"
+
+#include "skepu3/maprandom.hpp"
+#include "skepu3/maprandomreduce.hpp"
+#include "skepu3/maprandomoverlap.hpp"
 
 #else
 

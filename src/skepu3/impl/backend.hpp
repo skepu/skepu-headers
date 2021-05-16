@@ -9,6 +9,9 @@
 
 
 #ifdef SKEPU_OPENMP
+#ifndef _OPENMP
+#error Fatal: OpenMP backend is activated in SkePU but the backend compiler is not OpenMP-capable.
+#endif
 #include <omp.h>
 #endif
 

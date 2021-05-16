@@ -7,6 +7,7 @@ namespace skepu
 {
 	namespace impl
 	{
+		/*
 		template<typename, typename...>
 		class MapOverlap1D;
 		
@@ -14,26 +15,19 @@ namespace skepu
 		class MapOverlap2D;
 		
 		template<typename, typename...>
-		class MapOverlap3D;
+		class MapOverlap3D;*/
 		
-		template<typename, typename...>
-		class MapOverlap4D;
+		template<size_t, typename, typename...>
+		class MapRandomOverlap4D;
 	}
-	
+	/*
 	template<typename Ret, typename... Args, REQUIRES(mapoverlap_dimensionality<Args...>::value == 1)>
 	impl::MapOverlap1D<Ret, Args...> MapOverlapWrapper(std::function<Ret(Args...)> mapo)
 	{
 		return impl::MapOverlap1D<Ret, Args...>(mapo);
-	}
-	/*
-	// For function pointers
-	template<typename Ret, typename... Args>
-	impl::MapOverlap1D<Ret, Args...> MapOverlap(Ret(*mapo)(Region1D<T>, Args...))
-	{
-		return MapOverlapWrapper((std::function<Ret(Region1D<T>, Args...)>)mapo);
 	}*/
 	
-	
+	/*
 	template<typename Ret, typename... Args, REQUIRES(mapoverlap_dimensionality<Args...>::value == 2)>
 	impl::MapOverlap2D<Ret, Args...> MapOverlapWrapper(std::function<Ret(Args...)> mapo)
 	{
@@ -44,31 +38,31 @@ namespace skepu
 	impl::MapOverlap3D<Ret, Args...> MapOverlapWrapper(std::function<Ret(Args...)> mapo)
 	{
 		return impl::MapOverlap3D<Ret, Args...>(mapo);
-	}
+	}*/
 	
-	template<typename Ret, typename... Args, REQUIRES(mapoverlap_dimensionality<Args...>::value == 4)>
-	impl::MapOverlap4D<Ret, Args...> MapOverlapWrapper(std::function<Ret(Args...)> mapo)
+	template<size_t RandomCount, typename Ret, typename... Args, REQUIRES(mapoverlap_dimensionality<Args...>::value == 4)>
+	impl::MapRandomOverlap4D<RandomCount, Ret, Args...> MapRandomOverlapWrapper(std::function<Ret(skepu::Random<RandomCount> &, Args...)> mapo)
 	{
-		return impl::MapOverlap4D<Ret, Args...>(mapo);
+		return impl::MapRandomOverlap4D<RandomCount, Ret, Args...>(mapo);
 	}
 	
 	// For function pointers
-	template<typename Ret, typename... Args>
-	auto MapOverlap(Ret(*mapo)(Args...)) -> decltype(MapOverlapWrapper((std::function<Ret(Args...)>)mapo))
+	template<size_t RandomCount, typename Ret, typename... Args>
+	auto MapOverlap(Ret(*mapo)(skepu::Random<RandomCount> &, Args...)) -> decltype(MapRandomOverlapWrapper((std::function<Ret(skepu::Random<RandomCount> &, Args...)>)mapo))
 	{
-		return MapOverlapWrapper((std::function<Ret(Args...)>)mapo);
+		return MapRandomOverlapWrapper((std::function<Ret(skepu::Random<RandomCount> &, Args...)>)mapo);
 	}
 	
 	// For lambdas and functors
 	template<typename T>
-	auto MapOverlap(T mapo) -> decltype(MapOverlapWrapper(lambda_cast(mapo)))
+	auto MapOverlap(T mapo) -> decltype(MapRandomOverlapWrapper(lambda_cast(mapo)))
 	{
-		return MapOverlapWrapper(lambda_cast(mapo));
+		return MapRandomOverlapWrapper(lambda_cast(mapo));
 	}
 	
 	
 	namespace impl
-	{
+	{/*
 		template<typename T>
 		class MapOverlapBase: public SeqSkeletonBase
 		{
@@ -488,7 +482,7 @@ namespace skepu
 				this->m_edge = Edge::Duplicate;
 			}
 			
-			size_t m_overlap = 1;
+			size_t m_overlap = 0;
 			
 			friend MapOverlap1D<Ret, Args...> skepu::MapOverlapWrapper<Ret, Args...>(MapFunc);
 		};
@@ -597,7 +591,7 @@ namespace skepu
 				this->m_edge = Edge::None;
 			}
 			
-			int m_overlap_i = 1, m_overlap_j = 1;
+			int m_overlap_i, m_overlap_j;
 			
 			friend MapOverlap2D<Ret, Args...> skepu::MapOverlapWrapper<Ret, Args...>(MapFunc);
 		};
@@ -718,17 +712,17 @@ namespace skepu
 				this->m_edge = Edge::None;
 			}
 			
-			int m_overlap_i = 1, m_overlap_j = 1, m_overlap_k = 1;
+			int m_overlap_i, m_overlap_j, m_overlap_k;
 			
 			friend MapOverlap3D<Ret, Args...> skepu::MapOverlapWrapper<Ret, Args...>(MapFunc);
 		};
+		*/
 		
 		
 		
 		
-		
-		template<typename Ret, typename... Args>
-		class MapOverlap4D: public MapOverlapBase<typename region_type<typename pack_element<is_indexed<Args...>::value ? 1 : 0, Args...>::type>::type>
+		template<size_t RandomCount, typename Ret, typename... Args>
+		class MapRandomOverlap4D: public MapOverlapBase<typename region_type<typename pack_element<is_indexed<Args...>::value ? 1 : 0, Args...>::type>::type>
 		{
 			static constexpr bool indexed = is_indexed<Args...>::value;
 			static constexpr size_t InArity = 1;
@@ -741,7 +735,7 @@ namespace skepu
 			static constexpr typename make_pack_indices<InArity + OutArity + anyCont, InArity + OutArity>::type any_indices{};
 			static constexpr typename make_pack_indices<numArgs, InArity + OutArity + anyCont>::type const_indices{};
 			
-			using MapFunc = std::function<Ret(Args...)>;
+			using MapFunc = std::function<Ret(skepu::Random<RandomCount> &, Args...)>;
 			using F = ConditionalIndexForwarder<indexed, MapFunc>;
 			using RegionType = typename pack_element<indexed ? 1 : 0, Args...>::type;
 			using T = typename region_type<RegionType>::type;
@@ -804,6 +798,14 @@ namespace skepu
 					end = Index4D{size_i - this->m_overlap_i, size_j - this->m_overlap_j, size_k - this->m_overlap_k, size_l - this->m_overlap_l};
 				}
 				
+				if (this->m_prng == nullptr)
+					SKEPU_ERROR("No random stream set in skeleton instance");
+				
+				size_t final_size = (end.i - start.i) * (end.j - start.j) * (end.k - start.k) * (end.l - start.l);
+				auto random = this->m_prng->template asRandom<RandomCount>(final_size);
+				
+				std::cout << "final size: " << final_size << "\n";
+				
 				for (size_t i = start.i; i < end.i; i++)
 					for (size_t j = start.j; j < end.j; j++)
 						for (size_t k = start.k; k < end.k; k++)
@@ -811,7 +813,7 @@ namespace skepu
 								if (p == Parity::None || index_parity(p, i, j, k, l))
 								{
 									region.idx = Index4D{i,j,k,l};
-									auto res = F::forward(this->mapFunc, Index4D{i,j,k,l}, region, get<AI>(args...).hostProxy()..., get<CI>(args...)...);
+									auto res = F::forward(this->mapFunc, Index4D{i,j,k,l}, random, region, get<AI>(args...).hostProxy()..., get<CI>(args...)...);
 									SKEPU_VARIADIC_RETURN(get<OI>(args...)(i, j, k, l)..., res);
 								}
 			}
@@ -838,14 +840,14 @@ namespace skepu
 			
 		private:
 			MapFunc mapFunc;
-			MapOverlap4D(MapFunc map): mapFunc(map)
+			MapRandomOverlap4D(MapFunc map): mapFunc(map)
 			{
 				this->m_edge = Edge::None;
 			}
 			
 			int m_overlap_i = 1, m_overlap_j = 1, m_overlap_k = 1, m_overlap_l = 1;
 			
-			friend MapOverlap4D<Ret, Args...> skepu::MapOverlapWrapper<Ret, Args...>(MapFunc);
+			friend MapRandomOverlap4D<RandomCount, Ret, Args...> skepu::MapRandomOverlapWrapper<RandomCount, Ret, Args...>(MapFunc);
 		};
 		
 	}

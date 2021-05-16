@@ -1,3 +1,4 @@
+#pragma once
 
 namespace future_std
 {
@@ -315,19 +316,22 @@ namespace skepu
 	// ----------------------------------------------------------------
 	
 	template<typename T>
-	struct region_type {};
+	struct region_type_h {};
 	
 	template<typename T>
-	struct region_type<Region1D<T>> { using type = T; };
+	struct region_type_h<Region1D<T>> { using type = T; };
 	
 	template<typename T>
-	struct region_type<Region2D<T>> { using type = T; };
+	struct region_type_h<Region2D<T>> { using type = T; };
 	
 	template<typename T>
-	struct region_type<Region3D<T>> { using type = T; };
+	struct region_type_h<Region3D<T>> { using type = T; };
 	
 	template<typename T>
-	struct region_type<Region4D<T>> { using type = T; };
+	struct region_type_h<Region4D<T>> { using type = T; };
+	
+	template<typename T>
+	struct region_type : region_type_h<typename std::decay<T>::type> {};
 	
 	
 	// ----------------------------------------------------------------
@@ -360,6 +364,35 @@ namespace skepu
 	
 	template<typename T, typename... Args>
 	struct mapoverlap_dimensionality<Index4D, Region4D<T>, Args...>: std::integral_constant<int, 4> {};
+	
+	
+	template<size_t RC, typename T, typename... Args>
+	struct mapoverlap_dimensionality<Random<RC>&, Region1D<T>, Args...>: std::integral_constant<int, 1> {};
+	
+	template<size_t RC, typename T, typename... Args>
+	struct mapoverlap_dimensionality<Random<RC>&, Region2D<T>, Args...>: std::integral_constant<int, 2> {};
+	
+	template<size_t RC, typename T, typename... Args>
+	struct mapoverlap_dimensionality<Random<RC>&, Region3D<T>, Args...>: std::integral_constant<int, 3> {};
+	
+	template<size_t RC, typename T, typename... Args>
+	struct mapoverlap_dimensionality<Random<RC>&, Region4D<T>, Args...>: std::integral_constant<int, 4> {};
+	
+	template<size_t RC, typename T, typename... Args>
+	struct mapoverlap_dimensionality<Index1D, Random<RC>&, Region1D<T>, Args...>: std::integral_constant<int, 1> {};
+	
+	template<size_t RC, typename T, typename... Args>
+	struct mapoverlap_dimensionality<Index2D, Random<RC>&, Region2D<T>, Args...>: std::integral_constant<int, 2> {};
+	
+	template<size_t RC, typename T, typename... Args>
+	struct mapoverlap_dimensionality<Index3D, Random<RC>&, Region3D<T>, Args...>: std::integral_constant<int, 3> {};
+	
+	template<size_t RC, typename T, typename... Args>
+	struct mapoverlap_dimensionality<Index4D, Random<RC>&, Region4D<T>, Args...>: std::integral_constant<int, 4> {};
+	
+	
+	template<typename T, typename... Args>
+	struct mapoverlap_dimensionality<T, Args...>: mapoverlap_dimensionality<typename std::decay<T>::type, Args...> {};
 	
 
 }
