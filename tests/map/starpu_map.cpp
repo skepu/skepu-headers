@@ -53,6 +53,7 @@ TEST_CASE("Simple map to vector")
 			REQUIRE(e == 10);
 	}
 
+/*
 	SECTION("And with filters")
 	{
 		auto mfbs = skepu::max_filter_block_size;
@@ -64,6 +65,7 @@ TEST_CASE("Simple map to vector")
 			REQUIRE(v(i) == 10);
 		skepu::max_filter_block_size = mfbs;
 	}
+	*/
 }
 
 struct indexed_map_fn

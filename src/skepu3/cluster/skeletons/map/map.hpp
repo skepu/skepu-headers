@@ -229,7 +229,7 @@ private:
 		pack_indices<OI...>,
 		pack_indices<EI...>,
 		pack_indices<AI...>,
-		pack_indices<CI...> ci,
+		pack_indices<CI...>,
 		pack_indices<PI...>,
 		Iterator begin,
 		Iterator end,
@@ -237,7 +237,6 @@ private:
 	-> void
 	{
 		auto constexpr static proxy_tags = typename MapFunc::ProxyTags{};
-		auto static constexpr cbai = make_pack_indices<2>::type{};
 
 		// Since attribute maybe_unsed is not available until C++17, we use this
 		// trick instead to get rid of the unused variable warnings for proxy_tags.
@@ -298,11 +297,10 @@ private:
 			auto call_back_args = std::make_tuple(begin, task_count);
 
 			this->schedule(
-				ci,
-				cbai,
 				handles,
-				call_back_args,
-				std::forward<CallArgs>(args)...);
+				begin,
+				task_count,
+				std::forward<decltype(get<CI>(args...))>(get<CI>(args...))...);
 
 			begin += task_count;
 		}

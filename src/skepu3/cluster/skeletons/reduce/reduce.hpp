@@ -388,7 +388,6 @@ private:
 	STARPU(Iterator begin, Iterator const end) noexcept
 	-> T
 	{
-		auto static constexpr cbai = typename make_pack_indices<1>::type{};
 		begin.getParent().partition();
 		std::set<int> scheduled_ranks;
 
@@ -404,13 +403,10 @@ private:
 					m_result_handles[rank],
 					m_buffer_handles[rank],
 					handle);
-			auto call_back_args = std::make_tuple(count);
 
 			skeleton_task::schedule(
-				uniform_indices,
-				cbai,
 				handles,
-				call_back_args);
+				count);
 
 			begin += count;
 		}
@@ -435,7 +431,6 @@ private:
 	STARPU(Vector & res, Matrix & data)
 	-> Vector
 	{
-		auto static constexpr cbai = typename make_pack_indices<2>::type{};
 		auto & rp = cont::getParent(res);
 		auto & dp = cont::getParent(data);
 		auto cols = data.size_j();
@@ -453,13 +448,11 @@ private:
 				rp.handle_for(i),
 				m_buffer_handles[rank],
 				dp.handle_for(i * cols));
-			auto call_back_args = std::make_tuple(count,cols);
 
 			skeleton_task::schedule(
-				uniform_indices,
-				cbai,
 				handles,
-				call_back_args);
+				count,
+				cols);
 
 			i += count;
 		}

@@ -474,12 +474,11 @@ private:
 				res.handle_for(0),
 				part_res_handles[0],
 				arg.handle_for(0));
-		auto first_cbargs = std::make_tuple(count, m_mode, m_initial);
 		scan_task_first::schedule(
-			uniform_indices,
-			typename make_pack_indices<3>::type{},
 			first_handles,
-			first_cbargs);
+			count,
+			m_mode,
+			m_initial);
 
 		size_t part(1);
 		size_t pos(count);
@@ -491,24 +490,20 @@ private:
 					res.handle_for(pos),
 					part_res_handles[part],
 					arg.handle_for(pos));
-			auto cbargs = std::make_tuple(count, m_mode, m_initial);
 
 			scan_task::schedule(
-				uniform_indices,
-				typename make_pack_indices<3>::type{},
 				handles,
-				cbargs);
+				count,
+				m_mode,
+				m_initial);
 
 			pos += count;
 			++part;
 		}
 		auto update_handles = std::make_tuple(part_res);
-		auto update_args = std::make_tuple(num_parts);
 		scan_update::schedule(
-			uniform_indices,
-			typename make_pack_indices<1>::type{},
 			update_handles,
-			update_args);
+			num_parts);
 		pos = res.block_count_from(0);
 		part = 0;
 		while(pos < res.size())
@@ -518,13 +513,10 @@ private:
 				std::make_tuple(
 					res.handle_for(pos),
 					part_res_handles[part]);
-			auto cbargs = std::make_tuple(count);
 
 			scan_add::schedule(
-				uniform_indices,
-				typename make_pack_indices<1>::type{},
 				handles,
-				cbargs);
+				count);
 
 			pos += count;
 			++part;

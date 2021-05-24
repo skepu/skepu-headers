@@ -192,8 +192,6 @@ class MapOverlap2D
 		typename make_pack_indices<
 			nresult + nelwise + ncontainer + nuniform,
 			nresult + nelwise + ncontainer>::type{};
-	auto static constexpr callback_indices =
-		typename make_pack_indices<7>::type{};
 
 	int m_overlap_i;
 	int m_overlap_j;
@@ -412,19 +410,14 @@ private:
 						std::get<CI>(container_args),
 						std::get<CI>(proxy_tags),
 						row)...);
-			auto cb_args =
-				std::make_tuple(
-					base::m_edge,
-					base::m_pad,
-					res_0_ptr,
-					m_overlap_i, m_overlap_j,
-					row, row_count);
 
 			skeleton_task::schedule(
-				typename make_pack_indices<nuniform>::type{},
-				callback_indices,
 				handles,
-				cb_args,
+				base::m_edge,
+				base::m_pad,
+				res_0_ptr,
+				m_overlap_i, m_overlap_j,
+				row, row_count,
 				std::forward<Args>(args)...);
 
 			row += row_count;

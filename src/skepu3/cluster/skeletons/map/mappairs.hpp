@@ -159,6 +159,8 @@ class MapPairs
 	auto static constexpr Helwise_indices =
 		typename make_pack_indices<outArity + Varity + Harity, outArity + Varity>
 			::type{};
+	auto static constexpr elwise_indices =
+			typename make_pack_indices<outArity + Varity + Harity, outArity>::type{};
 	auto static constexpr any_indices =
 		typename make_pack_indices<
 				outArity + Varity + Harity + anyArity,
@@ -221,7 +223,7 @@ private:
 		pack_indices<VEI...> vei,
 		pack_indices<HEI...> hei,
 		pack_indices<AI...>,
-		pack_indices<CI...> ci,
+		pack_indices<CI...>,
 		pack_indices<PI...>,
 		size_t Vsize,
 		size_t Hsize,
@@ -237,8 +239,6 @@ private:
 
 		if(disjunction((get<HEI, CallArgs...>(args...).size() < Hsize)...))
 			SKEPU_ERROR("Non-matching horizontal container sizes");
-
-		auto static constexpr cbai = make_pack_indices<5>::type{};
 
 		/* Data locality
 		 * The proxy's will be gathered or partitioned depending on if it is a
@@ -292,24 +292,14 @@ private:
 						std::get<PI>(proxy_tags),
 						row)...);
 
-			/* Note: Order is important.
-			 * StarPU can't unpack the callback args correctly if the parameter packs
-			 * are the last items in the tuple and the parameter packs are emtpy.
-			 */
-			auto call_back_args =
-				std::make_tuple(
-					vei,
-					hei,
-					row,
-					task_size,
-					Hsize);
-
 			skeleton_task::schedule(
-				ci,
-				cbai,
 				handles,
-				call_back_args,
-				std::forward<CallArgs>(args)...);
+				vei,
+				hei,
+				row,
+				task_size,
+				Hsize,
+				std::forward<decltype(get<CI>(args...))>(get<CI>(args...))...);
 
 			row += task_size;
 		}

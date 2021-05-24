@@ -474,9 +474,6 @@ private:
 
 		check_vector_sizes(ri, res, in);
 
-		auto static constexpr cbai =
-			typename make_pack_indices<6>::type{};
-
 		// Refering to that the implementation of a skepu container is called
 		// <container>_partition
 		auto res_parts =
@@ -517,7 +514,7 @@ private:
 			// Schedule StarPU task.
 			auto handles =
 				std::make_tuple(
-					res_handle,
+					std::get<RI>(res_parts).handle_for(pos)...,
 					start_region.handle(),
 					end_region.handle(),
 					arg_part.handle_for(pos),
@@ -525,20 +522,16 @@ private:
 						cont::getParent(std::get<CI>(containers),
 						cont::getParent(std::get<CI>(proxy_tags)),
 						pos))...);
-			auto cb_args =
-				std::make_tuple(
-					m_overlap,
-					base::m_edge,
-					base::m_pad,
-					size,
-					pos,
-					count);
+
 			vector_task::schedule(
-				typename make_pack_indices<nuniform>::type{},
-				cbai,
 				handles,
-				cb_args,
-				args...);
+				m_overlap,
+				base::m_edge,
+				base::m_pad,
+				size,
+				pos,
+				count,
+				std::forward<Args>(args)...);
 
 			pos += count;
 		}
@@ -666,9 +659,6 @@ private:
 		Args &&... args) noexcept
 	-> void
 	{
-		auto static constexpr cbai =
-			typename make_pack_indices<5>::type{};
-
 		// Referencing that the implementation class of the containers are called
 		// <container>_partition
 		auto res_parts =
@@ -703,18 +693,14 @@ private:
 					container_handle(
 						std::get<CI>(containers),
 						std::get<CI>(proxy_tags))...);
-			auto cb_args =
-				std::make_tuple(
-					m_overlap,
-					base::m_edge,
-					base::m_pad,
-					count,
-					cols);
+
 			matrix_task::schedule(
-				typename make_pack_indices<nuniform>::type{},
-				cbai,
 				handles,
-				cb_args,
+				m_overlap,
+				base::m_edge,
+				base::m_pad,
+				count,
+				cols,
 				std::forward<Args>(args)...);
 
 			row += count;

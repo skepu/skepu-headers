@@ -189,12 +189,18 @@ class MapReduce
 			typename MapFunc::UniformArgs>
 		skeleton_task;
 
-	static constexpr bool prefers_matrix = MapFunc::prefersMatrix;
-
 	static constexpr size_t numArgs =
 		MapFunc::totalArity - (MapFunc::indexed ? 1 : 0);
 	static constexpr size_t anyArity =
 		std::tuple_size<typename MapFunc::ContainerArgs>::value;
+
+	size_t constexpr static nresult = MapFunc::outArity;
+	size_t constexpr static nelwise =
+		std::tuple_size<typename MapFunc::ElwiseArgs>::value;
+	size_t constexpr static ncontainer =
+		std::tuple_size<typename MapFunc::ContainerArgs>::value;
+	size_t constexpr static nuniform =
+		std::tuple_size<typename MapFunc::UniformArgs>::value;
 
 	static constexpr typename make_pack_indices<MapFunc::outArity>::type
 		out_indices{};
@@ -403,7 +409,7 @@ private:
 		pack_indices<OI...> oi,
 		pack_indices<EI...>,
 		pack_indices<AI...>,
-		pack_indices<CI...> ci,
+		pack_indices<CI...>,
 		pack_indices<PI...>,
 		Iterator begin,
 		Iterator end,
@@ -411,7 +417,7 @@ private:
 	-> Ret
 	{
 		auto static constexpr pt = typename MapFunc::ProxyTags{};
-		auto static constexpr cbai = make_pack_indices<3>::type{};
+
 		pack_expand((
 			skeleton_task::handle_container_arg(
 				cont::getParent(get<AI>(args...)),
@@ -434,18 +440,13 @@ private:
 						cont::getParent(get<AI>(args...)),
 						std::get<PI>(pt),
 						pos)...);
-			auto call_back_args =
-				std::make_tuple(
-					oi,
-					begin,
-					task_size);
 
 			skeleton_task::schedule(
-				ci,
-				cbai,
 				handles,
-				call_back_args,
-				std::forward<CallArgs>(args)...);
+				oi,
+				begin,
+				task_size,
+				std::forward<decltype(get<CI>(args...))>(get<CI>(args...))...);
 
 			scheduled_ranks.insert(rank);
 			begin += task_size;
@@ -480,14 +481,13 @@ private:
 	STARPU(
 		pack_indices<OI...> oi,
 		pack_indices<AI...>,
-		pack_indices<CI...> ci,
+		pack_indices<CI...>,
 		pack_indices<PI...>,
 		size_t size,
 		CallArgs && ... args) noexcept
 	-> Ret
 	{
 		auto static constexpr pt = typename MapFunc::ProxyTags{};
-		auto static constexpr cbai = make_pack_indices<6>::type{};
 		pack_expand((
 			skeleton_task::handle_container_arg(
 				cont::getParent(get<AI>(args...)),
@@ -518,11 +518,14 @@ private:
 					default_size_l);
 
 			skeleton_task::schedule(
-				ci,
-				cbai,
 				handles,
-				call_back_args,
-				std::forward<CallArgs>(args)...);
+				oi,
+				pos,
+				count,
+				default_size_j,
+				default_size_k,
+				default_size_l,
+				std::forward<decltype(get<CI>(args...))>(get<CI>(args...))...);
 		}
 
 		Ret res = m_start;

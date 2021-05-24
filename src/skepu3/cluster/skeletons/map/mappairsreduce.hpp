@@ -181,6 +181,8 @@ class MapPairsReduce
 	auto static constexpr Helwise_indices =
 		typename make_pack_indices<out_arity + Harity + Varity, out_arity + Varity>
 			::type{};
+	auto static constexpr elwise_indices =
+		typename make_pack_indices<out_arity + Harity + Varity, out_arity>::type{};
 	auto static constexpr any_indices =
 		typename make_pack_indices<
 				out_arity + Varity + Harity + anyArity, out_arity + Varity + Harity>
@@ -289,12 +291,10 @@ private:
 		pack_indices<VEI...> vei,
 		pack_indices<HEI...> hei,
 		pack_indices<AI...>,
-		pack_indices<CI...> ci,
+		pack_indices<CI...>,
 		pack_indices<PI...>,
 		CallArgs &&... args) noexcept
 	{
-		auto cbai =
-			make_pack_indices<6>::type{};
 		size_t Vsize =
 			get_noref<0>(get_noref<VEI>(args...).size()..., default_size_i);
 		size_t Hsize =
@@ -331,21 +331,15 @@ private:
 						std::get<PI>(proxy_tags),
 						row)...);
 
-			auto call_back_args =
-				std::make_tuple(
-					vei,
-					hei,
-					m_start,
-					row,
-					task_size,
-					Hsize);
-
 			rowwise_task::schedule(
-				ci,
-				cbai,
 				handles,
-				call_back_args,
-				std::forward<CallArgs>(args)...);
+				vei,
+				hei,
+				m_start,
+				row,
+				task_size,
+				Hsize,
+				std::forward<decltype(get<CI>(args...))>(get<CI>(args...))...);
 
 			row += task_size;
 		}
@@ -364,12 +358,10 @@ private:
 		pack_indices<VEI...> vei,
 		pack_indices<HEI...> hei,
 		pack_indices<AI...>,
-		pack_indices<CI...> ci,
+		pack_indices<CI...>,
 		pack_indices<PI...>,
 		CallArgs &&... args) noexcept
 	{
-		auto cbai =
-			make_pack_indices<6>::type{};
 		size_t Vsize =
 			get_noref<0>(get_noref<VEI>(args...).size()..., default_size_i);
 		size_t Hsize =
@@ -419,11 +411,14 @@ private:
 					Vsize);
 
 			colwise_task::schedule(
-				ci,
-				cbai,
 				handles,
-				call_back_args,
-				std::forward<CallArgs>(args)...);
+				vei,
+				hei,
+				m_start,
+				col,
+				task_size,
+				Vsize,
+				std::forward<decltype(get<CI>(args...))>(get<CI>(args...))...);
 
 			col += task_size;
 		}
