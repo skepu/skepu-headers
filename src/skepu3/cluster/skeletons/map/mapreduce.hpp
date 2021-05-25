@@ -418,11 +418,15 @@ private:
 	{
 		auto static constexpr pt = typename MapFunc::ProxyTags{};
 
-		pack_expand((
-			skeleton_task::handle_container_arg(
+		pack_expand(
+			// Overpartiniing not supported yet.
+			(cont::getParent(get<EI>(args...)).filter(0),0)...,
+			(cont::getParent(get<AI>(args...)).filter(0),0)...,
+
+			(skeleton_task::handle_container_arg(
 				cont::getParent(get<AI>(args...)),
-				std::get<PI>(pt)),0)...);
-		pack_expand((cont::getParent(get<EI>(args...)).partition(),0)...);
+				std::get<PI>(pt)),0)...,
+			(cont::getParent(get<EI>(args...)).partition(),0)...);
 
 		std::set<size_t> scheduled_ranks;
 		while(begin != end)
@@ -488,8 +492,10 @@ private:
 	-> Ret
 	{
 		auto static constexpr pt = typename MapFunc::ProxyTags{};
-		pack_expand((
-			skeleton_task::handle_container_arg(
+		pack_expand(
+			(cont::getParent(get<AI>(args...)).filter(0), 0)...,
+
+			(skeleton_task::handle_container_arg(
 				cont::getParent(get<AI>(args...)),
 				std::get<PI>(pt)),0)...);
 		size_t task_size = size / cluster::mpi_size();

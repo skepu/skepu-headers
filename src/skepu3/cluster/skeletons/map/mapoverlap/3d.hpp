@@ -379,11 +379,6 @@ private:
 	-> void
 	{
 		pack_expand((
-			std::get<RI>(result_args).partition(),
-			std::get<RI>(result_args).invalidate_local_storage(),
-			std::get<RI>(result_args).filter(0),
-			0)...);
-		pack_expand((
 			std::get<EI>(elwise_args).partition(),
 			std::get<EI>(elwise_args).filter(0),
 			0)...);
@@ -393,6 +388,11 @@ private:
 			skeleton_task::handle_container_arg(
 				std::get<CI>(container_args),
 				std::get<CI>(proxy_tags)),
+			0)...);
+		pack_expand((
+			std::get<RI>(result_args).partition(),
+			std::get<RI>(result_args).invalidate_local_storage(),
+			std::get<RI>(result_args).filter(0),
 			0)...);
 
 		auto * res_0_ptr = &std::get<0>(result_args);

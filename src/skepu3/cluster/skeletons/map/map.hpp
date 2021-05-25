@@ -250,11 +250,6 @@ private:
 				cont::getParent(get<AI>(args...)),
 				std::get<PI>(proxy_tags)),0)...);
 
-		// The result will be partitioned.
-		pack_expand(
-			(cont::getParent(get<OI>(args...)).partition(),
-			(cont::getParent(get<OI>(args...)).invalidate_local_storage()),0)...);
-
 		// And the same goes for the elwise arguments.
 		// TODO: They should be realinged so that element i in the elwise is on the
 		// same rank as element i in the result. This will ensure that the number of
@@ -276,6 +271,11 @@ private:
 				cont::getParent(get<AI>(args...)),
 				std::get<PI>(proxy_tags),
 				filter_parts), 0)...);
+
+		// The result will be partitioned.
+		pack_expand(
+			(cont::getParent(get<OI>(args...)).partition(),
+			(cont::getParent(get<OI>(args...)).invalidate_local_storage()),0)...);
 
 		while(begin != end)
 		{

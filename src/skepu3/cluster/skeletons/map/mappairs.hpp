@@ -254,7 +254,6 @@ private:
 				cont::getParent(get<AI>(args...)),
 				std::get<PI>(proxy_tags)),0)...,
 			(cont::getParent(get<OI>(args...)).partition(),0)...,
-			(cont::getParent(get<OI>(args...)).invalidate_local_storage(),0)...,
 			(cont::getParent(get<VEI>(args...)).partition(),0)...,
 			(cont::getParent(get<HEI>(args...)).allgather(),0)...);
 
@@ -275,6 +274,9 @@ private:
 				cont::getParent(get<AI>(args...)),
 				std::get<PI>(proxy_tags),
 				parts), 0)...);
+
+		pack_expand(
+			(cont::getParent(get<OI>(args...)).invalidate_local_storage(),0)...);
 
 		auto cols = get<0>(args...).size_j();
 		for(size_t row = 0; row < Vsize;)

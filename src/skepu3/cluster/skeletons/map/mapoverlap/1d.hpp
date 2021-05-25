@@ -474,6 +474,15 @@ private:
 
 		check_vector_sizes(ri, res, in);
 
+		auto & arg_part = cont::getParent(in);
+		arg_part.partition();
+		arg_part.filter(0);
+
+		pack_expand(
+			handle_container_arg(
+				cont::getParent(get<CI>(args...)),
+				std::get<CI>(proxy_tags))...);
+
 		// Refering to that the implementation of a skepu container is called
 		// <container>_partition
 		auto res_parts =
@@ -483,15 +492,6 @@ private:
 			std::get<RI>(res_parts).partition(),
 			std::get<RI>(res_parts).invalidate_local_storage(),
 			0)...);
-
-		auto & arg_part = cont::getParent(in);
-		arg_part.partition();
-		arg_part.filter(0);
-
-		pack_expand(
-			handle_container_arg(
-				cont::getParent(get<CI>(args...)),
-				std::get<CI>(proxy_tags))...);
 
 		std::vector<util::border_region<in_t>> borders;
 		size_t pos{0};
@@ -659,16 +659,6 @@ private:
 		Args &&... args) noexcept
 	-> void
 	{
-		// Referencing that the implementation class of the containers are called
-		// <container>_partition
-		auto res_parts =
-			std::tie(cont::getParent(std::get<RI>(res))...);
-		pack_expand((
-			std::get<RI>(res_parts).filter(0),
-			std::get<RI>(res_parts).partition(),
-			std::get<RI>(res_parts).invalidate_local_storage(),
-			0)...);
-
 		auto & arg_ref = cont::getParent(arg);
 		arg_ref.filter(0);
 		arg_ref.partition();
@@ -678,6 +668,16 @@ private:
 			handle_container_arg(
 				cont::getParent(get<CI>(args...)),
 				std::get<CI>(proxy_tags)),
+			0)...);
+
+		// Referencing that the implementation class of the containers are called
+		// <container>_partition
+		auto res_parts =
+			std::tie(cont::getParent(std::get<RI>(res))...);
+		pack_expand((
+			std::get<RI>(res_parts).filter(0),
+			std::get<RI>(res_parts).partition(),
+			std::get<RI>(res_parts).invalidate_local_storage(),
 			0)...);
 
 		size_t row(0);

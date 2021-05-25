@@ -388,6 +388,8 @@ private:
 	STARPU(Iterator begin, Iterator const end) noexcept
 	-> T
 	{
+		begin.getParent().filter(
+			begin.getParent().min_filter_parts());
 		begin.getParent().partition();
 		std::set<int> scheduled_ranks;
 
@@ -434,6 +436,13 @@ private:
 		auto & rp = cont::getParent(res);
 		auto & dp = cont::getParent(data);
 		auto cols = data.size_j();
+
+		auto filter_parts =
+			std::max<size_t>(
+				rp.min_filter_parts(),
+				dp.min_filter_parts());
+		rp.filter(filter_parts);
+		dp.filter(filter_parts);
 
 		rp.partition();
 		rp.invalidate_local_storage();

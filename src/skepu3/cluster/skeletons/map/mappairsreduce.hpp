@@ -309,13 +309,21 @@ private:
 		if(disjunction((get<HEI, CallArgs...>(args...).size() < Hsize)...))
 			SKEPU_ERROR("Non-matching container sizes");
 
+		// Filters are not supported here, make sure containers are not filtered...
+		pack_expand(
+			(cont::getParent(get<OI>(args...)).filter(0),0)...,
+			(cont::getParent(get<VEI>(args...)).filter(0),0)...,
+			(cont::getParent(get<HEI>(args...)).filter(0),0)...,
+			(cont::getParent(get<AI>(args...)).filter(0),0)...);
+
 		pack_expand(
 			(rowwise_task::handle_container_arg(
 				cont::getParent(get<AI>(args...)),
 				std::get<PI>(proxy_tags)),0)...,
 			(cont::getParent(get<OI>(args...)).partition(),0)...,
 			(cont::getParent(get<VEI>(args...)).partition(),0)...,
-			(cont::getParent(get<HEI>(args...)).allgather(),0)...);
+			(cont::getParent(get<HEI>(args...)).allgather(),0)...,
+			(cont::getParent(get<OI>(args...)).invalidate_local_storage(),0)...);
 
 		for(size_t row = 0; row < Vsize;)
 		{
@@ -377,6 +385,12 @@ private:
 			SKEPU_ERROR("Non-matching container sizes");
 
 		pack_expand(
+			// Filters are not supported here yet
+			(cont::getParent(get<OI>(args...)).filter(0),0)...,
+			(cont::getParent(get<VEI>(args...)).filter(0),0)...,
+			(cont::getParent(get<HEI>(args...)).filter(0),0)...,
+			(cont::getParent(get<AI>(args...)).filter(0),0)...,
+
 			/* Might need a version for MatCol that does not allgather in this case.
 			(colwise_task::handle_container_arg(
 				cont::getParent(get<AI>(args...)),
@@ -385,7 +399,8 @@ private:
 			(cont::getParent(get<AI>(args...)).allgather(),0)...,
 			(cont::getParent(get<OI>(args...)).partition(),0)...,
 			(cont::getParent(get<VEI>(args...)).allgather(),0)...,
-			(cont::getParent(get<HEI>(args...)).partition(),0)...);
+			(cont::getParent(get<HEI>(args...)).partition(),0)...,
+			(cont::getParent(get<OI>(args...)).invalidate_local_storage(),0)...);
 
 		for(size_t col = 0; col < Hsize;)
 		{

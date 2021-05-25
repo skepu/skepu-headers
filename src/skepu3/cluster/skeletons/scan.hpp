@@ -434,11 +434,11 @@ private:
 	dispatch(Res & res, Arg & arg) noexcept
 	-> void
 	{
+		arg.partition();
+		arg.filter(0);
 		res.partition();
 		res.invalidate_local_storage();
 		res.filter(0);
-		arg.partition();
-		arg.filter(0);
 
 		auto num_parts = res.num_parts();
 		starpu_data_filter part_res_filter;
