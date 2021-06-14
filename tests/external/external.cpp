@@ -20,7 +20,7 @@ struct container_stub
 	bool flushed;
 
 	auto inline
-	flush() noexcept
+	flush()
 	-> void
 	{
 		flushed = true;

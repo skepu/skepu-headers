@@ -18,14 +18,14 @@ struct scalar_fn
 	constexpr static bool prefersMatrix = 0;
 
 	auto static inline
-	OMP(int i) noexcept
+	OMP(int i)
 	-> int
 	{
 		return i;
 	}
 
 	auto static inline
-	CPU(int i) noexcept
+	CPU(int i)
 	-> int
 	{
 		return i;
@@ -47,14 +47,14 @@ struct add_int
 	constexpr static bool prefersMatrix = 0;
 
 	auto static inline
-	OMP(int a, int b) noexcept
+	OMP(int a, int b)
 	-> int
 	{
 		return a + b;
 	}
 
 	auto static inline
-	CPU(int a, int b) noexcept
+	CPU(int a, int b)
 	-> int
 	{
 		return a + b;
@@ -115,14 +115,14 @@ struct copy_fn
 	constexpr static bool prefersMatrix = 0;
 
 	auto static inline
-	OMP(int i) noexcept
+	OMP(int i)
 	-> int
 	{
 		return i;
 	}
 
 	auto static inline
-	CPU(int i) noexcept
+	CPU(int i)
 	-> int
 	{
 		return i;
@@ -207,7 +207,7 @@ struct multi_return_fn
 	constexpr static bool prefersMatrix = 0;
 
 	auto static inline
-	CPU(skepu::Index1D idx) noexcept
+	CPU(skepu::Index1D idx)
 	-> std::tuple<int, int>
 	{
 			return std::tuple<int, int>{
@@ -216,7 +216,7 @@ struct multi_return_fn
 	}
 
 	auto static inline
-	OMP(skepu::Index1D idx) noexcept
+	OMP(skepu::Index1D idx)
 	-> std::tuple<int, int>
 	{
 			return std::tuple<int, int>{
@@ -240,14 +240,14 @@ struct mult_red_fn
 	constexpr static bool prefersMatrix = 0;
 
 	auto static inline
-	CPU(int a, int b) noexcept
+	CPU(int a, int b)
 	-> int
 	{
 		return a * b;
 	}
 
 	auto static inline
-	OMP(int a, int b) noexcept
+	OMP(int a, int b)
 	-> int
 	{
 		return a * b;
@@ -342,14 +342,14 @@ struct elwise_multi_return_fn
 	constexpr static bool prefersMatrix = 0;
 
 	auto static inline
-	CPU(int a, int b) noexcept
+	CPU(int a, int b)
 	-> std::tuple<int, int>
 	{
 		return std::tuple<int, int>{a, a + b};
 	}
 
 	auto static inline
-	OMP(int a, int b) noexcept
+	OMP(int a, int b)
 	-> std::tuple<int, int>
 	{
 		return std::tuple<int, int>{a, a + b};

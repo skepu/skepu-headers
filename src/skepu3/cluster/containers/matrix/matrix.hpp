@@ -60,10 +60,25 @@ public:
 		m_data.set(l_it, l.end());
 	}
 
-	/* TODO: In vector we have ptr vals here. Matrix should be the same.
-	Matrix(size_type _rows, size_type _cols, const std::vector<T>& vals);
-	Matrix(size_type _rows, size_type _cols, std::vector<T>&& vals);
-	*/
+	Matrix(pointer ptr, size_t rows, size_t cols, bool deallocEnabled = true)
+	{
+		if(m_data.size())
+		{
+			if(!cluster::mpi_rank())
+				std::cerr << "[SkePU][Vector] Error: "
+					"Can only be initialized once!\n";
+			std::abort();
+		}
+		if(!(rows && cols))
+		{
+			if(!cluster::mpi_rank())
+				std::cerr << "[SkePU][Vector] Error: "
+					"Can not initialize without size\n";
+			std::abort();
+		}
+
+		m_data.init(ptr, rows, cols, deallocEnabled);
+	}
 
 	~Matrix() noexcept = default;
 

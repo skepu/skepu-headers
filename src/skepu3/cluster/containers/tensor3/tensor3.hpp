@@ -32,16 +32,14 @@ private:
 	partition_type m_partition;
 
 public:
-	explicit Tensor3() noexcept : m_partition() {}
+	Tensor3() noexcept : m_partition() {}
 
-	explicit
 	Tensor3(Tensor3 const & other) noexcept
 	: m_partition(other.m_partition)
 	{}
 
-	explicit
 	Tensor3(Tensor3 && other) noexcept
-	: m_partition(std::move(other))
+	: m_partition(std::move(other.m_partition))
 	{}
 
 	explicit
@@ -56,6 +54,31 @@ public:
 	{
 		if(i && j && k)
 			init(i, j, k, val);
+	}
+
+	explicit
+	Tensor3(
+		pointer ptr,
+		size_type i,
+		size_type j,
+		size_type k,
+		bool deallocEnabled = true)
+	{
+		if(m_partition.size())
+		{
+			if(!cluster::mpi_rank())
+				std::cerr << "[SkePU][Vector] Error: "
+					"Can only be initialized once!\n";
+			std::abort();
+		}
+		if(!(i && j && k))
+		{
+			if(!cluster::mpi_rank())
+				std::cerr << "[SkePU][Vector] Error: "
+					"Can not initialize without size\n";
+			std::abort();
+		}
+		m_partition.init(ptr, i, j, k, deallocEnabled);
 	}
 
 	~Tensor3() noexcept = default;

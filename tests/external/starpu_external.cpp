@@ -41,7 +41,7 @@ struct container_stub
 	void scatter_from_root() { partitioned = true; }
 
 	auto inline
-	getParent() noexcept
+	getParent()
 	-> container_stub &
 	{
 		return *this;

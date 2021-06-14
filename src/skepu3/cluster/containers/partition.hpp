@@ -83,6 +83,7 @@ protected:
 
 	T * m_data;
 	T * m_part_data;
+	bool m_dealloc_mdata;
 
 	bool m_data_valid;
 	bool m_part_valid;
@@ -105,6 +106,7 @@ protected:
 	partition_base() noexcept
 	: m_data(0),
 		m_part_data(0),
+		m_dealloc_mdata(true),
 		m_data_valid(false),
 		m_part_valid(false),
 		m_size(0),
@@ -121,6 +123,7 @@ protected:
 	partition_base(filter_func fn) noexcept
 	: m_data(0),
 		m_part_data(0),
+		m_dealloc_mdata(true),
 		m_data_valid(false),
 		m_part_valid(false),
 		m_size(0),
@@ -137,6 +140,7 @@ protected:
 	partition_base(partition_base && other) noexcept
 	: m_data(std::move(other.m_data)),
 		m_part_data(std::move(other.m_part_data)),
+		m_dealloc_mdata(std::move(other.m_dealloc_mdata)),
 		m_data_valid(std::move(other.m_data_valid)),
 		m_part_valid(std::move(other.m_part_valid)),
 		m_size(std::move(other.m_size)),
@@ -706,7 +710,8 @@ private:
 		if(m_data)
 		{
 			starpu_data_unregister_no_coherency(m_data_handle);
-			delete[] m_data;
+			if(m_dealloc_mdata)
+				delete[] m_data;
 			m_data = 0;
 		}
 	}

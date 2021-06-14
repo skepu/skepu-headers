@@ -49,6 +49,18 @@ public:
 	}
 
 	auto
+	init(T * ptr, size_t count, bool dealloc_mdata) noexcept
+	-> void
+	{
+		set_sizes(count);
+		base::m_dealloc_mdata = dealloc_mdata;
+		register_local_storage(ptr);
+		alloc_partitions();
+		base::m_data_valid = true;
+		base::m_part_valid = false;
+	}
+
+	auto
 	operator=(vector_partition const & other) noexcept
 	-> vector_partition &
 	{
@@ -182,27 +194,24 @@ private:
 	}
 
 	auto
-	update_sizes() noexcept
-	-> void override
+	register_local_storage(T * ptr) noexcept
+	-> void
 	{
-		auto size = base::m_size;
-		starpu_data_handle_t size_handle;
-		starpu_variable_data_register(
-			&size_handle,
-			STARPU_MAIN_RAM,
-			(uintptr_t)&size,
-			sizeof(size_t));
-		starpu_mpi_data_register(size_handle, cluster::mpi_tag(), 0);
-		starpu_mpi_get_data_on_all_nodes_detached(MPI_COMM_WORLD, size_handle);
-		starpu_data_acquire(size_handle, STARPU_RW);
-
-		set_sizes(size);
-
-		starpu_data_release(size_handle);
-		starpu_data_unregister_no_coherency(size_handle);
-
-		alloc_partitions();
-		alloc_local_storage();
+		base::m_data = ptr;
+		if(!base::m_external && !base::m_data_handle)
+		{
+			starpu_data_handle_t & handle = base::m_data_handle;
+			starpu_vector_data_register(
+				&handle,
+				STARPU_MAIN_RAM,
+				(uintptr_t)(base::m_data),
+				base::m_size,
+				sizeof(T));
+			starpu_mpi_data_register(
+				base::m_data_handle,
+				cluster::mpi_tag(),
+				STARPU_MPI_PER_NODE);
+		}
 	}
 
 	auto
@@ -247,6 +256,30 @@ private:
 			handle,
 			cluster::mpi_tag(),
 			rank);
+	}
+
+	auto
+	update_sizes() noexcept
+	-> void override
+	{
+		auto size = base::m_size;
+		starpu_data_handle_t size_handle;
+		starpu_variable_data_register(
+			&size_handle,
+			STARPU_MAIN_RAM,
+			(uintptr_t)&size,
+			sizeof(size_t));
+		starpu_mpi_data_register(size_handle, cluster::mpi_tag(), 0);
+		starpu_mpi_get_data_on_all_nodes_detached(MPI_COMM_WORLD, size_handle);
+		starpu_data_acquire(size_handle, STARPU_RW);
+
+		set_sizes(size);
+
+		starpu_data_release(size_handle);
+		starpu_data_unregister_no_coherency(size_handle);
+
+		alloc_partitions();
+		alloc_local_storage();
 	}
 };
 

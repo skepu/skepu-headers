@@ -39,7 +39,7 @@ public:
 	{}
 
 	Tensor4(Tensor4 && other) noexcept
-	: m_partition(std::move(other))
+	: m_partition(std::move(other.m_partition))
 	{}
 
 	~Tensor4() noexcept = default;
@@ -60,6 +60,32 @@ public:
 	{
 		if(m_partition.size())
 			m_partition.fill(m_partition.size(), val);
+	}
+
+	explicit
+	Tensor4(
+		pointer ptr,
+		size_type i,
+		size_type j,
+		size_type k,
+		size_type l,
+		bool deallocEnabled = true)
+	{
+		if(m_partition.size())
+		{
+			if(!cluster::mpi_rank())
+				std::cerr << "[SkePU][Vector] Error: "
+					"Can only be initialized once!\n";
+			std::abort();
+		}
+		if(!(i && j && k && l))
+		{
+			if(!cluster::mpi_rank())
+				std::cerr << "[SkePU][Vector] Error: "
+					"Can not initialize without size\n";
+			std::abort();
+		}
+		m_partition.init(ptr, i, j, k, l, deallocEnabled);
 	}
 
 	auto

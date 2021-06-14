@@ -54,7 +54,14 @@ public:
 	}
 
 	tensor4_partition(tensor4_partition && other) noexcept
-	: base(std::move(other))
+	: base(std::move(other)),
+		m_size_i(other.m_size_i),
+		m_size_j(other.m_size_j),
+		m_size_k(other.m_size_l),
+		m_size_l(other.m_size_l),
+		m_size_kl(other.m_size_kl),
+		m_size_jkl(other.m_size_jkl),
+		m_part_i(other.m_part_i)
 	{}
 
 	~tensor4_partition() noexcept = default;
@@ -67,14 +74,34 @@ public:
 		m_size_j = j;
 		m_size_k = k;
 		m_size_l = l;
-		m_size_kl = k*l;
-		m_size_jkl = j*m_size_kl;
 		set_sizes();
 
 		if(base::m_external)
 			alloc_local_storage();
 		else
 			alloc_partitions();
+	}
+
+	auto
+	init(
+		T * ptr,
+		size_t i,
+		size_t j,
+		size_t k,
+		size_t l,
+		bool dealloc_mdata) noexcept
+	-> void
+	{
+		base::m_dealloc_mdata = dealloc_mdata;
+		m_size_i = i;
+		m_size_j = j;
+		m_size_k = k;
+		m_size_l = l;
+		set_sizes();
+		register_local_storage(ptr);
+		alloc_partitions();
+		base::m_data_valid = true;
+		base::m_part_valid = false;
 	}
 
 	auto
@@ -311,6 +338,48 @@ private:
 	}
 
 	auto
+	register_local_storage(T * ptr) noexcept
+	-> void
+	{
+		base::m_data = ptr;
+
+		if(!base::m_external && !base::m_data_handle)
+		{
+			auto & handle = base::m_data_handle;
+			starpu_tensor_data_register(
+				&handle,
+				STARPU_MAIN_RAM,
+				(uintptr_t)(base::m_data),
+				m_size_l, m_size_kl, m_size_jkl,
+				m_size_l, m_size_k, m_size_j, m_size_i,
+				sizeof(T));
+			starpu_mpi_data_register(
+				base::m_data_handle,
+				cluster::mpi_tag(),
+				STARPU_MPI_PER_NODE);
+		}
+	}
+
+	auto
+	set_sizes() noexcept
+	-> void
+	{
+		m_size_kl = m_size_k * m_size_l;
+		m_size_jkl = m_size_j * m_size_kl;
+		base::m_size = m_size_i * m_size_jkl;
+		if(base::m_size)
+		{
+			auto ranks = skepu::cluster::mpi_size();
+			m_part_i = m_size_i / ranks;
+			if(m_size_i - (m_part_i * ranks))
+				++m_part_i;
+			base::m_part_size = m_part_i * m_size_jkl;
+			base::m_capacity = base::m_part_size * ranks;
+			base::m_filter_block_size = m_size_jkl;
+		}
+	}
+
+	auto
 	update_sizes() noexcept
 	-> void override
 	{
@@ -341,23 +410,6 @@ private:
 
 		alloc_partitions();
 		alloc_local_storage();
-	}
-
-	auto
-	set_sizes() noexcept
-	-> void
-	{
-		base::m_size = m_size_i * m_size_jkl;
-		if(base::m_size)
-		{
-			auto ranks = skepu::cluster::mpi_size();
-			m_part_i = m_size_i / ranks;
-			if(m_size_i - (m_part_i * ranks))
-				++m_part_i;
-			base::m_part_size = m_part_i * m_size_jkl;
-			base::m_capacity = base::m_part_size * ranks;
-			base::m_filter_block_size = m_size_jkl;
-		}
 	}
 };
 

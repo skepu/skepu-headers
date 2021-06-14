@@ -245,3 +245,39 @@ TEST_CASE("Size_i returns same value as size")
 		CHECK(v.size_l() == 0);
 	}
 }
+
+TEST_CASE("Flushing container created from pointer updates the original array")
+{
+	size_t const N = 10 * skepu::cluster::mpi_size();
+	auto v = new int[N];
+	skepu::Vector<int> sv(v, N);
+
+	auto & part = skepu::cont::getParent(sv);
+	part.partition();
+	part.invalidate_local_storage();
+
+	auto rank = skepu::cluster::mpi_rank();
+
+	int i = 0;
+	while((size_t)i < N)
+	{
+		auto task_size = part.block_count_from(i);
+		auto handle = part.handle_for(i);
+		auto owner = (size_t)starpu_mpi_data_get_rank(handle);
+
+		if(owner == rank)
+		{
+			starpu_data_acquire(handle, STARPU_RW);
+			auto ptr = (int *)starpu_data_get_local_ptr(handle);
+			for(int ti = 0; (size_t)ti < task_size; ++ti)
+				ptr[ti] = ti +i;
+			starpu_data_release(handle);
+		}
+
+		i += task_size;
+	}
+
+	sv.flush();
+	for(i = 0; (size_t)i < N; ++i)
+		REQUIRE(v[i] == i);
+}

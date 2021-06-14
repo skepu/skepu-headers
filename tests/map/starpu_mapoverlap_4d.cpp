@@ -665,7 +665,7 @@ struct indexed_uf
 		skepu::Region4D<int>,
 		size_t const J,
 		size_t const K,
-		size_t const L) noexcept
+		size_t const L)
 	-> int
 	{
 		return idx.i * J*K*L + idx.j * K*L + idx.k * L + idx.l;
@@ -677,7 +677,7 @@ struct indexed_uf
 		skepu::Region4D<int>,
 		size_t const J,
 		size_t const K,
-		size_t const L) noexcept
+		size_t const L)
 	-> int
 	{
 		return idx.i * J*K*L + idx.j * K*L + idx.k * L + idx.l;

@@ -23,21 +23,21 @@ struct simple_map_fn
 
 	__device__
 	auto static
-	CU() noexcept
+	CU()
 	-> int
 	{
 		return 10;
 	}
 
 	auto static
-	OMP() noexcept
+	OMP()
 	-> int
 	{
 		return 10;
 	}
 
 	auto static
-	CPU() noexcept
+	CPU()
 	-> int
 	{
 		return 10;

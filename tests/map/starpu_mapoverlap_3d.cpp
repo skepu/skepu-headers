@@ -547,7 +547,7 @@ struct indexed_uf
 		skepu::Index3D idx,
 		skepu::Region3D<int>,
 		size_t const J,
-		size_t const K) noexcept
+		size_t const K)
 	-> int
 	{
 		return idx.i * J*K + idx.j * K + idx.k;
@@ -558,7 +558,7 @@ struct indexed_uf
 		skepu::Index3D idx,
 		skepu::Region3D<int>,
 		size_t const J,
-		size_t const K) noexcept
+		size_t const K)
 	-> int
 	{
 		return idx.i * J*K + idx.j * K + idx.k;

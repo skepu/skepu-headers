@@ -65,12 +65,9 @@ public:
 			init(count, val);
 	}
 
-	Vector(pointer p, size_type count, bool deallocEnabled)
+	Vector(pointer p, size_type count, bool deallocEnabled = true)
 	{
-		// TODO: p shoudl realy live as long as the container lives.
-		init(p, count);
-		if(deallocEnabled)
-			delete[] p;
+		init(p, count, deallocEnabled);
 	}
 
 	~Vector() noexcept
@@ -107,12 +104,25 @@ public:
 	}
 
 	auto
-	init(pointer p, size_type count) noexcept
+	init(pointer p, size_type count, bool deallocEnabled) noexcept
 	-> void
 	{
-		m_data = partition_type(count);
-		m_data.set(p, p + count);
+		if(m_data.size())
+		{
+			if(!cluster::mpi_rank())
+				std::cerr << "[SkePU][Vector] Error: "
+					"Can only be initialized once!\n";
+			std::abort();
+		}
+		if(!count)
+		{
+			if(!cluster::mpi_rank())
+				std::cerr << "[SkePU][Vector] Error: "
+					"Can not initialize without size\n";
+			std::abort();
+		}
 
+		m_data.init(p, count, deallocEnabled);
 	}
 
 	auto

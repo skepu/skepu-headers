@@ -21,14 +21,14 @@ struct simple_map_fn
 	constexpr static bool prefersMatrix = 0;
 
 	auto static inline
-	OMP() noexcept
+	OMP()
 	-> int
 	{
 		return 10;
 	}
 
 	auto static inline
-	CPU() noexcept
+	CPU()
 	-> int
 	{
 		return 10;
@@ -82,14 +82,14 @@ struct indexed_map_fn
 	constexpr static bool prefersMatrix = 0;
 
 	auto static inline
-	OMP(skepu::Index1D index) noexcept
+	OMP(skepu::Index1D index)
 	-> int
 	{
 		return index.i;
 	}
 
 	auto static inline
-	CPU(skepu::Index1D index) noexcept
+	CPU(skepu::Index1D index)
 	-> int
 	{
 		return index.i;
@@ -125,14 +125,14 @@ struct elwise_mult_fn
 	constexpr static bool prefersMatrix = 0;
 
 	auto static inline
-	OMP(int a, int b) noexcept
+	OMP(int a, int b)
 	-> int
 	{
 		return a * b;
 	}
 
 	auto static inline
-	CPU(int a, int b) noexcept
+	CPU(int a, int b)
 	-> int
 	{
 		return a * b;
@@ -182,14 +182,14 @@ struct indexed_elwise_mult_fn
 	constexpr static bool prefersMatrix = 0;
 
 	auto static inline
-	OMP(skepu::Index1D idx, int val) noexcept
+	OMP(skepu::Index1D idx, int val)
 	-> int
 	{
 		return idx.i * val;
 	}
 
 	auto static inline
-	CPU(skepu::Index1D idx, int val) noexcept
+	CPU(skepu::Index1D idx, int val)
 	-> int
 	{
 		return idx.i * val;
@@ -225,7 +225,7 @@ struct vector_copy_fn
 	constexpr static bool prefersMatrix = 0;
 
 	static inline auto
-	OMP(skepu::Vec<int> v) noexcept
+	OMP(skepu::Vec<int> v)
 	-> int
 	{
 		int sum(0);
@@ -235,7 +235,7 @@ struct vector_copy_fn
 	}
 
 	static inline auto
-	CPU(skepu::Vec<int> v) noexcept
+	CPU(skepu::Vec<int> v)
 	-> int
 	{
 		int sum(0);
@@ -322,14 +322,14 @@ struct vector_scale_fn
 	constexpr static bool prefersMatrix = 0;
 
 	auto static inline
-	OMP(int a, int b) noexcept
+	OMP(int a, int b)
 	-> int
 	{
 		return a * b;
 	}
 
 	auto static inline
-	CPU(int a, int b) noexcept
+	CPU(int a, int b)
 	-> int
 	{
 		return a * b;
@@ -391,14 +391,14 @@ struct matrix_indexed_fn
 	constexpr static bool prefersMatrix = 1;
 
 	auto static inline
-	OMP(skepu::Index2D idx) noexcept
+	OMP(skepu::Index2D idx)
 	-> int
 	{
 		return idx.row * idx.col;
 	}
 
 	auto static inline
-	CPU(skepu::Index2D idx) noexcept
+	CPU(skepu::Index2D idx)
 	-> int
 	{
 		return idx.row * idx.col;
@@ -437,14 +437,14 @@ struct matrix_scale_fn
 	constexpr static bool prefersMatrix = 1;
 
 	auto static inline
-	OMP(int elem, int factor) noexcept
+	OMP(int elem, int factor)
 	-> int
 	{
 		return elem * factor;
 	}
 
 	auto static inline
-	CPU(int elem, int factor) noexcept
+	CPU(int elem, int factor)
 	-> int
 	{
 		return elem * factor;
@@ -491,7 +491,7 @@ struct matrix_vector_mult_fn
 	constexpr static bool prefersMatrix = 0;
 
 	auto static inline
-	OMP(skepu::Index1D row, skepu::Mat<int> m, skepu::Vec<int> v) noexcept
+	OMP(skepu::Index1D row, skepu::Mat<int> m, skepu::Vec<int> v)
 	-> int
 	{
 		auto row_it = m.data + (row.i * m.cols);
@@ -504,7 +504,7 @@ struct matrix_vector_mult_fn
 	}
 
 	auto static inline
-	CPU(skepu::Index1D row, skepu::Mat<int> m, skepu::Vec<int> v) noexcept
+	CPU(skepu::Index1D row, skepu::Mat<int> m, skepu::Vec<int> v)
 	-> int
 	{
 		auto row_it = m.data + (row.i * m.cols);
@@ -570,7 +570,7 @@ struct matrow_vector_mult_fn
 	constexpr static bool prefersMatrix = 0;
 
 	auto static inline
-	OMP(skepu::MatRow<int> m, skepu::Vec<int> v) noexcept
+	OMP(skepu::MatRow<int> m, skepu::Vec<int> v)
 	-> int
 	{
 		auto res(0);
@@ -580,7 +580,7 @@ struct matrow_vector_mult_fn
 	}
 
 	auto static inline
-	CPU(skepu::MatRow<int> m, skepu::Vec<int> v) noexcept
+	CPU(skepu::MatRow<int> m, skepu::Vec<int> v)
 	-> int
 	{
 		auto res(0);
@@ -746,14 +746,14 @@ struct multiple_return_fn
 	constexpr static bool prefersMatrix = 0;
 
 	auto static inline
-	CPU(skepu::Index1D idx, int i, double d) noexcept
+	CPU(skepu::Index1D idx, int i, double d)
 	-> std::tuple<int, double>
 	{
 		return std::make_tuple(idx.i * i, (double)(idx.i)*d);
 	}
 
 	auto static inline
-	OMP(skepu::Index1D idx, int i, double d) noexcept
+	OMP(skepu::Index1D idx, int i, double d)
 	-> std::tuple<int, double>
 	{
 		return std::make_tuple(idx.i * i, (double)(idx.i)*d);

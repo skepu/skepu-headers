@@ -21,7 +21,7 @@ struct smoothing_filter
 	constexpr static bool prefersMatrix = 0;
 
 	auto static
-	CPU(skepu::Region1D<int> r) noexcept
+	CPU(skepu::Region1D<int> r)
 	-> int
 	{
 		int res = 0;
@@ -31,7 +31,7 @@ struct smoothing_filter
 	}
 
 	auto static
-	OMP(skepu::Region1D<int> r) noexcept
+	OMP(skepu::Region1D<int> r)
 	-> int
 	{
 		int res = 0;
@@ -551,14 +551,14 @@ struct indexed_uf
 	constexpr static bool prefersMatrix = 0;
 
 	auto static
-	CPU(skepu::Index1D idx, skepu::Region1D<int>) noexcept
+	CPU(skepu::Index1D idx, skepu::Region1D<int>)
 	-> int
 	{
 		return idx.i;
 	}
 
 	auto static
-	OMP(skepu::Index1D idx, skepu::Region1D<int>) noexcept
+	OMP(skepu::Index1D idx, skepu::Region1D<int>)
 	-> int
 	{
 		return idx.i;

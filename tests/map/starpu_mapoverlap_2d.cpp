@@ -438,14 +438,14 @@ struct indexed_uf
 	constexpr static bool prefersMatrix = 0;
 
 	auto static
-	CPU(skepu::Index2D idx, skepu::Region2D<int>, size_t const N) noexcept
+	CPU(skepu::Index2D idx, skepu::Region2D<int>, size_t const N)
 	-> int
 	{
 		return idx.row * N + idx.col;
 	}
 
 	auto static
-	OMP(skepu::Index2D idx, skepu::Region2D<int>, size_t N) noexcept
+	OMP(skepu::Index2D idx, skepu::Region2D<int>, size_t N)
 	-> int
 	{
 		return idx.row * N + idx.col;

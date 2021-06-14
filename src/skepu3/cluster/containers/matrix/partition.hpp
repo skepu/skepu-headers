@@ -68,6 +68,20 @@ public:
 	}
 
 	auto
+	init(T * ptr, size_t rows, size_t cols, bool dealloc_mdata) noexcept
+	-> void
+	{
+		base::m_dealloc_mdata = dealloc_mdata;
+		m_rows = rows;
+		m_cols = cols;
+		set_sizes();
+		register_local_storage(ptr);
+		alloc_partitions();
+		base::m_data_valid = true;
+		base::m_part_valid = false;
+	}
+
+	auto
 	operator=(matrix_partition const & other) noexcept
 	-> matrix_partition &
 	{
@@ -329,30 +343,26 @@ private:
 	}
 
 	auto
-	update_sizes() noexcept
-	-> void override
+	register_local_storage(T * ptr) noexcept
+	-> void
 	{
-		size_t size_arr[]{m_rows, m_cols};
-		starpu_data_handle_t size_handle;
-		starpu_variable_data_register(
-			&size_handle,
-			STARPU_MAIN_RAM,
-			(uintptr_t)size_arr,
-			sizeof(size_arr));
-		starpu_mpi_data_register(size_handle, cluster::mpi_tag(), 0);
-		starpu_mpi_get_data_on_all_nodes_detached(MPI_COMM_WORLD, size_handle);
-		starpu_data_acquire(size_handle, STARPU_RW);
-
-		m_rows = size_arr[0];
-		m_cols = size_arr[1];
-
-		starpu_data_release(size_handle);
-		starpu_data_unregister_no_coherency(size_handle);
-
-		set_sizes();
-
-		alloc_partitions();
-		alloc_local_storage();
+		base::m_data = ptr;
+		if(!base::m_external && !base::m_data_handle)
+		{
+			auto & handle = base::m_data_handle;
+			starpu_matrix_data_register(
+				&handle,
+				STARPU_MAIN_RAM,
+				(uintptr_t)(base::m_data),
+				m_cols,
+				m_cols,
+				m_rows,
+				sizeof(T));
+			starpu_mpi_data_register(
+				base::m_data_handle,
+				skepu::cluster::mpi_tag(),
+				STARPU_MPI_PER_NODE);
+		}
 	}
 
 	auto
@@ -423,6 +433,33 @@ private:
 
 		other.m_data_valid = true;
 		other.m_part_valid = false;
+	}
+
+	auto
+	update_sizes() noexcept
+	-> void override
+	{
+		size_t size_arr[]{m_rows, m_cols};
+		starpu_data_handle_t size_handle;
+		starpu_variable_data_register(
+			&size_handle,
+			STARPU_MAIN_RAM,
+			(uintptr_t)size_arr,
+			sizeof(size_arr));
+		starpu_mpi_data_register(size_handle, cluster::mpi_tag(), 0);
+		starpu_mpi_get_data_on_all_nodes_detached(MPI_COMM_WORLD, size_handle);
+		starpu_data_acquire(size_handle, STARPU_RW);
+
+		m_rows = size_arr[0];
+		m_cols = size_arr[1];
+
+		starpu_data_release(size_handle);
+		starpu_data_unregister_no_coherency(size_handle);
+
+		set_sizes();
+
+		alloc_partitions();
+		alloc_local_storage();
 	}
 };
 

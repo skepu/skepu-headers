@@ -23,21 +23,21 @@ struct HVScale
 
 	__device__
 	auto static
-	CU(int a, int b) noexcept
+	CU(int a, int b)
 	-> int
 	{
 		return a * b;
 	}
 
 	auto static
-	OMP(int a, int b) noexcept
+	OMP(int a, int b)
 	-> int
 	{
 		return a * b;
 	}
 
 	auto static
-	CPU(int a, int b) noexcept
+	CPU(int a, int b)
 	-> int
 	{
 		return a * b;

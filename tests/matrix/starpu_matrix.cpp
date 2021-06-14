@@ -275,3 +275,40 @@ TEST_CASE("Matrix transpose.")
 		for(size_t j(0); j < N; ++j)
 			REQUIRE(mt(i,j) == m(j,i));
 }
+
+TEST_CASE("Flushing container created from pointer updates the original array")
+{
+	size_t const R = 10 * skepu::cluster::mpi_size();
+	size_t const C = 10;
+	auto v = new int[R*C];
+	skepu::Matrix<int> sv(v, R, C);
+
+	auto & part = skepu::cont::getParent(sv);
+	part.partition();
+	part.invalidate_local_storage();
+
+	auto rank = skepu::cluster::mpi_rank();
+
+	int i = 0;
+	while((size_t)i < R*C)
+	{
+		auto task_size = part.block_count_from(i);
+		auto handle = part.handle_for(i);
+		auto owner = (size_t)starpu_mpi_data_get_rank(handle);
+
+		if(owner == rank)
+		{
+			starpu_data_acquire(handle, STARPU_RW);
+			auto ptr = (int *)starpu_data_get_local_ptr(handle);
+			for(int ti = 0; (size_t)ti < task_size; ++ti)
+				ptr[ti] = ti +i;
+			starpu_data_release(handle);
+		}
+
+		i += task_size;
+	}
+
+	sv.flush();
+	for(i = 0; (size_t)i < R*C; ++i)
+		REQUIRE(v[i] == i);
+}

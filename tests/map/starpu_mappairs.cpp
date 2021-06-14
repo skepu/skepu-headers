@@ -65,14 +65,14 @@ struct vv_add
 	constexpr static bool prefersMatrix = 1;
 
 	auto inline static
-	OMP(int a, int b) noexcept
+	OMP(int a, int b)
 	-> int
 	{
 		return a + b;
 	}
 
 	auto inline static
-	CPU(int a, int b) noexcept
+	CPU(int a, int b)
 	-> int
 	{
 		return a + b;
