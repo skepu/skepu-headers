@@ -29,7 +29,7 @@ namespace skepu
 			// ==========================    Type definitions   ==========================
 
 			using T = typename MapFunc::Ret;
-			using F = ConditionalIndexForwarder<MapFunc::indexed, decltype(&MapFunc::CPU)>;
+			using F = ConditionalIndexForwarder<MapFunc::indexed, MapFunc::usesPRNG, decltype(&MapFunc::CPU)>;
 
 			// ==========================     Class members     ==========================
 
@@ -40,6 +40,7 @@ namespace skepu
 			// ==========================    Instance members   ==========================
 
 			CUDAKernel m_cuda_kernel;
+			StrideList<outArity + arity> m_strides{};
 
 		public:
 
@@ -67,15 +68,25 @@ namespace skepu
 			{
 				tuner::tune(*this, std::forward<Args>(args)...);
 			}
+			
+			template<typename... S>
+			void setStride(S... strides)
+			{
+				this->m_strides = StrideList<outArity + arity>(strides...);
+			}
 
 			// =======================      Call operators      ==========================
 
 			template<typename... CallArgs>
-			auto operator()(CallArgs&&... args) -> decltype(get<0>(args...))
+			auto operator()(CallArgs&&... args) -> decltype(get<0>(std::forward<CallArgs>(args)...))
 			{
 				static_assert(sizeof...(CallArgs) == numArgs, "Number of arguments not matching Map function");
-				this->backendDispatch(get<0>(args...).size(), out_indices, elwise_indices, any_indices, const_indices, args...);
-				return get<0>(args...);
+				this->backendDispatch(
+					get<0>(std::forward<CallArgs>(args)...).size() / this->m_strides[0],
+					out_indices, elwise_indices, any_indices, const_indices,
+					std::forward<CallArgs>(args)...
+				);
+				return get<0>(std::forward<CallArgs>(args)...);
 			}
 
 
@@ -83,7 +94,11 @@ namespace skepu
 			Iterator operator()(Iterator res, Iterator res_end, CallArgs&&... args)
 			{
 				static_assert(sizeof...(CallArgs) == numArgs-1, "Number of arguments not matching Map function");
-				this->backendDispatch(res_end - res, out_indices, elwise_indices, any_indices, const_indices, res, args...);
+				this->backendDispatch(
+					(res_end - res)  / this->m_strides[0],
+					out_indices, elwise_indices, any_indices, const_indices,
+					res, std::forward<CallArgs>(args)...
+				);
 				return res;
 			}
 
@@ -91,19 +106,13 @@ namespace skepu
 
 			// ==========================    Implementation     ==========================
 
-			template<size_t... OI, size_t... EI, size_t... AI, size_t... CI, typename... CallArgs, REQUIRES(!MapFunc::usesPRNG && true && sizeof...(CallArgs) > 0)>
-			void CPU(size_t size, pack_indices<OI...>, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args);
-			
-			template<size_t... OI, size_t... EI, size_t... AI, size_t... CI, typename... CallArgs, REQUIRES(!!MapFunc::usesPRNG && sizeof...(CallArgs) > 0)>
+			template<size_t... OI, size_t... EI, size_t... AI, size_t... CI, typename... CallArgs>
 			void CPU(size_t size, pack_indices<OI...>, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args);
 
 
 #ifdef SKEPU_OPENMP
 
-			template<size_t... OI, size_t... EI, size_t... AI, size_t... CI, typename ...CallArgs, REQUIRES(!MapFunc::usesPRNG && true && sizeof...(CallArgs) > 0)>
-			void OMP(size_t size, pack_indices<OI...>, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args);
-			
-			template<size_t... OI, size_t... EI, size_t... AI, size_t... CI, typename ...CallArgs, REQUIRES(!!MapFunc::usesPRNG && sizeof...(CallArgs) > 0)>
+			template<size_t... OI, size_t... EI, size_t... AI, size_t... CI, typename ...CallArgs>
 			void OMP(size_t size, pack_indices<OI...>, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args);
 
 #endif // SKEPU_OPENMP
@@ -134,10 +143,7 @@ namespace skepu
 			template<size_t... OI, size_t... EI, size_t... AI, size_t... CI, typename... CallArgs>
 			void CL(size_t startIdx, size_t size, pack_indices<OI...>, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args);
 
-			template<size_t... OI, size_t... EI, size_t... AI, size_t... CI, typename... CallArgs, REQUIRES(!MapFunc::usesPRNG && true && sizeof...(CallArgs) >= 0)>
-			void mapNumDevices_CL(size_t startIdx, size_t numDevices, size_t size, pack_indices<OI...>, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args);
-			
-			template<size_t... OI, size_t... EI, size_t... AI, size_t... CI, typename... CallArgs, REQUIRES(!!MapFunc::usesPRNG && sizeof...(CallArgs) >= 0)>
+			template<size_t... OI, size_t... EI, size_t... AI, size_t... CI, typename... CallArgs>
 			void mapNumDevices_CL(size_t startIdx, size_t numDevices, size_t size, pack_indices<OI...>, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args);
 
 #endif // SKEPU_OPENCL
@@ -154,10 +160,10 @@ namespace skepu
 			{
 			//	assert(this->m_execPlan != nullptr && this->m_execPlan->isCalibrated());
 
-				if (disjunction((get<OI>(args...).size() < size)...))
+				if (disjunction((get<OI>(std::forward<CallArgs>(args)...).size() / abs(this->m_strides[OI]) < size)...))
 					SKEPU_ERROR("Non-matching output container sizes");
 
-				if (disjunction((get<EI>(args...).size() < size)...))
+				if (disjunction((get<EI>(std::forward<CallArgs>(args)...).size() / abs(this->m_strides[EI]) < size)...))
 					SKEPU_ERROR("Non-matching input container sizes");
 
 				this->selectBackend(size);
@@ -166,26 +172,51 @@ namespace skepu
 				{
 				case Backend::Type::Hybrid:
 #ifdef SKEPU_HYBRID
-					this->Hybrid(size, oi, ei, ai, ci, get<OI, CallArgs...>(args...).begin()..., get<EI, CallArgs...>(args...).begin()..., get<AI, CallArgs...>(args...)..., get<CI, CallArgs...>(args...)...);
+					this->Hybrid(size, oi, ei, ai, ci,
+						get<OI>(std::forward<CallArgs>(args)...).begin()...,
+						get<EI>(std::forward<CallArgs>(args)...).begin()...,
+						get<AI>(std::forward<CallArgs>(args)...)...,
+						get<CI>(std::forward<CallArgs>(args)...)..
+					);
 					break;
 #endif
 				case Backend::Type::CUDA:
 #ifdef SKEPU_CUDA
-					this->CUDA(0, size, oi, ei, ai, ci, get<OI, CallArgs...>(args...).begin()..., get<EI, CallArgs...>(args...).begin()..., get<AI, CallArgs...>(args...)..., get<CI, CallArgs...>(args...)...);
+					this->CUDA(0, size, oi, ei, ai, ci,
+						get<OI>(std::forward<CallArgs>(args)...).begin()...,
+						get<EI>(std::forward<CallArgs>(args)...).begin()...,
+						get<AI>(std::forward<CallArgs>(args)...)...,
+						get<CI>(std::forward<CallArgs>(args)...)...
+					);
 					break;
 #endif
 				case Backend::Type::OpenCL:
 #ifdef SKEPU_OPENCL
-					this->CL(0, size, oi, ei, ai, ci, get<OI, CallArgs...>(args...).begin()..., get<EI, CallArgs...>(args...).begin()..., get<AI, CallArgs...>(args...)..., get<CI, CallArgs...>(args...)...);
+					this->CL(0, size, oi, ei, ai, ci,
+						get<OI>(std::forward<CallArgs>(args)...).begin()...,
+						get<EI>(std::forward<CallArgs>(args)...).begin()...,
+						get<AI>(std::forward<CallArgs>(args)...)...,
+						get<CI>(std::forward<CallArgs>(args)...)...
+					);
 					break;
 #endif
 				case Backend::Type::OpenMP:
 #ifdef SKEPU_OPENMP
-					this->OMP(size, oi, ei, ai, ci, get<OI, CallArgs...>(args...).begin()..., get<EI, CallArgs...>(args...).begin()..., get<AI, CallArgs...>(args...)..., get<CI, CallArgs...>(args...)...);
+					this->OMP(size, oi, ei, ai, ci,
+						get<OI>(std::forward<CallArgs>(args)...).stridedBegin(size, this->m_strides[OI])...,
+						get<EI>(std::forward<CallArgs>(args)...).stridedBegin(size, this->m_strides[EI])...,
+						get<AI>(std::forward<CallArgs>(args)...)...,
+						get<CI>(std::forward<CallArgs>(args)...)...
+					);
 					break;
 #endif
 				default:
-					this->CPU(size, oi, ei, ai, ci, get<OI, CallArgs...>(args...).begin()..., get<EI, CallArgs...>(args...).begin()..., get<AI, CallArgs...>(args...)..., get<CI, CallArgs...>(args...)...);
+					this->CPU(size, oi, ei, ai, ci,
+						get<OI>(std::forward<CallArgs>(args)...).stridedBegin(size, this->m_strides[OI])...,
+						get<EI>(std::forward<CallArgs>(args)...).stridedBegin(size, this->m_strides[EI])...,
+						get<AI>(std::forward<CallArgs>(args)...)...,
+						get<CI>(std::forward<CallArgs>(args)...)...
+					);
 					break;
 				}
 			}

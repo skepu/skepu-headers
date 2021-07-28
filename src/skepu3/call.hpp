@@ -42,7 +42,7 @@ namespace skepu
 		template<size_t... AI, size_t... CI, typename... CallArgs> 
 		Ret apply(pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args)
 		{
-			return this->callFunc(get<AI>(args...).hostProxy()..., get<CI>(args...)...);
+			return this->callFunc(get<AI>(std::forward<CallArgs>(args)...).hostProxy()..., get<CI>(std::forward<CallArgs>(args)...)...);
 		}
 		
 	public:

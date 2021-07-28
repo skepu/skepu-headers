@@ -56,9 +56,10 @@ namespace skepu
 				return *this->m_selected_spec;
 			}
 			
-			void setPRNG(PRNG &prng)
+			void setPRNG(PRNG &prng, size_t iterations = 1)
 			{
 				this->m_prng = &prng;
+				this->m_prng->registerInstance(this, iterations);
 			}
 			
 		protected:
@@ -91,6 +92,48 @@ namespace skepu
 				setExecPlan(plan);
 			*/
 			}
+			
+			
+			template<size_t randomCount, REQUIRES(randomCount != SKEPU_NO_RANDOM)>
+			Random<randomCount> prepareRandom(size_t size)
+			{
+				if (this->m_prng == nullptr)
+					SKEPU_ERROR("No random stream set in skeleton instance");
+				return this->m_prng->template asRandom<randomCount>(size);
+			}
+			
+			template<size_t randomCount, REQUIRES(randomCount != SKEPU_NO_RANDOM)>
+			skepu::Vector<Random<randomCount>> prepareRandom(size_t size, size_t copies, size_t atomic_size = 1)
+			{
+				if (this->m_prng == nullptr)
+					SKEPU_ERROR("No random stream set in skeleton instance");
+				return this->m_prng->template asRandom<randomCount>(size, copies);
+			}
+			
+			template<size_t randomCount, REQUIRES(randomCount == SKEPU_NO_RANDOM)>
+			PRNG::Placeholder prepareRandom(size_t size = 0, size_t copies = 0, size_t atomic_size = 0)
+			{
+				return {};
+			}
+			
+#ifdef SKEPU_OPENCL
+
+			template<size_t randomCount, REQUIRES(randomCount != SKEPU_NO_RANDOM)>
+			skepu::Vector<RandomForCL> prepareRandom_CL(size_t size, size_t copies, size_t atomic_size = 1)
+			{
+				if (this->m_prng == nullptr)
+					SKEPU_ERROR("No random stream set in skeleton instance");
+				return this->m_prng->template asRandom_CL<randomCount>(size, copies, atomic_size);
+			}
+			
+			template<size_t randomCount, REQUIRES(randomCount == SKEPU_NO_RANDOM)>
+			PRNG::Placeholder prepareRandom_CL(size_t size = 0, size_t copies = 0, size_t atomic_size = 0)
+			{
+				return {};
+			}
+			
+#endif
+			
 			
 			Environment<int>* m_environment;
 			

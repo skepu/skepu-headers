@@ -19,8 +19,8 @@ namespace skepu
 			const size_t numDevices = std::min(this->m_selected_spec->devices(), this->m_environment->m_devices_CL.size());
 			
 			for (size_t i = 0; i < numDevices; ++i)
-				pack_expand((get<AI, CallArgs...>(args...).getParent().updateDevice_CL(get<AI, CallArgs...>(args...).getAddress(),
-					get<AI, CallArgs...>(args...).size(), this->m_environment->m_devices_CL[i], false), 0)...);
+				pack_expand((get<AI>(std::forward<CallArgs>(args)...).getParent().updateDevice_CL(get<AI>(std::forward<CallArgs>(args)...).getAddress(),
+					get<AI>(std::forward<CallArgs>(args)...).size(), this->m_environment->m_devices_CL[i], false), 0)...);
 			
 			for (size_t i = 0; i < numDevices; ++i)
 			{
@@ -30,13 +30,13 @@ namespace skepu
 				DEBUG_TEXT_LEVEL1("OpenCL Call: device " << i << ", numBlocks = " << numBlocks << ", numThreads = " << numThreads);
 				
 				// Copies the elements to the device
-				auto anyMemP = std::make_tuple(get<AI, CallArgs...>(args...).getParent().updateDevice_CL(get<AI, CallArgs...>(args...).getAddress(),
-					get<AI, CallArgs...>(args...).size(), this->m_environment->m_devices_CL[i], hasReadAccess(CallFunc::anyAccessMode[AI]))...);
+				auto anyMemP = std::make_tuple(get<AI>(std::forward<CallArgs>(args)...).getParent().updateDevice_CL(get<AI>(std::forward<CallArgs>(args)...).getAddress(),
+					get<AI>(std::forward<CallArgs>(args)...).size(), this->m_environment->m_devices_CL[i], hasReadAccess(CallFunc::anyAccessMode[AI]))...);
 				
 				CLKernel::call(
 					i, numThreads, numBlocks * numThreads, 
-					std::make_tuple(&get<AI, CallArgs...>(args...).getParent(), std::get<AI>(anyMemP))...,
-					get<CI, CallArgs...>(args...)...
+					std::make_tuple(&get<AI>(std::forward<CallArgs>(args)...).getParent(), std::get<AI>(anyMemP))...,
+					get<CI>(std::forward<CallArgs>(args)...)...
 				);
 				
 				// Make sure the data is marked as changed by the device

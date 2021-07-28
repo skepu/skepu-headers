@@ -18,7 +18,7 @@ namespace skepu
 		void MapOverlap1D<MapOverlapFunc, CUDAKernel, C2, C3, C4, CLKernel>
 		::vector_Hybrid(skepu::Parity, pack_indices<OI...> oi, pack_indices<EI...> ei, pack_indices<AI...> ai, pack_indices<CI...> ci, CallArgs&&... args)
 		{
-			auto &arg = get<outArity>(args...);
+			auto &arg = get<outArity>(std::forward<CallArgs>(args)...);
 			const int overlap = this->m_overlap;
 			const size_t size = arg.size();
 			const size_t stride = 1;
@@ -34,15 +34,15 @@ namespace skepu
 			// If one partition is considered too small, fall back to GPU-only or CPU-only
 			if(gpuSize < 32) { // Not smaller than a warp (=32 threads)
 				DEBUG_TEXT_LEVEL1("Hybrid MapOverlap: Too small GPU size, fall back to CPU-only.");
-				this->vector_OpenMP(oi, ei, ai, ci, args...);
+				this->vector_OpenMP(oi, ei, ai, ci, std::forward<CallArgs>(args)...);
 				return;
 			}
 			else if(cpuSize < numCPUThreads) {
 				DEBUG_TEXT_LEVEL1("Hybrid MapOverlap: Too small CPU size, fall back to GPU-only.");
 #ifdef SKEPU_HYBRID_USE_CUDA
-				this->vector_CUDA(0, oi, ei, ai, ci, args...);
+				this->vector_CUDA(0, oi, ei, ai, ci, std::forward<CallArgs>(args)...);
 #else
-				this->vector_OpenCL(0, oi, ei, ai, ci, args...);
+				this->vector_OpenCL(0, oi, ei, ai, ci, std::forward<CallArgs>(args)...);
 #endif
 				return;
 			}
@@ -51,9 +51,9 @@ namespace skepu
 			
 			// Sync with device data
 			arg.updateHost();
-			pack_expand((get<AI, CallArgs...>(args...).getParent().updateHost(hasReadAccess(MapOverlapFunc::anyAccessMode[AI-arity-outArity])), 0)...);
-			pack_expand((get<AI, CallArgs...>(args...).getParent().invalidateDeviceData(hasWriteAccess(MapOverlapFunc::anyAccessMode[AI-arity-outArity])), 0)...);
-			pack_expand((get<OI, CallArgs...>(args...).getParent().invalidateDeviceData(), 0)...);
+			pack_expand((get<AI>(std::forward<CallArgs>(args)...).getParent().updateHost(hasReadAccess(MapOverlapFunc::anyAccessMode[AI-arity-outArity])), 0)...);
+			pack_expand((get<AI>(std::forward<CallArgs>(args)...).getParent().invalidateDeviceData(hasWriteAccess(MapOverlapFunc::anyAccessMode[AI-arity-outArity])), 0)...);
+			pack_expand((get<OI>(std::forward<CallArgs>(args)...).getParent().invalidateDeviceData(), 0)...);
 			
 			omp_set_nested(true);
 			
@@ -62,9 +62,9 @@ namespace skepu
 				if(omp_get_thread_num() == 0) {
 					// Let first thread handle GPU
 #ifdef SKEPU_HYBRID_USE_CUDA
-					this->vector_CUDA(cpuSize, oi, ei, ai, ci, args...);
+					this->vector_CUDA(cpuSize, oi, ei, ai, ci, std::forward<CallArgs>(args)...);
 #else
-					this->vector_OpenCL(cpuSize, oi, ei, ai, ci, args...);
+					this->vector_OpenCL(cpuSize, oi, ei, ai, ci, std::forward<CallArgs>(args)...);
 #endif
 				}
 				else {
@@ -97,23 +97,23 @@ namespace skepu
 					for (size_t i = 0; i < overlap; ++i)
 					{
 						auto res = F::forward(MapOverlapFunc::OMP, Index1D{i}, Region1D<T>{overlap, stride, &start[i + overlap]},
-								get<AI, CallArgs...>(args...).hostProxy()..., get<CI, CallArgs...>(args...)...);
-						SKEPU_VARIADIC_RETURN(get<OI>(args...)(i)..., res);
+								get<AI>(std::forward<CallArgs>(args)...).hostProxy()..., get<CI>(std::forward<CallArgs>(args)...)...);
+						SKEPU_VARIADIC_RETURN(get<OI>(std::forward<CallArgs>(args)...)(i)..., res);
 					}
 						
 #pragma omp parallel for num_threads(numCPUThreads)
 					for (size_t i = overlap; i < size - overlap; ++i)
 					{
 						auto res = F::forward(MapOverlapFunc::OMP, Index1D{i}, Region1D<T>{overlap, stride, &arg(i)},
-							get<AI, CallArgs...>(args...).hostProxy()..., get<CI, CallArgs...>(args...)...);
-						SKEPU_VARIADIC_RETURN(get<OI>(args...)(i)..., res);
+							get<AI>(std::forward<CallArgs>(args)...).hostProxy()..., get<CI>(std::forward<CallArgs>(args)...)...);
+						SKEPU_VARIADIC_RETURN(get<OI>(std::forward<CallArgs>(args)...)(i)..., res);
 					}
 						
 					for (size_t i = size - overlap; i < size; ++i)
 					{
 						auto res = F::forward(MapOverlapFunc::OMP, Index1D{i}, Region1D<T>{overlap, stride, &end[i + 2 * overlap - size]},
-							get<AI, CallArgs...>(args...).hostProxy()..., get<CI, CallArgs...>(args...)...);
-						SKEPU_VARIADIC_RETURN(get<OI>(args...)(i)..., res);
+							get<AI>(std::forward<CallArgs>(args)...).hostProxy()..., get<CI>(std::forward<CallArgs>(args)...)...);
+						SKEPU_VARIADIC_RETURN(get<OI>(std::forward<CallArgs>(args)...)(i)..., res);
 					}
 				} // end else
 				
@@ -131,7 +131,7 @@ namespace skepu
 		void MapOverlap1D<MapOverlapFunc, CUDAKernel, C2, C3, C4, CLKernel>
 		::rowwise_Hybrid(skepu::Parity, pack_indices<OI...> oi, pack_indices<EI...> ei, pack_indices<AI...> ai, pack_indices<CI...> ci, CallArgs&&... args)
 		{
-			auto &arg = get<outArity>(args...);
+			auto &arg = get<outArity>(std::forward<CallArgs>(args)...);
 			const size_t rowWidth = arg.total_cols();
 			const size_t stride = 1;
 			
@@ -146,24 +146,24 @@ namespace skepu
 			// If one partition is considered too small, fall back to GPU-only or CPU-only
 			if(gpuRows == 0) {
 				DEBUG_TEXT_LEVEL1("Hybrid MapOverlap: Too small GPU size, fall back to CPU-only.");
-				this->rowwise_OpenMP(oi, ei, ai, ci, args...);
+				this->rowwise_OpenMP(oi, ei, ai, ci, std::forward<CallArgs>(args)...);
 				return;
 			}
 			else if(cpuRows < numCPUThreads) {
 				DEBUG_TEXT_LEVEL1("Hybrid MapOverlap: Too small CPU size, fall back to GPU-only.");
 #ifdef SKEPU_HYBRID_USE_CUDA
-				this->rowwise_CUDA(arg.total_rows(), oi, ei, ai, ci, args...);
+				this->rowwise_CUDA(arg.total_rows(), oi, ei, ai, ci, std::forward<CallArgs>(args)...);
 #else
-				this->rowwise_OpenCL(arg.total_rows(), oi, ei, ai, ci, args...);
+				this->rowwise_OpenCL(arg.total_rows(), oi, ei, ai, ci, std::forward<CallArgs>(args)...);
 #endif
 				return;
 			}
 			
 			// Sync with device data
 			arg.updateHost();
-			pack_expand((get<AI, CallArgs...>(args...).getParent().updateHost(hasReadAccess(MapOverlapFunc::anyAccessMode[AI-arity-outArity])), 0)...);
-			pack_expand((get<AI, CallArgs...>(args...).getParent().invalidateDeviceData(hasWriteAccess(MapOverlapFunc::anyAccessMode[AI-arity-outArity])), 0)...);
-			pack_expand((get<OI, CallArgs...>(args...).getParent().invalidateDeviceData(), 0)...);
+			pack_expand((get<AI>(std::forward<CallArgs>(args)...).getParent().updateHost(hasReadAccess(MapOverlapFunc::anyAccessMode[AI-arity-outArity])), 0)...);
+			pack_expand((get<AI>(std::forward<CallArgs>(args)...).getParent().invalidateDeviceData(hasWriteAccess(MapOverlapFunc::anyAccessMode[AI-arity-outArity])), 0)...);
+			pack_expand((get<OI>(std::forward<CallArgs>(args)...).getParent().invalidateDeviceData(), 0)...);
 			
 			const int overlap = this->m_overlap;
 			T start[3*overlap], end[3*overlap];
@@ -179,9 +179,9 @@ namespace skepu
 				if(omp_get_thread_num() == 1) {
 					// Let last thread handle GPU
 #ifdef SKEPU_HYBRID_USE_CUDA
-					this->rowwise_CUDA(gpuRows, oi, ei, ai, ci, args...);
+					this->rowwise_CUDA(gpuRows, oi, ei, ai, ci, std::forward<CallArgs>(args)...);
 #else
-					this->rowwise_OpenCL(gpuRows, oi, ei, ai, ci, args...);
+					this->rowwise_OpenCL(gpuRows, oi, ei, ai, ci, std::forward<CallArgs>(args)...);
 #endif
 				}
 				else {
@@ -218,21 +218,21 @@ namespace skepu
 						
 						for (size_t i = 0; i < overlap; ++i)
 						{
-							auto res = F::forward(MapOverlapFunc::OMP, Index1D{i}, Region1D<T>{overlap, stride, &start[i + overlap]}, get<AI, CallArgs...>(args...).hostProxy()..., get<CI, CallArgs...>(args...)...);
-							SKEPU_VARIADIC_RETURN(get<OI>(args...)(row, i)..., res);
+							auto res = F::forward(MapOverlapFunc::OMP, Index1D{i}, Region1D<T>{overlap, stride, &start[i + overlap]}, get<AI>(std::forward<CallArgs>(args)...).hostProxy()..., get<CI>(std::forward<CallArgs>(args)...)...);
+							SKEPU_VARIADIC_RETURN(get<OI>(std::forward<CallArgs>(args)...)(row, i)..., res);
 						}
 							
 #pragma omp parallel for num_threads(numCPUThreads)
 						for (size_t i = overlap; i < rowWidth - overlap; ++i)
 						{
-							auto res = F::forward(MapOverlapFunc::OMP, Index1D{i}, Region1D<T>{overlap, stride, &inputBegin[i]}, get<AI, CallArgs...>(args...).hostProxy()..., get<CI, CallArgs...>(args...)...);
-							SKEPU_VARIADIC_RETURN(get<OI>(args...)(row, i)..., res);
+							auto res = F::forward(MapOverlapFunc::OMP, Index1D{i}, Region1D<T>{overlap, stride, &inputBegin[i]}, get<AI>(std::forward<CallArgs>(args)...).hostProxy()..., get<CI>(std::forward<CallArgs>(args)...)...);
+							SKEPU_VARIADIC_RETURN(get<OI>(std::forward<CallArgs>(args)...)(row, i)..., res);
 						}
 						
 						for (size_t i = rowWidth - overlap; i < rowWidth; ++i)
 						{
-							auto res = F::forward(MapOverlapFunc::OMP, Index1D{i}, Region1D<T>{overlap, stride, &end[i + 2 * overlap - rowWidth]}, get<AI, CallArgs...>(args...).hostProxy()..., get<CI, CallArgs...>(args...)...);
-							SKEPU_VARIADIC_RETURN(get<OI>(args...)(row, i)..., res);
+							auto res = F::forward(MapOverlapFunc::OMP, Index1D{i}, Region1D<T>{overlap, stride, &end[i + 2 * overlap - rowWidth]}, get<AI>(std::forward<CallArgs>(args)...).hostProxy()..., get<CI>(std::forward<CallArgs>(args)...)...);
+							SKEPU_VARIADIC_RETURN(get<OI>(std::forward<CallArgs>(args)...)(row, i)..., res);
 						}
 						
 						inputBegin += rowWidth;

@@ -1,10 +1,10 @@
 
-//#define SKEPU_DEBUG_PRNG
+#define SKEPU_DEBUG_PRNG
 //#define SKEPU_PRNG_VERIFY_FORWARD
 
 namespace skepu
 {	
-	#define SKEPU_RAND_DEFAULT_SEED 456
+	#define SKEPU_RAND_DEFAULT_SEED 0
 	
 	#define RND_MOD (1LL << 48)
 	#define RND_EXP 1
@@ -88,8 +88,15 @@ namespace skepu
 	
 	class PRNG
 	{
+	public:
 		using State = RandomImpl::State;
+		struct Placeholder {
+			Placeholder operator()(size_t) { return {}; };
+			Placeholder updateDevice_CL(int, int, void*, bool) { return {}; }
+			int getAddress() { return 0; }
+		};
 		
+	private:
 		State m_state;
 		size_t m_next_iterations = 0;
 		size_t m_current_iterations = 0;
@@ -160,8 +167,10 @@ namespace skepu
 			return retval_vec;
 		}
 		
+#ifdef SKEPU_OPENCL
+		
 		template<size_t GetCount>
-		skepu::Vector<RandomForCL> asRandomB(size_t size, size_t copies, size_t atomic_size = 1)
+		skepu::Vector<RandomForCL> asRandom_CL(size_t size, size_t copies, size_t atomic_size = 1)
 		{
 			// precondition: size | atomic_size
 			size_t atomic_chunk_count = size / atomic_size;
@@ -180,14 +189,51 @@ namespace skepu
 			return retval_vec;
 		}
 		
+#endif
+		
 	};
 	
 	
+	/* METAPROGRAMMING */
+
+#define SKEPU_NO_RANDOM -1
+	
+	
+	// Check if type is skepu::Random
+	template<typename T>
+	struct is_random: std::false_type {};
+	
+	template<size_t RC>
+	struct is_random<skepu::Random<RC>>: std::true_type {};
+
+	template<size_t RC>
+	struct is_random<skepu::Random<RC> &>: std::true_type {};
+	
+	
+	// Get random count from type
+	template<typename... Ts>
+	struct get_random_count: std::integral_constant<int, SKEPU_NO_RANDOM> {};
+	
+	template<typename T, typename... Ts>
+	struct get_random_count<T, Ts...>: get_random_count<Ts...> {};
+	
+	template<size_t RC, typename... Ts>
+	struct get_random_count<skepu::Random<RC>, Ts...>: std::integral_constant<int, RC> {};
+	
+	template<size_t RC, typename... Ts>
+	struct get_random_count<skepu::Random<RC>&, Ts...>: std::integral_constant<int, RC> {};
+	
+	
+	
+	// Check if parameter pack contains a random type
 	template<typename... Args>
 	struct has_random: std::false_type {};
 
 	template<size_t RC, typename... Args>
 	struct has_random<skepu::Random<RC> &, Args...>: std::true_type {};
+	
+	template<typename T, typename... Args>
+	struct has_random<T, Args...>: has_random<Args...> {};
 	
 	
 	template<typename T>

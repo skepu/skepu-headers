@@ -43,8 +43,10 @@ namespace skepu
 		using RedFunc = std::function<RedType(RedType, RedType)>;
 		
 		static constexpr bool indexed = is_indexed<Args...>::value;
+		static constexpr bool randomized = has_random<Args...>::value;
+		static constexpr size_t randomCount = get_random_count<Args...>::value;
 		static constexpr size_t OutArity = out_size<RetType>::value;
-		static constexpr size_t numArgs = sizeof...(Args) - (indexed ? 1 : 0);
+		static constexpr size_t numArgs = sizeof...(Args) - (indexed ? 1 : 0) - (randomized ? 1 : 0);
 		static constexpr size_t anyCont = trait_count_all<is_skepu_container_proxy, Args...>::value;
 		
 		using defaultDim = typename std::conditional<indexed, index_dimension<typename first_element<Args...>::type>, std::integral_constant<int, 1>>::type;
@@ -55,25 +57,27 @@ namespace skepu
 		static constexpr typename make_pack_indices<InArity + anyCont, InArity>::type any_indices{};
 		static constexpr typename make_pack_indices<numArgs, InArity + anyCont>::type const_indices{};
 		
-		using F = ConditionalIndexForwarder<indexed, MapFunc>;
+		using F = ConditionalIndexForwarder<indexed, randomized, MapFunc>;
 		
 		
 		template<size_t... OI, size_t... EI, size_t... AI, size_t... CI, typename... CallArgs>
-		RetType apply(pack_indices<OI...>, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, size_t size, CallArgs&&... args)
+		RetType apply(size_t size, pack_indices<OI...>, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args)
 		{
-			if (disjunction((get<EI>(args...).size() < size)...))
+			auto elwise = std::make_tuple(get<EI>(std::forward<CallArgs>(args)...).stridedBegin(size, this->m_strides[EI])...);
+			
+			if (disjunction((std::get<EI>(elwise).size() < size)...))
 				SKEPU_ERROR("MapReduce: Non-matching container sizes");
 			
-			RetType res = this->m_start;
-			auto elwiseIterators = std::make_tuple(get<EI>(args...).begin()...);
+			auto random = this->template prepareRandom<randomCount>(size);
 			
+			RetType res = this->m_start;
 			while (size --> 0)
 			{
-				auto index = std::get<0>(elwiseIterators).getIndex();
-				RetType temp = F::forward(mapFunc, index,
-					*std::get<EI>(elwiseIterators)++...,
-					get<AI>(args...).hostProxy()...,
-					get<CI>(args...)...
+				auto index = std::get<0>(elwise).getIndex();
+				RetType temp = F::forward(mapFunc, index, random,
+					*std::get<EI>(elwise)++...,
+					get<AI>(std::forward<CallArgs>(args)...).hostProxy(typename pack_element<AI + (indexed ? 1 : 0) + (randomized ? 1 : 0), typename proxy_tag<Args>::type...>::type{}, index)...,
+					get<CI>(std::forward<CallArgs>(args)...)...
 				);
 				pack_expand((get_or_return<OI>(res) = redFunc(get_or_return<OI>(res), get_or_return<OI>(temp)), 0)...);
 			}
@@ -89,19 +93,25 @@ namespace skepu
 			if (defaultDim::value >= 3) size *= this->default_size_k;
 			if (defaultDim::value >= 4) size *= this->default_size_l;
 			
+			auto random = this->template prepareRandom<randomCount>(size);
+			
 			RetType res = this->m_start;
 			for (size_t i = 0; i < size; ++i)
 			{
-				RetType temp = F::forward(mapFunc,
-					make_index(defaultDim{}, i, this->default_size_j, this->default_size_k, this->default_size_l),
-					get<AI>(args...).hostProxy()...,
-					get<CI>(args...)...
+				auto index = make_index(defaultDim{}, i, this->default_size_j, this->default_size_k, this->default_size_l);
+				RetType temp = F::forward(mapFunc, index, random,
+					get<AI>(std::forward<CallArgs>(args)...).hostProxy(typename pack_element<AI + (indexed ? 1 : 0) + (randomized ? 1 : 0), typename proxy_tag<Args>::type...>::type{}, index)...,
+					get<CI>(std::forward<CallArgs>(args)...)...
 				);
 				pack_expand((get<OI>(res) = redFunc(get<OI>(res), get_or_return<OI>(temp)), 0)...);
 			}
 			return res;
 		}
 		
+		int returnsOne()
+		{
+			return 1;
+		}
 		
 	public:
 		
@@ -118,23 +128,36 @@ namespace skepu
 			this->default_size_l = l;
 		}
 		
-		// For first elwise argument as container
-		template<typename First, template<class> class Container, typename... CallArgs, REQUIRES_VALUE(is_skepu_container<Container<First>>)>
-		RetType operator()(Container<First>& arg1, CallArgs&&... args)
+		template<typename... S>
+		void setStride(S... strides)
 		{
-			static_assert(sizeof...(CallArgs) + 1 == numArgs, "Number of arguments not matching Map function");
-			return apply(out_indices, elwise_indices, any_indices, const_indices, arg1.size(), arg1.begin(), std::forward<CallArgs>(args)...);
+			this->m_strides = StrideList<InArity>(strides...);
+		}
+		
+		// For first elwise argument as container
+		template<typename... CallArgs, REQUIRES(InArity > 0 && sizeof...(CallArgs) == numArgs)>
+		RetType operator()(CallArgs&&... args)
+		{
+			return apply(
+				get<0>(std::forward<CallArgs>(args)...).size() / this->m_strides[0],
+				out_indices, elwise_indices, any_indices, const_indices,
+				std::forward<CallArgs>(args)...
+			);
 		}
 		
 		// For first elwise argument as iterator
 		template<typename Iterator, typename... CallArgs, REQUIRES(sizeof...(CallArgs) + 1 == numArgs)>
 		RetType operator()(Iterator arg1, Iterator arg1_end, CallArgs&&... args)
 		{
-			return apply(out_indices, elwise_indices, any_indices, const_indices, arg1_end - arg1, arg1, std::forward<CallArgs>(args)...);
+			return apply(
+				(arg1_end - arg1) / this->m_strides[0],
+				out_indices, elwise_indices, any_indices, const_indices,
+				arg1, std::forward<CallArgs>(args)...
+			);
 		}
 		
 		// For no elwise arguments
-		template<typename... CallArgs, REQUIRES(sizeof...(CallArgs) == numArgs)>
+		template<typename... CallArgs, REQUIRES(InArity == 0 && sizeof...(CallArgs) == numArgs)>
 		RetType operator()(CallArgs&&... args)
 		{
 			return this->zero_apply(out_indices, any_indices, const_indices, std::forward<CallArgs>(args)...);
@@ -150,6 +173,8 @@ namespace skepu
 		size_t default_size_j = 0;
 		size_t default_size_k = 0;
 		size_t default_size_l = 0;
+		
+		StrideList<InArity> m_strides{};
 		
 		friend MapReduceImpl<InArity, GivenArity, RetType, RedType, Args...> MapReduceWrapper<GivenArity, RetType, RedType, Args...>(MapFunc, RedFunc);
 		

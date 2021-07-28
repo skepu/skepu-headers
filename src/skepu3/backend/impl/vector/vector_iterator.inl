@@ -22,6 +22,14 @@ namespace skepu
 		return *this;
 	}
 	
+	// Returns begin() if s >= 0, else returns end() - 1
+	template <typename T>
+	typename Vector<T>::strided_iterator VectorIterator<T>::stridedBegin(size_t n, int s)
+	{
+		return typename Vector<T>::strided_iterator(this->m_parent, &this->m_std_iterator[(s < 0) ? (-n + 1) * s : 0], s);
+	}
+	
+	// Returns the number of elements remaining, starting from the iterator
 	template <typename T>
 	size_t VectorIterator<T>::size()
 	{

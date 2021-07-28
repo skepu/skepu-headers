@@ -4,24 +4,6 @@
 
 namespace skepu
 {
-	enum class ReduceMode
-	{
-		RowWise, ColWise
-	};
-	
-	inline std::ostream &operator<<(std::ostream &o, ReduceMode m)
-	{
-		switch (m)
-		{
-		case ReduceMode::RowWise:
-			o << "Rowwise"; break;
-		case ReduceMode::ColWise:
-			o << "Colwise"; break;
-		default:
-			o << "<Invalid reduce mode>";
-		}
-		return o;
-	}
 	
 	namespace impl
 	{

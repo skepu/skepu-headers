@@ -82,11 +82,12 @@ namespace skepu
 #endif //win32
 
 			template<size_t... I, typename... Args>
-			inline void setKernelArgsHelper(cl_kernel kernel, pack_indices<I...>, Args... args)
+			inline void setKernelArgsHelper(cl_kernel kernel, pack_indices<I...>, Args&&... args)
 			{
+				auto tempStorage = std::make_tuple(std::forward<Args>(args)...); // copy is fine here
 				cl_int errors[sizeof...(Args)] = 
 				{
-					clSetKernelArg(kernel, I, sizeof get<I, Args...>(args...), &get<I, Args...>(args...))...,
+					clSetKernelArg(kernel, I, sizeof std::get<I>(tempStorage), &std::get<I>(tempStorage))...,
 				};
 				
 				for (size_t e = 0; e < sizeof...(Args); ++e)
@@ -94,9 +95,9 @@ namespace skepu
 			}
 			
 			template<typename... Args>
-			inline void setKernelArgs(cl_kernel kernel, Args... args)
+			inline void setKernelArgs(cl_kernel kernel, Args&&... args)
 			{
-				setKernelArgsHelper(kernel, typename make_pack_indices<sizeof...(Args), 0>::type(), args...);
+				setKernelArgsHelper(kernel, typename make_pack_indices<sizeof...(Args), 0>::type(), std::forward<Args>(args)...);
 			}
 			
 			template<typename T>

@@ -32,6 +32,8 @@ namespace skepu
 	
 	template<typename T> class Region3D;
 	template<typename T> class Region4D;
+	template<typename T> class Pool3D;
+	template<typename T> class Pool4D;
 	
 	template<typename T>
 	class Tensor3;
@@ -162,6 +164,10 @@ namespace skepu
 			return iterator(*this, &Vector<T>::m_data[this->m_size]);
 		}
 		
+		// These do nothing special for now
+		iterator stridedBegin(size_t, int) { return this->begin(); };
+		const_iterator begin(size_t, int) const { return this->begin(); };
+		
 		template<typename Ignore>
 		proxy_type hostProxy(ProxyTag::Default, Ignore)
 		{
@@ -258,6 +264,7 @@ namespace skepu
 		}
 		
 		friend class Region3D<T>;
+		friend class Pool3D<T>;
 		
 	private:
 		
@@ -298,6 +305,7 @@ namespace skepu
 		
 		parent_type& getParent() const;
 		iterator& begin(); // returns itself
+		iterator stridedBegin(size_t, int) { return this->begin(); };
 		size_t size(); // returns number of elements "left" in parent container from this index
 		
 		T* getAddress();
@@ -497,6 +505,10 @@ namespace skepu
 			return iterator(*this, &Vector<T>::m_data[this->m_size]);
 		}
 		
+		// These do nothing special for now
+		iterator stridedBegin(size_t, int) { return this->begin(); };
+		const_iterator begin(size_t, int) const { return this->begin(); };
+		
 		template<typename Ignore>
 		proxy_type hostProxy(ProxyTag::Default, Ignore)
 		{
@@ -596,6 +608,7 @@ namespace skepu
 		}
 		
 		friend class Region4D<T>;
+		friend class Pool4D<T>;
 		
 	private:
 		

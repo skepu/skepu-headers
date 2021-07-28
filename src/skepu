@@ -23,7 +23,6 @@
 
 #ifdef SKEPU_STARPU_MPI
 
-#include <skepu3/backend/benchmark.h>
 #include <skepu3/cluster/cluster.hpp>
 #include <skepu3/cluster/external.hpp>
 #include <skepu3/cluster/containers/matrix/matrix.hpp>
@@ -46,11 +45,9 @@
 #include "skepu3/backend/helper_methods.h"
 #include "skepu3/impl/common.hpp"
 #include "skepu3/impl/external.hpp"
-#include "skepu3/impl/timer.hpp"
-#include "skepu3/backend/tuner.h"
 #include "skepu3/backend/hybrid_tuner.h"
 
-#ifndef SKEPU_PRECOMPILED
+//#ifndef SKEPU_PRECOMPILED
 
 #include "skepu3/map.hpp"
 #include "skepu3/reduce.hpp"
@@ -61,11 +58,9 @@
 #include "skepu3/mappairsreduce.hpp"
 #include "skepu3/call.hpp"
 
-#include "skepu3/maprandom.hpp"
-#include "skepu3/maprandomreduce.hpp"
-#include "skepu3/maprandomoverlap.hpp"
+//#else
 
-#else
+#ifdef SKEPU_PRECOMPILED
 
 #include "skepu3/backend/skeleton_base.h"
 #include "skepu3/backend/map.h"

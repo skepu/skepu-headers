@@ -71,6 +71,9 @@ namespace skepu
 	template <typename T>
 	class VectorIterator;
 	
+	template <typename T>
+	class StridedVectorIterator;
+	
 	/*!
 	*  \class Vector
 	*
@@ -105,6 +108,9 @@ namespace skepu
 			
 		typedef VectorIterator<T> iterator;
 		typedef VectorIterator<const T> const_iterator;
+		
+		typedef StridedVectorIterator<T> strided_iterator;
+		typedef StridedVectorIterator<const T> const_strided_iterator;
 		
 		//-- For Testing --//
 		
@@ -184,9 +190,11 @@ namespace skepu
 		// Iterators
 		iterator begin();
 		iterator end();
+		strided_iterator stridedBegin(size_t n, int dir);
 		
 		const_iterator begin() const;
 		const_iterator end() const;
+		const_strided_iterator stridedBegin(size_t n, int dir) const;
 		
 		// Capacity
 		size_type size() const       { return this->m_size; }
@@ -217,9 +225,11 @@ namespace skepu
 		
 		void swap(Vector<T>& from);
 		
-		T *getAddress() { return m_data; }
+		T *getAddress() { return this->m_data; }
+		const T *getAddress() const { return this->m_data; }
 		
-		T *data() { return m_data; }
+		T *data() { return this->m_data; }
+		const T *data() const { return this->m_data; }
 		
 	public: //-- Additions to interface --//
 		
@@ -349,6 +359,7 @@ namespace skepu
 		
 		parent_type& getParent() const;
 		iterator& begin(); // returns itself
+		typename Vector<T>::strided_iterator stridedBegin(size_t n, int dir);
 		size_t size(); // returns number of elements "left" in parent container from this index
 		
 		T* getAddress() const;
@@ -395,10 +406,71 @@ namespace skepu
 		const T& operator-> () const;
 		T& operator-> ();
 		
-	private: //-- Data --//
+	protected: //-- Data --//
 		
 		parent_type& m_parent;
 		T *m_std_iterator;
+	};
+	
+	template <typename T>
+	class StridedVectorIterator: public VectorIterator<T>
+	{
+	public:	
+		StridedVectorIterator(typename VectorIterator<T>::parent_type& vec, T *std_iterator, int stride)
+		: VectorIterator<T>(vec, std_iterator), m_stride(stride) {}
+		
+		const StridedVectorIterator<T>& operator++()
+		{
+			this->m_std_iterator += this->m_stride;
+			return *this;
+		}
+		
+		StridedVectorIterator<T> operator++(int) //Postfix
+		{
+			StridedVectorIterator<T> temp(*this);
+			this->m_std_iterator += this->m_stride;
+			return temp;
+		}
+		
+		const StridedVectorIterator<T>& operator+=(const ssize_t i)
+		{
+			this->m_std_iterator += i * this->m_stride;
+			return *this;
+		}
+		
+		StridedVectorIterator<T> operator+(const ssize_t i) const
+		{
+			StridedVectorIterator<T> temp(*this);
+			temp += i;
+			return temp;
+		};
+		
+		T& operator()(const ssize_t index = 0)
+		{
+			return this->m_std_iterator[index * this->m_stride];
+		}
+		
+		const T& operator()(const ssize_t index) const
+		{
+			return this->m_std_iterator[index * this->m_stride];
+		}
+		
+		
+		// If stride > 0: Returns the number of elements remaining, starting from the iterator / abs(stride)
+		// If stride < 0: Returns the number of elements preceeding, ending with the iterator / abs(stride)
+		// Else return "infinity"
+		size_t size() const
+		{
+			if (this->m_stride >= 0)
+				return (this->m_parent.end() - *this) / this->m_stride;
+			else if (this->m_stride < 0)
+				return (*this - this->m_parent.begin() - this->m_stride) / (-1 * this->m_stride);
+			else
+				return std::numeric_limits<size_t>::max();
+		}
+		
+	private:
+		int m_stride;
 	};
 	
 }

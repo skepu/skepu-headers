@@ -20,8 +20,8 @@ namespace skepu
 		::mapOverlapSingleThread_CU(size_t deviceID, size_t startIdx, Parity p, pack_indices<OI...>, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args)
 		{
 			cudaSetDevice(deviceID);
-			auto &res = get<0>(args...);
-			auto &arg = get<outArity>(args...);
+			auto &res = get<0>(std::forward<CallArgs>(args)...);
+			auto &arg = get<outArity>(std::forward<CallArgs>(args)...);
 			
 			// Setup parameters
 			size_t numElem = arg.size() - startIdx;
@@ -74,9 +74,9 @@ namespace skepu
 			
 			// Copy elements to device and allocate output memory.
 			auto inMemP = arg.updateDevice_CU(arg.getAddress() + startIdx - out_offset, n, deviceID, AccessMode::Read);
-			auto outMemP = std::make_tuple(get<OI, CallArgs...>(args...).getParent().updateDevice_CU(get<OI, CallArgs...>(args...).getAddress() + startIdx, numElem, deviceID, AccessMode::Write)...);
+			auto outMemP = std::make_tuple(get<OI>(std::forward<CallArgs>(args)...).getParent().updateDevice_CU(get<OI>(std::forward<CallArgs>(args)...).getAddress() + startIdx, numElem, deviceID, AccessMode::Write)...);
 			
-			auto anyMemP = std::make_tuple(get<AI, CallArgs...>(args...).cudaProxy(deviceID, MapOverlapFunc::anyAccessMode[AI])...);
+			auto anyMemP = std::make_tuple(get<AI>(std::forward<CallArgs>(args)...).cudaProxy(deviceID, MapOverlapFunc::anyAccessMode[AI])...);
 			
 #ifdef USE_PINNED_MEMORY
 			this->m_cuda_kernel<<<numBlocks, numThreads, sharedMemSize, (m_environment->m_devices_CU.at(deviceID)->m_streams[0])>>>
@@ -87,7 +87,7 @@ namespace skepu
 				std::get<OI>(outMemP)->getDeviceDataPointer()...,
 				inMemP->getDeviceDataPointer(),
 				std::get<AI>(anyMemP).second...,
-				get<CI, CallArgs...>(args...)...,
+				get<CI>(std::forward<CallArgs>(args)...)...,
 				wrapMemP->getDeviceDataPointer(),
 				n, out_offset, out_numelements,
 				static_cast<int>(this->m_edge),
@@ -116,8 +116,8 @@ namespace skepu
 		::mapOverlapNumDevices_CU(size_t numDevices, size_t startIdx, Parity p, pack_indices<OI...>, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args)
 		{
 			DEBUG_TEXT_LEVEL1("MAPOVERLAP CUDA\n")
-			auto &res = get<0>(args...);
-			auto &arg = get<outArity>(args...);
+			auto &res = get<0>(std::forward<CallArgs>(args)...);
+			auto &arg = get<outArity>(std::forward<CallArgs>(args)...);
 			
 			const size_t totalNumElements = arg.size() - startIdx;
 			const size_t overlap = this->m_overlap;
@@ -143,7 +143,7 @@ namespace skepu
 			}
 			
 			DeviceMemPointer_CU<T> *in_mem_p[MAX_GPU_DEVICES];
-			decltype(std::make_tuple(get<OI, CallArgs...>(args...).updateDevice_CU(get<OI, CallArgs...>(args...).getAddress(), 0, 0, AccessMode::None)...)) out_mem_p[MAX_GPU_DEVICES];
+			decltype(std::make_tuple(get<OI>(std::forward<CallArgs>(args)...).updateDevice_CU(get<OI>(std::forward<CallArgs>(args)...).getAddress(), 0, 0, AccessMode::None)...)) out_mem_p[MAX_GPU_DEVICES];
 			DeviceMemPointer_CU<T> *wrap_mem_p[MAX_GPU_DEVICES];
 			
 			size_t numBlocks[MAX_GPU_DEVICES];
@@ -162,7 +162,7 @@ namespace skepu
 				else                        { out_offset[i] = overlap; n[i] = numElem + overlap * 2;}
 				
 				in_mem_p[i] = arg.updateDevice_CU(arg.getAddress() + startIdx + i * numElemPerSlice - out_offset[i], n[i], i, AccessMode::None);
-				out_mem_p[i] = std::make_tuple(get<OI, CallArgs...>(args...).updateDevice_CU(get<OI, CallArgs...>(args...).getAddress() + i * numElemPerSlice, numElem, i, AccessMode::None)...);
+				out_mem_p[i] = std::make_tuple(get<OI>(std::forward<CallArgs>(args)...).updateDevice_CU(get<OI>(std::forward<CallArgs>(args)...).getAddress() + i * numElemPerSlice, numElem, i, AccessMode::None)...);
 				
 				// wrap vector, don't copy just allocates space onf CUDA device.
 				wrap_mem_p[i] = new DeviceMemPointer_CU<T>(&wrap[0], wrap.size(), m_environment->m_devices_CU.at(i));
@@ -208,9 +208,9 @@ namespace skepu
 				// Copy elemets to device 
 				out_numelements = numElem;
 				in_mem_p[i] = arg.updateDevice_CU(arg.getAddress() + startIdx + i * numElemPerSlice - out_offset[i], n[i], i, AccessMode::Read);
-				out_mem_p[i] = std::make_tuple(get<OI, CallArgs...>(args...).updateDevice_CU(get<OI, CallArgs...>(args...).getAddress() + startIdx + i * numElemPerSlice, numElem, i, AccessMode::Write, true)...);
+				out_mem_p[i] = std::make_tuple(get<OI>(std::forward<CallArgs>(args)...).updateDevice_CU(get<OI>(std::forward<CallArgs>(args)...).getAddress() + startIdx + i * numElemPerSlice, numElem, i, AccessMode::Write, true)...);
 				
-				auto anyMemP = std::make_tuple(get<AI, CallArgs...>(args...).cudaProxy(i, MapOverlapFunc::anyAccessMode[AI])...);
+				auto anyMemP = std::make_tuple(get<AI>(std::forward<CallArgs>(args)...).cudaProxy(i, MapOverlapFunc::anyAccessMode[AI])...);
 				
 				const size_t sharedMemSize = sizeof(T) * (numThreads[i] + 2 * overlap);
 				
@@ -223,7 +223,7 @@ namespace skepu
 						std::get<OI>(out_mem_p[i])->getDeviceDataPointer()...,
 						in_mem_p[i]->getDeviceDataPointer(),
 						std::get<AI>(anyMemP).second...,
-						get<CI, CallArgs...>(args...)...,
+						get<CI>(std::forward<CallArgs>(args)...)...,
 						wrap_mem_p[i]->getDeviceDataPointer(),
 						n[i], out_offset[i], out_numelements,
 						static_cast<int>(this->m_edge),
@@ -258,12 +258,12 @@ namespace skepu
 #ifndef SKEPU_DEBUG_FORCE_MULTI_GPU_IMPL
 			
 			if (numDevices <= 1)
-				return this->mapOverlapSingleThread_CU(0, startIdx, oi, ei, ai, ci, args...);
+				return this->mapOverlapSingleThread_CU(0, startIdx, oi, ei, ai, ci, std::forward<CallArgs>(args)...);
 			else
 			
 #endif // SKEPU_DEBUG_FORCE_MULTI_GPU_IMPL
 				
-				return this->mapOverlapNumDevices_CU(numDevices, startIdx, oi, ei, ai, ci, args...);
+				return this->mapOverlapNumDevices_CU(numDevices, startIdx, oi, ei, ai, ci, std::forward<CallArgs>(args)...);
 		}
 		
 		
@@ -335,8 +335,8 @@ namespace skepu
 		::mapOverlapSingleThread_CU_Col(size_t deviceID, size_t _numcols, Parity p, pack_indices<OI...>, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args)
 		{
 			cudaSetDevice(deviceID);
-			auto &res = get<0>(args...);
-			auto &arg = get<outArity>(args...);
+			auto &res = get<0>(std::forward<CallArgs>(args)...);
+			auto &arg = get<outArity>(std::forward<CallArgs>(args)...);
 			
 			const size_t n = arg.size();
 			const size_t overlap = this->m_overlap;
@@ -387,8 +387,8 @@ namespace skepu
 			
 			// Copy elements to device and allocate output memory.
 			auto in_mem_p = arg.updateDevice_CU(arg.getAddress(), n, deviceID, AccessMode::Read, false);
-			auto out_mem_p = std::make_tuple(get<OI, CallArgs...>(args...).updateDevice_CU(get<OI, CallArgs...>(args...).getAddress(), n, deviceID, AccessMode::Write, false)...);
-			auto anyMemP = std::make_tuple(get<AI, CallArgs...>(args...).cudaProxy(deviceID, MapOverlapFunc::anyAccessMode[AI])...);
+			auto out_mem_p = std::make_tuple(get<OI>(std::forward<CallArgs>(args)...).updateDevice_CU(get<OI>(std::forward<CallArgs>(args)...).getAddress(), n, deviceID, AccessMode::Write, false)...);
+			auto anyMemP = std::make_tuple(get<AI>(std::forward<CallArgs>(args)...).cudaProxy(deviceID, MapOverlapFunc::anyAccessMode[AI])...);
 			
 #ifdef USE_PINNED_MEMORY
 			this->m_cuda_colwise_kernel<<<numBlocks, numThreads, sharedMemSize, this->m_environment->m_devices_CU.at(deviceID)->m_streams[0]>>>
@@ -399,7 +399,7 @@ namespace skepu
 				std::get<OI>(out_mem_p)->getDeviceDataPointer()...,
 				in_mem_p->getDeviceDataPointer(),
 				std::get<AI>(anyMemP).second...,
-				get<CI, CallArgs...>(args...)...,
+				get<CI>(std::forward<CallArgs>(args)...)...,
 				wrap_mem_p.getDeviceDataPointer(),
 				n, 0, n,
 				static_cast<int>(this->m_edge),
@@ -421,8 +421,8 @@ namespace skepu
 		void MapOverlap1D<MapOverlapFunc, CUDAKernel, C2, C3, C4, CLKernel>
 		::mapOverlapMultiThread_CU_Col(size_t numDevices, size_t _numcols, Parity p, pack_indices<OI...>, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args)
 		{
-			auto &res = get<0>(args...);
-			auto &arg = get<outArity>(args...);
+			auto &res = get<0>(std::forward<CallArgs>(args)...);
+			auto &arg = get<outArity>(std::forward<CallArgs>(args)...);
 			const size_t totalElems = arg.size();
 			const size_t maxBlocks = this->m_selected_spec->GPUBlocks();
 			size_t maxThreads = this->m_selected_spec->GPUThreads();
@@ -461,7 +461,7 @@ namespace skepu
 			}
 			
 			DeviceMemPointer_CU<T> *in_mem_p[MAX_GPU_DEVICES];
-			decltype(std::make_tuple(get<OI, CallArgs...>(args...).updateDevice_CU(get<OI, CallArgs...>(args...).getAddress(), 0, 0, AccessMode::None, false)...)) out_mem_p[MAX_GPU_DEVICES];
+			decltype(std::make_tuple(get<OI>(std::forward<CallArgs>(args)...).updateDevice_CU(get<OI>(std::forward<CallArgs>(args)...).getAddress(), 0, 0, AccessMode::None, false)...)) out_mem_p[MAX_GPU_DEVICES];
 			DeviceMemPointer_CU<T> *wrapStartDev_mem_p[MAX_GPU_DEVICES];
 			DeviceMemPointer_CU<T> *wrapEndDev_mem_p[MAX_GPU_DEVICES];
 			
@@ -494,7 +494,7 @@ namespace skepu
 				else if (i == numDevices-1) in_mem_p[i] = arg.updateDevice_CU(arg.getAddress() + i * numElemPerSlice - overlapElems, (numRows + overlap) * numCols,     i, AccessMode::None, false);
 				else                        in_mem_p[i] = arg.updateDevice_CU(arg.getAddress() + i * numElemPerSlice - overlapElems, (numRows + 2 * overlap) * numCols, i, AccessMode::None, false);
 				
-				out_mem_p[i] = std::make_tuple(get<OI, CallArgs...>(args...).updateDevice_CU(get<OI, CallArgs...>(args...).getAddress() + i * numElemPerSlice, numRows * numCols, i, AccessMode::None, false)...);
+				out_mem_p[i] = std::make_tuple(get<OI>(std::forward<CallArgs>(args)...).updateDevice_CU(get<OI>(std::forward<CallArgs>(args)...).getAddress() + i * numElemPerSlice, numRows * numCols, i, AccessMode::None, false)...);
 				
 				// wrap vector, don't copy just allocates space on CUDA device.
 				wrapStartDev_mem_p[i] = new DeviceMemPointer_CU<T>(&wrapStartDev[0], wrapStartDev.size(), this->m_environment->m_devices_CU.at(i));
@@ -534,12 +534,12 @@ namespace skepu
 					n = numElems; //+2*overlap;
 				}
 				
-				out_mem_p[i] = std::make_tuple(get<OI, CallArgs...>(args...).updateDevice_CU(get<OI, CallArgs...>(args...).getAddress() + i * numElemPerSlice, numRows * numCols, i, AccessMode::Write, false, true)...);
+				out_mem_p[i] = std::make_tuple(get<OI>(std::forward<CallArgs>(args)...).updateDevice_CU(get<OI>(std::forward<CallArgs>(args)...).getAddress() + i * numElemPerSlice, numRows * numCols, i, AccessMode::Write, false, true)...);
 				
-			//	auto anyMemP = std::make_tuple(get<AI, CallArgs...>(args...).getParent().updateDevice_CU(get<AI, CallArgs...>(args...).getAddress(),
-			//		get<AI, CallArgs...>(args...).getParent().size(), i, MapOverlapFunc::anyAccessMode[AI])...);
+			//	auto anyMemP = std::make_tuple(get<AI>(std::forward<CallArgs>(args)...).getParent().updateDevice_CU(get<AI>(std::forward<CallArgs>(args)...).getAddress(),
+			//		get<AI>(std::forward<CallArgs>(args)...).getParent().size(), i, MapOverlapFunc::anyAccessMode[AI])...);
 					
-				auto anyMemP = std::make_tuple(get<AI, CallArgs...>(args...).cudaProxy(i, MapOverlapFunc::anyAccessMode[AI])...);
+				auto anyMemP = std::make_tuple(get<AI>(std::forward<CallArgs>(args)...).cudaProxy(i, MapOverlapFunc::anyAccessMode[AI])...);
 				
 				const size_t numThreads = trdsize[i]; //std::min(maxThreads, rowWidth);
 				const size_t numBlocks = std::max<size_t>(1, std::min(blocksPerCol[i] * numCols, maxBlocks));
@@ -561,7 +561,7 @@ namespace skepu
 					std::get<OI>(out_mem_p[i])->getDeviceDataPointer()...,
 					in_mem_p[i]->getDeviceDataPointer(),
 					std::get<AI>(anyMemP).second...,
-					get<CI, CallArgs...>(args...)...,
+					get<CI>(std::forward<CallArgs>(args)...)...,
 					wrapStartDev_mem_p[i]->getDeviceDataPointer(),
 					n, in_offset, n,
 					static_cast<int>(this->m_edge),
@@ -601,10 +601,10 @@ namespace skepu
 			
 #ifndef SKEPU_DEBUG_FORCE_MULTI_GPU_IMPL
 			if (numDevices <= 1)
-				return this->mapOverlapSingleThread_CU_Col(0, numcols, oi, ei, ai, ci, args...);
+				return this->mapOverlapSingleThread_CU_Col(0, numcols, oi, ei, ai, ci, std::forward<CallArgs>(args)...);
 			else
 #endif // SKEPU_DEBUG_FORCE_MULTI_GPU_IMPL
-				return this->mapOverlapMultiThread_CU_Col(numDevices, numcols, oi, ei, ai, ci, args...);
+				return this->mapOverlapMultiThread_CU_Col(numDevices, numcols, oi, ei, ai, ci, std::forward<CallArgs>(args)...);
 		}
 		
 		
@@ -618,8 +618,8 @@ namespace skepu
 		void MapOverlap1D<MapOverlapFunc, CUDAKernel, C2, C3, C4, CLKernel>
 		::mapOverlapSingleThread_CU_Row(size_t deviceID, size_t numrows, Parity p, pack_indices<OI...>, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args)
 		{
-			auto &res = get<0>(args...);
-			auto &arg = get<outArity>(args...);
+			auto &res = get<0>(std::forward<CallArgs>(args)...);
+			auto &arg = get<outArity>(std::forward<CallArgs>(args)...);
 			const size_t maxBlocks = this->m_selected_spec->GPUBlocks();
 			size_t maxThreads = 256; // this->m_selected_spec->GPUThreads();
 			const size_t overlap = this->m_overlap;
@@ -671,8 +671,8 @@ namespace skepu
 			
 			// Copy elements to device and allocate output memory.
 			auto in_mem_p = arg.updateDevice_CU(arg.getAddress(), n, deviceID, AccessMode::Read, false);
-			auto out_mem_p = std::make_tuple(get<OI, CallArgs...>(args...).updateDevice_CU(get<OI, CallArgs...>(args...).getAddress(), n, deviceID, AccessMode::Write, false)...);
-			auto anyMemP = std::make_tuple(get<AI, CallArgs...>(args...).cudaProxy(deviceID, MapOverlapFunc::anyAccessMode[AI])...);
+			auto out_mem_p = std::make_tuple(get<OI>(std::forward<CallArgs>(args)...).updateDevice_CU(get<OI>(std::forward<CallArgs>(args)...).getAddress(), n, deviceID, AccessMode::Write, false)...);
+			auto anyMemP = std::make_tuple(get<AI>(std::forward<CallArgs>(args)...).cudaProxy(deviceID, MapOverlapFunc::anyAccessMode[AI])...);
 			
 #ifdef USE_PINNED_MEMORY
 			this->m_cuda_rowwise_kernel<<<numBlocks, numThreads, sharedMemSize, this->m_environment->m_devices_CU.at(deviceID)->m_streams[0]>>>
@@ -683,7 +683,7 @@ namespace skepu
 				std::get<OI>(out_mem_p)->getDeviceDataPointer()...,
 				in_mem_p->getDeviceDataPointer(),
 				std::get<AI>(anyMemP).second...,
-				get<CI, CallArgs...>(args...)...,
+				get<CI>(std::forward<CallArgs>(args)...)...,
 				wrap_mem_p.getDeviceDataPointer(),
 				n, 0, n,
 				static_cast<int>(this->m_edge),
@@ -706,8 +706,8 @@ namespace skepu
 		void MapOverlap1D<MapOverlapFunc, CUDAKernel, C2, C3, C4, CLKernel>
 		::mapOverlapMultiThread_CU_Row(size_t numDevices, size_t numrows, Parity p, pack_indices<OI...>, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args)
 		{
-			auto &res = get<0>(args...);
-			auto &arg = get<outArity>(args...);
+			auto &res = get<0>(std::forward<CallArgs>(args)...);
+			auto &arg = get<outArity>(std::forward<CallArgs>(args)...);
 			const size_t maxBlocks = this->m_selected_spec->GPUBlocks();
 			size_t maxThreads = this->m_selected_spec->GPUThreads();
 			const size_t overlap = this->m_overlap;
@@ -760,7 +760,7 @@ namespace skepu
 			size_t numThreads = trdsize; //std::min(maxThreads, rowWidth);
 			
 			DeviceMemPointer_CU<T> *in_mem_p[MAX_GPU_DEVICES];
-			decltype(std::make_tuple(get<OI, CallArgs...>(args...).updateDevice_CU(get<OI, CallArgs...>(args...).getAddress(), 0, 0, AccessMode::None, false)...)) out_mem_p[MAX_GPU_DEVICES];
+			decltype(std::make_tuple(get<OI>(std::forward<CallArgs>(args)...).updateDevice_CU(get<OI>(std::forward<CallArgs>(args)...).getAddress(), 0, 0, AccessMode::None, false)...)) out_mem_p[MAX_GPU_DEVICES];
 			DeviceMemPointer_CU<T> *wrap_mem_p[MAX_GPU_DEVICES];
 			
 			// First create CUDA memory if not created already.
@@ -773,7 +773,7 @@ namespace skepu
 				
 				// Copy elements to device and allocate output memory.
 				in_mem_p[i]  = arg.updateDevice_CU(arg.getAddress() + i * numElemPerSlice, numRows * rowWidth, i, AccessMode::None, false);
-				out_mem_p[i] = std::make_tuple(get<OI, CallArgs...>(args...).updateDevice_CU(get<OI, CallArgs...>(args...).getAddress() + i * numElemPerSlice, numRows * rowWidth, i, AccessMode::None, false)...);
+				out_mem_p[i] = std::make_tuple(get<OI>(std::forward<CallArgs>(args)...).updateDevice_CU(get<OI>(std::forward<CallArgs>(args)...).getAddress() + i * numElemPerSlice, numRows * rowWidth, i, AccessMode::None, false)...);
 			}
 			
 			// we will divide the computation row-wise... copy data and do operation
@@ -791,9 +791,9 @@ namespace skepu
 				
 				// Copy elements to device and allocate output memory.
 				in_mem_p[i]  = arg.updateDevice_CU(arg.getAddress() + i * numElemPerSlice, numRows * rowWidth, i, AccessMode::Read, false);
-				out_mem_p[i] = std::make_tuple(get<OI, CallArgs...>(args...).updateDevice_CU(get<OI, CallArgs...>(args...).getAddress() + i * numElemPerSlice, numRows * rowWidth, i, AccessMode::Write, false)...);
+				out_mem_p[i] = std::make_tuple(get<OI>(std::forward<CallArgs>(args)...).updateDevice_CU(get<OI>(std::forward<CallArgs>(args)...).getAddress() + i * numElemPerSlice, numRows * rowWidth, i, AccessMode::Write, false)...);
 				
-				auto anyMemP = std::make_tuple(get<AI, CallArgs...>(args...).cudaProxy(i, MapOverlapFunc::anyAccessMode[AI])...);
+				auto anyMemP = std::make_tuple(get<AI>(std::forward<CallArgs>(args)...).cudaProxy(i, MapOverlapFunc::anyAccessMode[AI])...);
 				
 				cudaSetDevice(i);
 				
@@ -806,7 +806,7 @@ namespace skepu
 					std::get<OI>(out_mem_p[i])->getDeviceDataPointer()...,
 					in_mem_p[i]->getDeviceDataPointer(),
 					std::get<AI>(anyMemP).second...,
-					get<CI, CallArgs...>(args...)...,
+					get<CI>(std::forward<CallArgs>(args)...)...,
 					wrap_mem_p[i]->getDeviceDataPointer(),
 					numElems, 0, numElems,
 					static_cast<int>(this->m_edge),
@@ -838,10 +838,10 @@ namespace skepu
 			
 #ifndef SKEPU_DEBUG_FORCE_MULTI_GPU_IMPL
 			if (numDevices <= 1)
-				return this->mapOverlapSingleThread_CU_Row(0, numrows, oi, ei, ai, ci, args...);
+				return this->mapOverlapSingleThread_CU_Row(0, numrows, oi, ei, ai, ci, std::forward<CallArgs>(args)...);
 			else
 #endif // SKEPU_DEBUG_FORCE_MULTI_GPU_IMPL
-				return this->mapOverlapMultiThread_CU_Row(numDevices, numrows, oi, ei, ai, ci, args...);
+				return this->mapOverlapMultiThread_CU_Row(numDevices, numrows, oi, ei, ai, ci, std::forward<CallArgs>(args)...);
 		}
 		
 		
@@ -858,8 +858,8 @@ namespace skepu
 		void MapOverlap2D<MapOverlapFunc, CUDAKernel, CLKernel>
 		::mapOverlapSingleThread_CU(size_t deviceID, Parity p, pack_indices<OI...>, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args)
 		{
-			auto &res = get<0>(args...);
-			auto &arg = get<outArity>(args...);
+			auto &res = get<0>(std::forward<CallArgs>(args)...);
+			auto &arg = get<outArity>(std::forward<CallArgs>(args)...);
 			const size_t in_rows = arg.total_rows();
 			const size_t in_cols = arg.total_cols();
 			const size_t out_rows = res.total_rows();
@@ -867,8 +867,8 @@ namespace skepu
 			
 			cudaSetDevice(deviceID);
 			
-			auto in_mem_p = arg.updateDevice_CU(arg.GetArrayRep(), in_rows * in_cols, deviceID, AccessMode::Read, true);
-			auto out_mem_p = std::make_tuple(get<OI, CallArgs...>(args...).updateDevice_CU(get<OI, CallArgs...>(args...).GetArrayRep(), out_rows * out_cols, deviceID, AccessMode::Write, true)...);
+			auto in_mem_p = arg.updateDevice_CU(arg.getAddress(), in_rows * in_cols, deviceID, AccessMode::Read, true);
+			auto out_mem_p = std::make_tuple(get<OI>(std::forward<CallArgs>(args)...).updateDevice_CU(get<OI>(std::forward<CallArgs>(args)...).getAddress(), out_rows * out_cols, deviceID, AccessMode::Write, true)...);
 			
 			dim3 numBlocks, numThreads;
 			
@@ -880,7 +880,7 @@ namespace skepu
 			numBlocks.y = (out_rows + numThreads.y - 1) / numThreads.y;
 			numBlocks.z = 1;
 			
-			auto anyMemP = std::make_tuple(get<AI, CallArgs...>(args...).cudaProxy(deviceID, MapOverlapFunc::anyAccessMode[AI])...);
+			auto anyMemP = std::make_tuple(get<AI>(std::forward<CallArgs>(args)...).cudaProxy(deviceID, MapOverlapFunc::anyAccessMode[AI])...);
 			
 			size_t sharedMem =  (numThreads.x + this->m_overlap_x * 2) * (numThreads.y + this->m_overlap_y * 2) * sizeof(T);
 			
@@ -893,7 +893,7 @@ namespace skepu
 				std::get<OI>(out_mem_p)->getDeviceDataPointer()...,
 				in_mem_p->getDeviceDataPointer(),
 				std::get<AI-arity-outArity>(anyMemP).second...,
-				get<CI, CallArgs...>(args...)...,
+				get<CI>(std::forward<CallArgs>(args)...)...,
 				out_rows, out_cols,
 				this->m_overlap_y, this->m_overlap_x,
 				in_cols, out_cols,
@@ -915,8 +915,8 @@ namespace skepu
 		void MapOverlap2D<MapOverlapFunc, CUDAKernel, CLKernel>
 		::mapOverlapMultipleThread_CU(size_t numDevices, Parity p, pack_indices<OI...>, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args)
 		{
-			auto &res = get<0>(args...);
-			auto &arg = get<outArity>(args...);
+			auto &res = get<0>(std::forward<CallArgs>(args)...);
+			auto &arg = get<outArity>(std::forward<CallArgs>(args)...);
 			const size_t in_rows = arg.total_rows();
 			const size_t in_cols = arg.total_cols();
 			const size_t out_rows = res.total_rows();
@@ -930,7 +930,7 @@ namespace skepu
 		//	input.updateHostAndInvalidateDevice();
 			
 			typename Matrix<T>::device_pointer_type_cu in_mem_p[MAX_GPU_DEVICES];
-			decltype(std::make_tuple(get<OI, CallArgs...>(args...).updateDevice_CU(get<OI, CallArgs...>(args...).GetArrayRep(), 0, 0, AccessMode::None, true)...)) out_mem_p[MAX_GPU_DEVICES];
+			decltype(std::make_tuple(get<OI>(std::forward<CallArgs>(args)...).updateDevice_CU(get<OI>(std::forward<CallArgs>(args)...).getAddress(), 0, 0, AccessMode::None, true)...)) out_mem_p[MAX_GPU_DEVICES];
 			
 			// First create CUDA memory if not created already.
 			for (size_t i = 0; i < numDevices; ++i)
@@ -945,8 +945,8 @@ namespace skepu
 				
 				size_t inRows = outRows + this->m_overlap_y * 2; // no matter which device, number of input rows is same.
 				
-				in_mem_p[i] = arg.updateDevice_CU(arg.GetArrayRep() + i * numRowsPerSlice * in_cols, inRows * in_cols, i, AccessMode::None, true);
-				out_mem_p[i] = std::make_tuple(get<OI, CallArgs...>(args...).updateDevice_CU(get<OI, CallArgs...>(args...).GetArrayRep() + i * numRowsPerSlice * out_cols, outRows * out_cols, i, AccessMode::None, true)...);
+				in_mem_p[i] = arg.updateDevice_CU(arg.getAddress() + i * numRowsPerSlice * in_cols, inRows * in_cols, i, AccessMode::None, true);
+				out_mem_p[i] = std::make_tuple(get<OI>(std::forward<CallArgs>(args)...).updateDevice_CU(get<OI>(std::forward<CallArgs>(args)...).getAddress() + i * numRowsPerSlice * out_cols, outRows * out_cols, i, AccessMode::None, true)...);
 			}
 			
 			// Fill out argument struct with right information and start threads.
@@ -962,8 +962,8 @@ namespace skepu
 				
 				size_t inRows = outRows + this->m_overlap_y * 2; // no matter which device, number of input rows is same.
 				
-				in_mem_p[i] = arg.updateDevice_CU(arg.GetArrayRep() + i * numRowsPerSlice * in_cols, inRows * in_cols, i, AccessMode::Read, true);
-				out_mem_p[i] = std::make_tuple(get<OI, CallArgs...>(args...).updateDevice_CU(get<OI, CallArgs...>(args...).GetArrayRep() + i * numRowsPerSlice * out_cols, outRows * out_cols, i, AccessMode::Write, true, true)...);
+				in_mem_p[i] = arg.updateDevice_CU(arg.getAddress() + i * numRowsPerSlice * in_cols, inRows * in_cols, i, AccessMode::Read, true);
+				out_mem_p[i] = std::make_tuple(get<OI>(std::forward<CallArgs>(args)...).updateDevice_CU(get<OI>(std::forward<CallArgs>(args)...).getAddress() + i * numRowsPerSlice * out_cols, outRows * out_cols, i, AccessMode::Write, true, true)...);
 				
 				dim3 numBlocks;
 				dim3 numThreads;
@@ -978,7 +978,7 @@ namespace skepu
 				
 				size_t sharedMem =  (numThreads.x + this->m_overlap_x * 2) * (numThreads.y + this->m_overlap_y * 2) * sizeof(T);
 				
-				auto anyMemP = std::make_tuple(get<AI, CallArgs...>(args...).cudaProxy(i, MapOverlapFunc::anyAccessMode[AI])...);
+				auto anyMemP = std::make_tuple(get<AI>(std::forward<CallArgs>(args)...).cudaProxy(i, MapOverlapFunc::anyAccessMode[AI])...);
 				
 #ifdef USE_PINNED_MEMORY
 				this->m_cuda_kernel<<< numBlocks,numThreads, sharedMem, this->m_environment->m_devices_CU[i]->m_streams[0]>>>
@@ -989,7 +989,7 @@ namespace skepu
 					std::get<OI>(out_mem_p[i])->getDeviceDataPointer()...,
 					in_mem_p[i]->getDeviceDataPointer(), 
 					std::get<AI-arity-outArity>(anyMemP).second...,
-					get<CI, CallArgs...>(args...)...,
+					get<CI>(std::forward<CallArgs>(args)...)...,
 					outRows, out_cols,
 					this->m_overlap_y, this->m_overlap_x,
 					in_cols, out_cols,
@@ -1008,7 +1008,7 @@ namespace skepu
 		void MapOverlap2D<MapOverlapFunc, CUDAKernel, CLKernel>
 		::helper_CUDA(pack_indices<OI...> oi, pack_indices<EI...> ei, pack_indices<AI...> ai, pack_indices<CI...> ci, CallArgs&&... args)
 		{
-			auto &arg = get<outArity>(args...);
+			auto &arg = get<outArity>(std::forward<CallArgs>(args)...);
 			DEBUG_TEXT_LEVEL1("CUDA MapOverlap 2D: size = " << arg.size() << ", maxDevices = " << this->m_selected_spec->devices()
 				<< ", maxBlocks = " << this->m_selected_spec->GPUBlocks() << ", maxThreads = " << this->m_selected_spec->GPUThreads());
 			
@@ -1016,10 +1016,10 @@ namespace skepu
 			
 #ifndef SKEPU_DEBUG_FORCE_MULTI_GPU_IMPL
 			if (numDevices <= 1)
-				return this->mapOverlapSingleThread_CU(0, oi, ei, ai, ci, args...);
+				return this->mapOverlapSingleThread_CU(0, oi, ei, ai, ci, std::forward<CallArgs>(args)...);
 			else
 #endif // SKEPU_DEBUG_FORCE_MULTI_GPU_IMPL
-				return this->mapOverlapMultipleThread_CU(numDevices, oi, ei, ai, ci, args...);
+				return this->mapOverlapMultipleThread_CU(numDevices, oi, ei, ai, ci, std::forward<CallArgs>(args)...);
 		}
 		
 		
@@ -1054,8 +1054,8 @@ namespace skepu
 			
 			cudaSetDevice(deviceID);
 			
-			typename Tensor3<T>::device_pointer_type_cu in_mem_p  = arg.updateDevice_CU(arg.GetArrayRep(), arg.size(), deviceID, AccessMode::Read,  true);
-			typename Tensor3<T>::device_pointer_type_cu out_mem_p = res.updateDevice_CU(res.GetArrayRep(), res.size(), deviceID, AccessMode::Write, true);
+			typename Tensor3<T>::device_pointer_type_cu in_mem_p  = arg.updateDevice_CU(arg.getAddress(), arg.size(), deviceID, AccessMode::Read,  true);
+			typename Tensor3<T>::device_pointer_type_cu out_mem_p = res.updateDevice_CU(res.getAddress(), res.size(), deviceID, AccessMode::Write, true);
 			
 			dim3 numBlocks, numThreads;
 			
@@ -1067,7 +1067,7 @@ namespace skepu
 			numBlocks.y = (out_i + numThreads.y - 1) / numThreads.y;
 			numBlocks.z = 1;
 			
-			auto anyMemP = std::make_tuple(get<AI, CallArgs...>(args...).cudaProxy(deviceID, MapOverlapFunc::anyAccessMode[AI])...);
+			auto anyMemP = std::make_tuple(get<AI>(std::forward<CallArgs>(args)...).cudaProxy(deviceID, MapOverlapFunc::anyAccessMode[AI])...);
 			
 			size_t sharedMem =  (numThreads.x + this->m_overlap_i * 2) * (numThreads.y + this->m_overlap_j * 2) * (this->m_overlap_k * 2) * sizeof(T);
 			
@@ -1080,7 +1080,7 @@ namespace skepu
 				std::get<OI>(out_mem_p)->getDeviceDataPointer()...,
 				in_mem_p->getDeviceDataPointer(),
 				std::get<AI>(anyMemP).second...,
-				get<CI, CallArgs...>(args...)...,
+				get<CI>(std::forward<CallArgs>(args)...)...,
 				out_i, out_j, out_k,
 				this->m_overlap_i, this->m_overlap_j, this->m_overlap_k,
 				in_j, out_j,
@@ -1130,8 +1130,8 @@ namespace skepu
 				
 				size_t inRows = outRows + this->m_overlap_y * 2; // no matter which device, number of input rows is same.
 				
-				in_mem_p[i] = arg.updateDevice_CU(arg.GetArrayRep() + i * numRowsPerSlice * in_cols, inRows * in_cols, i, AccessMode::None, true);
-				out_mem_p[i] = res.updateDevice_CU(res.GetArrayRep() + i * numRowsPerSlice * out_cols, outRows * out_cols, i, AccessMode::None, true);
+				in_mem_p[i] = arg.updateDevice_CU(arg.getAddress() + i * numRowsPerSlice * in_cols, inRows * in_cols, i, AccessMode::None, true);
+				out_mem_p[i] = res.updateDevice_CU(res.getAddress() + i * numRowsPerSlice * out_cols, outRows * out_cols, i, AccessMode::None, true);
 			}
 			
 			// Fill out argument struct with right information and start threads.
@@ -1147,8 +1147,8 @@ namespace skepu
 				
 				size_t inRows = outRows + this->m_overlap_y * 2; // no matter which device, number of input rows is same.
 				
-				in_mem_p[i] = arg.updateDevice_CU(arg.GetArrayRep() + i * numRowsPerSlice * in_cols, inRows * in_cols, i, AccessMode::Read, true);
-				out_mem_p[i] = res.updateDevice_CU(res.GetArrayRep() + i * numRowsPerSlice * out_cols, outRows * out_cols, i, AccessMode::Write, true, true);
+				in_mem_p[i] = arg.updateDevice_CU(arg.getAddress() + i * numRowsPerSlice * in_cols, inRows * in_cols, i, AccessMode::Read, true);
+				out_mem_p[i] = res.updateDevice_CU(res.getAddress() + i * numRowsPerSlice * out_cols, outRows * out_cols, i, AccessMode::Write, true, true);
 				
 				dim3 numBlocks;
 				dim3 numThreads;
@@ -1163,7 +1163,7 @@ namespace skepu
 				
 				size_t sharedMem =  (numThreads.x + this->m_overlap_x * 2) * (numThreads.y + this->m_overlap_y * 2) * sizeof(T);
 				
-				auto anyMemP = std::make_tuple(get<AI, CallArgs...>(args...).cudaProxy(i, MapOverlapFunc::anyAccessMode[AI])...);
+				auto anyMemP = std::make_tuple(get<AI>(std::forward<CallArgs>(args)...).cudaProxy(i, MapOverlapFunc::anyAccessMode[AI])...);
 				
 #ifdef USE_PINNED_MEMORY
 				this->m_cuda_kernel<<< numBlocks,numThreads, sharedMem, this->m_environment->m_devices_CU[i]->m_streams[0]>>>
@@ -1174,7 +1174,7 @@ namespace skepu
 					std::get<OI>(out_mem_p[i])->getDeviceDataPointer()...,
 					in_mem_p[i]->getDeviceDataPointer(), 
 					std::get<AI>(anyMemP).second...,
-					get<CI, CallArgs...>(args...)...,
+					get<CI>(std::forward<CallArgs>(args)...)...,
 					outRows, out_cols,
 					this->m_overlap_y, this->m_overlap_x,
 					in_cols, out_cols,
@@ -1200,10 +1200,10 @@ namespace skepu
 			
 #ifndef SKEPU_DEBUG_FORCE_MULTI_GPU_IMPL
 			if (numDevices <= 1)
-				return this->mapOverlapSingleThread_CU(0, res, arg, ai, ci, get<AI, CallArgs...>(args...)..., get<CI, CallArgs...>(args...)...);
+				return this->mapOverlapSingleThread_CU(0, res, arg, ai, ci, get<AI>(std::forward<CallArgs>(args)...)..., get<CI>(std::forward<CallArgs>(args)...)...);
 			else
 #endif // SKEPU_DEBUG_FORCE_MULTI_GPU_IMPL
-				return this->mapOverlapMultipleThread_CU(numDevices, res, arg, ai, ci, get<AI, CallArgs...>(args...)..., get<CI, CallArgs...>(args...)...);
+				return this->mapOverlapMultipleThread_CU(numDevices, res, arg, ai, ci, get<AI>(std::forward<CallArgs>(args)...)..., get<CI>(std::forward<CallArgs>(args)...)...);
 		}*/
 		
 	}

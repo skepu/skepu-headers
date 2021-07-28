@@ -13,6 +13,7 @@
 #define VARIANT_CPU(block) block
 
 #include <vector>
+#include <array>
 #include <iostream>
 #include <utility>
 #include <cassert>
@@ -22,59 +23,12 @@
 #include <iomanip>
 
 
-namespace skepu_variadic_return
-{
-	template <typename T>
-	struct is_tuple_impl : std::false_type {};
-
-	template <typename... U>
-	struct is_tuple_impl<std::tuple <U...>> : std::true_type {};
-	
-	template <typename T>
-	struct is_tuple : is_tuple_impl<typename std::decay<T>::type> {};
-
-	template<typename ... Out, typename ... Res>
-	inline void bind(std::tuple<Out...> &&out, std::tuple<Res...> res) noexcept
-	{
-		out = res;
-	}
-
-	template<typename Out, typename Res, REQUIRES(!is_tuple<Res>::value)>
-	inline void bind(std::tuple<Out> &&out, Res && res) noexcept
-	{
-		std::get<0>(out) = res;
-	}
-
-	template<typename...Ts>
-	auto my_make_tuple(std::tuple<Ts...> &arg) -> std::tuple<Ts...>&
-	{
-		return arg;
-	}
-
-	template<typename T>
-	std::tuple<T&> my_make_tuple(T &&arg)
-	{
-		return std::tie(arg);
-	}
-}
-
-#ifndef SKEPU_VARIADIC_RETURN_IMPL
-#define SKEPU_VARIADIC_RETURN_IMPL 2
-#endif
-
-#if SKEPU_VARIADIC_RETURN_IMPL == 0
-#define SKEPU_VARIADIC_RETURN(lhs, rhs) std::tie(lhs) = (rhs);
-#elif SKEPU_VARIADIC_RETURN_IMPL == 1
-#define SKEPU_VARIADIC_RETURN(lhs, rhs) skepu_variadic_return::bind(std::tie(lhs), (rhs));
-#else
-#define SKEPU_VARIADIC_RETURN(lhs, rhs) std::tie(lhs) = skepu_variadic_return::my_make_tuple(rhs);
-#endif
-
-
 
 namespace skepu
 {
 	constexpr bool no_dealloc = false;
+	
+	struct PrecompilerMarker {};
 
 	// ----------------------------------------------------------------
 	// sizes and indices structures
@@ -175,6 +129,34 @@ namespace skepu
 	{
 		Normal, RedBlack, Red, Black
 	};
+	
+	// ReduceMode
+	
+	enum class ReduceMode
+	{
+		RowWise, ColWise
+	};
+	
+	inline std::ostream &operator<<(std::ostream &o, ReduceMode m)
+	{
+		switch (m)
+		{
+		case ReduceMode::RowWise:
+			o << "Rowwise"; break;
+		case ReduceMode::ColWise:
+			o << "Colwise"; break;
+		default:
+			o << "<Invalid reduce mode>";
+		}
+		return o;
+	}
+	
+	// ScanMode
+	
+	enum class ScanMode
+	{
+		Inclusive, Exclusive
+	};
 
 	enum class AccessMode
 	{
@@ -209,7 +191,6 @@ namespace skepu
 		MapOverlap4D,
 		Call,
 	};
-
 
 	// For multiple return Map variants
 
@@ -307,12 +288,66 @@ namespace skepu
 		}
 		
 	protected:
+		
+		template<size_t randomCount, REQUIRES(randomCount != SKEPU_NO_RANDOM)>
+		Random<randomCount> prepareRandom(size_t size)
+		{
+			if (this->m_prng == nullptr)
+				SKEPU_ERROR("No random stream set in skeleton instance");
+			
+			return this->m_prng->template asRandom<randomCount>(size);
+		}
+		
+		template<size_t randomCount, REQUIRES(randomCount != SKEPU_NO_RANDOM)>
+		skepu::Vector<Random<randomCount>> prepareRandom(size_t size, size_t copies)
+		{
+			if (this->m_prng == nullptr)
+				SKEPU_ERROR("No random stream set in skeleton instance");
+			
+			return this->m_prng->template asRandom<randomCount>(size, copies);
+		}
+		
+		template<size_t randomCount, REQUIRES(randomCount == SKEPU_NO_RANDOM)>
+		PRNG::Placeholder prepareRandom(size_t size = 0, size_t copies = 0)
+		{
+			return {};
+		}
+		
 		PRNG *m_prng = nullptr;
 	};
-}
+	
 
-namespace skepu
-{
+	// For Map with strides
+	
+	template<size_t count>
+	class StrideList
+	{
+	public:
+		StrideList<count>()
+		{
+			for (size_t i = 0; i < count; ++i)
+				this->values[i] = 1;
+		}
+		
+		template<typename... S>
+		StrideList<count>(S... strides)
+		{
+			static_assert(sizeof...(S) == count, "Unexpected stride count");
+		//	if (get<0>(strides...) == 0) SKEPU_ERROR("First stride cannot be 0.");
+			this->values = std::array<int, count>{(int)strides...};
+		}
+		
+		int operator[](size_t i) const
+		{
+			return this->values[i];
+		}
+		
+	private:
+		std::array<int, count> values{};
+	};
+	
+	
+	
 	inline size_t elwise_i(std::tuple<>) { return 0; }
 	inline size_t elwise_j(std::tuple<>) { return 0; }
 	inline size_t elwise_k(std::tuple<>) { return 0; }
@@ -543,9 +578,9 @@ namespace skepu
 	}
 
 	template<typename Index, typename... Args>
-	inline auto size_info(Index, size_t, size_t, size_t, size_t, Args&&... args) -> decltype(get<0, Args...>(args...).getParent().size_info())
+	inline auto size_info(Index, size_t, size_t, size_t, size_t, Args&&... args) -> decltype(get<0, Args...>(std::forward<Args>(args)...).getParent().size_info())
 	{
-		return get<0, Args...>(args...).getParent().size_info();
+		return get<0, Args...>(std::forward<Args>(args)...).getParent().size_info();
 	}
 
 
@@ -562,6 +597,7 @@ namespace skepu
 		? DA
 		: trait_count_first_not<is_skepu_container_proxy, Args...>::value
 			- (is_indexed<Args...>::value ? 1 : 0)
+			- (has_random<Args...>::value ? 1 : 0)
 	> {};
 
 
@@ -590,38 +626,135 @@ namespace skepu
 	// ConditionalIndexForwarder utility structure
 	// ----------------------------------------------------------------
 
-	template<bool indexed, typename Func>
+	template<bool indexed, bool randomized, typename Func>
 	struct ConditionalIndexForwarder
 	{
 		using Ret = typename return_type<Func>::type;
 
-		// Forward index
+		// Forward index, do not forward random
 
-		template<typename Index, typename... CallArgs, REQUIRES(is_skepu_index<Index>::value && indexed)>
-		static Ret forward(Func func, Index i, CallArgs&&... args)
+		template<typename Index, typename Rnd, typename... CallArgs,
+			REQUIRES(is_skepu_index<Index>::value && indexed && !randomized)>
+		static Ret forward(Func func, Index i, Rnd &&r, CallArgs&&... args)
 		{
 			return func(i, std::forward<CallArgs>(args)...);
 		}
 
-		template<typename Index, typename... CallArgs, REQUIRES(is_skepu_index<Index>::value && indexed)>
-		static Ret forward_device(Func func, Index i, CallArgs&&... args)
-		{
-			return func(i, std::forward<CallArgs>(args)...);
-		}
+		// Do not forward index, do not forward random
 
-		// Do not forward index
-
-		template<typename Index, typename... CallArgs, REQUIRES(is_skepu_index<Index>::value && !indexed)>
-		static Ret forward(Func func, Index, CallArgs&&... args)
+		template<typename Index, typename Rnd, typename... CallArgs,
+			REQUIRES(is_skepu_index<Index>::value && !indexed && !randomized)>
+		static Ret forward(Func func, Index, Rnd &&r, CallArgs&&... args)
 		{
 			return func(std::forward<CallArgs>(args)...);
 		}
+		
+		// Forward index, forward random
 
-		template<typename Index, typename... CallArgs, REQUIRES(is_skepu_index<Index>::value && !indexed)>
-		static Ret forward_device(Func func, Index, CallArgs&&... args)
+		template<typename Index, typename Rnd, typename... CallArgs,
+			REQUIRES(is_skepu_index<Index>::value && indexed && randomized)>
+		static Ret forward(Func func, Index i, Rnd &&r, CallArgs&&... args)
 		{
-			return func(std::forward<CallArgs>(args)...);
+			return func(i, std::forward<Rnd>(r), std::forward<CallArgs>(args)...);
+		}
+
+		// Do not forward index, forward random
+
+		template<typename Index, typename Rnd, typename... CallArgs,
+			REQUIRES(is_skepu_index<Index>::value && !indexed && randomized)>
+		static Ret forward(Func func, Index, Rnd &&r, CallArgs&&... args)
+		{
+			return func(std::forward<Rnd>(r), std::forward<CallArgs>(args)...);
 		}
 	};
 
 }
+
+
+
+namespace skepu_variadic_return
+{
+	template <typename T>
+	struct is_tuple_impl : std::false_type {};
+
+	template <typename... U>
+	struct is_tuple_impl<std::tuple <U...>> : std::true_type {};
+	
+	template <typename T>
+	struct is_tuple : is_tuple_impl<typename std::decay<T>::type> {};
+
+	template<typename ... Out, typename ... Res>
+	inline void bind(std::tuple<Out...> &&out, std::tuple<Res...> res) noexcept
+	{
+		out = res;
+	}
+
+	template<typename Out, typename Res, REQUIRES(!is_tuple<Res>::value)>
+	inline void bind(std::tuple<Out> &&out, Res && res) noexcept
+	{
+		std::get<0>(out) = res;
+	}
+	
+	
+	template <typename ... Out, typename ... Res, std::size_t ... Is>
+	void sumT(std::tuple<Out...> &&out, std::tuple<Res...> const &res, pack_indices<Is...> const &)
+	{
+		pack_expand((std::get<Is>(out) += std::get<Is>(res), 0)...);
+	}
+	
+	template<typename ... Out, typename ... Res>
+	inline void bindadd(std::tuple<Out...> &&out, std::tuple<Res...> const &res) noexcept
+	{
+		static_assert(sizeof...(Out) == sizeof...(Res), "Error in tuple return system");
+		sumT(std::forward<std::tuple<Out...>>(out), res, typename make_pack_indices<sizeof...(Out), 0>::type{});
+	}
+
+	template<typename Out, typename Res, REQUIRES(!is_tuple<Res>::value)>
+	inline void bindadd(std::tuple<Out> &&out, Res && res) noexcept
+	{
+		std::get<0>(out) += res;
+	}
+
+	
+	template<typename...Ts>
+	auto my_make_tuple(std::tuple<Ts...> &arg) -> std::tuple<Ts...>&
+	{
+		return arg;
+	}
+
+	template<typename T>
+	std::tuple<T&> my_make_tuple(T &&arg)
+	{
+		return std::tie(arg);
+	}
+}
+
+#ifndef SKEPU_VARIADIC_RETURN_IMPL
+#define SKEPU_VARIADIC_RETURN_IMPL 1
+#endif
+
+#if SKEPU_VARIADIC_RETURN_IMPL == 0
+#define SKEPU_VARIADIC_RETURN(lhs, rhs) std::tie(lhs) = (rhs);
+#elif SKEPU_VARIADIC_RETURN_IMPL == 1
+#define SKEPU_VARIADIC_RETURN(lhs, rhs) skepu_variadic_return::bind(std::tie(lhs), (rhs));
+
+#define SKEPU_VARIADIC_RETURN_INPLACE(inplace, lhs, rhs)\
+if (!inplace) \
+{ skepu_variadic_return::bind(std::tie(lhs), (rhs)); } \
+else \
+{ skepu_variadic_return::bindadd(std::tie(lhs), (rhs)); } \
+
+
+
+
+#else
+#define SKEPU_VARIADIC_RETURN(lhs, rhs) std::tie(lhs) = skepu_variadic_return::my_make_tuple(rhs);
+
+
+#define SKEPU_VARIADIC_RETURN_INPLACE(inplace, lhs, rhs) \
+	if (!inplace) \
+	{ std::tie(lhs) = skepu_variadic_return::my_make_tuple(rhs); } \
+	else \
+	{ std::tie(lhs) += skepu_variadic_return::my_make_tuple(rhs); } \
+
+#endif

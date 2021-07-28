@@ -1,6 +1,6 @@
 #pragma once
 
-#include <skepu3/backend/benchmark.h>
+#include <skepu-lib/benchmark.hpp>
 
 #define MEASURE_REPEATS 9
 #define ARG_SIZE_STEP_FACTOR 4

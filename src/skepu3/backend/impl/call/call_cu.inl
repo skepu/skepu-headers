@@ -15,8 +15,8 @@ namespace skepu
 		void Call<CallFunc, CUDAKernel, CLKernel>
 		::callSingleThread_CU(size_t deviceID, pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args)
 		{
-			auto aArgs = std::make_tuple(get<AI, CallArgs...>(args...)...);
-			auto scArgs = std::make_tuple(get<CI, CallArgs...>(args...)...);
+			auto aArgs = std::make_tuple(get<AI>(std::forward<CallArgs>(args)...)...);
+			auto scArgs = std::make_tuple(get<CI>(std::forward<CallArgs>(args)...)...);
 			
 			// Setup parameters
 			const size_t numThreads = this->m_selected_spec->GPUThreads();
@@ -55,8 +55,8 @@ namespace skepu
 			CHECK_CUDA_ERROR(cudaSetDevice(deviceID));
 			size_t numKernels = this->m_environment->m_devices_CU.at(deviceID)->getNoConcurrentKernels();
 			
-			auto aArgs = std::make_tuple(get<AI, CallArgs...>(args...)...);
-			auto scArgs = std::make_tuple(get<CI, CallArgs...>(args...)...);
+			auto aArgs = std::make_tuple(get<AI>(std::forward<CallArgs>(args)...)...);
+			auto scArgs = std::make_tuple(get<CI>(std::forward<CallArgs>(args)...)...);
 			
 			typename to_proxy_cu<decltype(CallFunc::ProxyTags), decltype(aArgs)>::type anyMemP[numKernels];
 			
@@ -108,8 +108,8 @@ namespace skepu
 			size_t streamRest[MAX_GPU_DEVICES];
 			size_t maxKernels = 0;
 			
-			auto aArgs = std::make_tuple(get<AI, CallArgs...>(args...)...);
-			auto scArgs = std::make_tuple(get<CI, CallArgs...>(args...)...);
+			auto aArgs = std::make_tuple(get<AI>(std::forward<CallArgs>(args)...)...);
+			auto scArgs = std::make_tuple(get<CI>(std::forward<CallArgs>(args)...)...);
 			
 			for (size_t i = 0; i < useNumGPU; ++i)
 			{
@@ -169,8 +169,8 @@ namespace skepu
 		void Call<CallFunc, CUDAKernel, CLKernel>
 		::callSingleThreadMultiGPU_CU(size_t numDevices, pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args)
 		{
-			auto aArgs = std::make_tuple(get<AI, CallArgs...>(args...)...);
-			auto scArgs = std::make_tuple(get<CI, CallArgs...>(args...)...);
+			auto aArgs = std::make_tuple(get<AI>(std::forward<CallArgs>(args)...)...);
+			auto scArgs = std::make_tuple(get<CI>(std::forward<CallArgs>(args)...)...);
 			
 			typename to_proxy_cu<typename CallFunc::ProxyTags, decltype(aArgs)>::type anyMemP[MAX_GPU_DEVICES];
 			
@@ -226,11 +226,11 @@ namespace skepu
 				
 				// Checks whether or not the GPU supports MemoryTransfer/KernelExec overlapping, if not call callSingleThread function
 				if (this->m_environment->m_devices_CU.at(this->m_environment->bestCUDADevID)->isOverlapSupported())
-					return callMultiStream_CU(this->m_environment->bestCUDADevID, ai, ci, args...);
+					return callMultiStream_CU(this->m_environment->bestCUDADevID, ai, ci, std::forward<CallArgs>(args)...);
 				
 #endif // USE_PINNED_MEMORY
 				
-				return callSingleThread_CU(this->m_environment->bestCUDADevID, ai, ci, args...);
+				return callSingleThread_CU(this->m_environment->bestCUDADevID, ai, ci, std::forward<CallArgs>(args)...);
 			}
 			
 #endif // SKEPU_DEBUG_FORCE_MULTI_GPU_IMPL
@@ -240,11 +240,11 @@ namespace skepu
 			// if pinned memory is used but the device does not support overlap the function continues with the previous implementation.
 			// if the multistream version is being used the function will exit at this point.
 			if (this->m_environment->supportsCUDAOverlap())
-				return callMultiStreamMultiGPU_CU(numDevices, ai, ci, args...);
+				return callMultiStreamMultiGPU_CU(numDevices, ai, ci, std::forward<CallArgs>(args)...);
 			
 #endif // USE_PINNED_MEMORY
 			
-			return callSingleThreadMultiGPU_CU(numDevices, ai, ci, args...);
+			return callSingleThreadMultiGPU_CU(numDevices, ai, ci, std::forward<CallArgs>(args)...);
 		}
 	} // namespace backend
 } // namespace skepu

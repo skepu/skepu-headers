@@ -14,10 +14,10 @@ namespace skepu
 			DEBUG_TEXT_LEVEL1("CPU Call");
 			
 			// Sync with device data
-			pack_expand((get<AI, CallArgs...>(args...).getParent().updateHost(hasReadAccess(CallFunc::anyAccessMode[AI])), 0)...);
-			pack_expand((get<AI, CallArgs...>(args...).getParent().invalidateDeviceData(hasWriteAccess(CallFunc::anyAccessMode[AI])), 0)...);
+			pack_expand((get<AI>(std::forward<CallArgs>(args)...).getParent().updateHost(hasReadAccess(CallFunc::anyAccessMode[AI])), 0)...);
+			pack_expand((get<AI>(std::forward<CallArgs>(args)...).getParent().invalidateDeviceData(hasWriteAccess(CallFunc::anyAccessMode[AI])), 0)...);
 			
-			return CallFunc::CPU(get<AI, CallArgs...>(args...).hostProxy()..., get<CI, CallArgs...>(args...)...);
+			return CallFunc::CPU(get<AI>(std::forward<CallArgs>(args)...).hostProxy()..., get<CI>(std::forward<CallArgs>(args)...)...);
 		}
 	}
 }

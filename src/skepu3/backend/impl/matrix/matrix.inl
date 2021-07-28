@@ -11,15 +11,6 @@ void Matrix<T>::setValidFlag(bool val)
    m_valid = val;
 }
 
-/*!
-* Get array representation
-*/
-template<typename T>
-T* Matrix<T>::GetArrayRep()
-{
-   return this->m_data;
-}
-
 
 /*!
 *  \brief Randomizes the Matrix.
@@ -38,6 +29,17 @@ void Matrix<T>::randomize(int min, int max)
    for(typename Matrix<T>::size_type i = 0; i < this->size(); i++)
    {
       this->m_data[i] = (T)( rand() % (int)(max-min+1) + min);
+   }
+}
+
+template<typename T>
+void Matrix<T>::randomizeReal(double min, double max)
+{
+   invalidateDeviceData();
+
+   for(typename Matrix<T>::size_type i = 0; i < this->size(); i++)
+   {
+      this->m_data[i] = min + (T)( (rand() % RAND_MAX) / (double)RAND_MAX) * (max - min);
    }
 }
 
@@ -134,7 +136,7 @@ Matrix<T>::Matrix()
   m_transpose_matrix(0),
   m_noValidDeviceCopy(true),
   m_valid(false),
-  m_deallocEnabled(true)
+  m_deallocEnabled(false)
 {
   DEBUG_TEXT_LEVEL1("Matrix: Constructor to an empty state");
 }
@@ -249,6 +251,7 @@ void Matrix<T>::init(size_type _rows, size_type _cols)
     this->m_rows = _rows;
     this->m_cols = _cols;
     backend::allocateHostMemory<T>(this->m_data, this->m_rows * this->m_cols);
+    this->m_deallocEnabled = true;
     
 #ifdef SKEPU_OPENCL
     this->m_transposeKernels_CL = &(backend::Environment<T>::getInstance()->m_transposeKernels_CL);

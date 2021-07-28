@@ -18,13 +18,13 @@ namespace skepu
 			DEBUG_TEXT_LEVEL1("OpenMP Call");
 			
 			// Sync with device data
-			pack_expand((get<AI, CallArgs...>(args...).getParent().updateHost(hasReadAccess(CallFunc::anyAccessMode[AI])), 0)...);
-			pack_expand((get<AI, CallArgs...>(args...).getParent().invalidateDeviceData(hasWriteAccess(CallFunc::anyAccessMode[AI])), 0)...);
+			pack_expand((get<AI>(std::forward<CallArgs>(args)...).getParent().updateHost(hasReadAccess(CallFunc::anyAccessMode[AI])), 0)...);
+			pack_expand((get<AI>(std::forward<CallArgs>(args)...).getParent().invalidateDeviceData(hasWriteAccess(CallFunc::anyAccessMode[AI])), 0)...);
 			
 			omp_set_num_threads(this->m_selected_spec->CPUThreads());
 			
 #pragma omp parallel
-			CallFunc::OMP(get<AI, CallArgs...>(args...).hostProxy()..., get<CI, CallArgs...>(args...)...);
+			CallFunc::OMP(get<AI>(std::forward<CallArgs>(args)...).hostProxy()..., get<CI>(std::forward<CallArgs>(args)...)...);
 			
 		}
 	}

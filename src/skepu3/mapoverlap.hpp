@@ -18,6 +18,18 @@ namespace skepu
 		
 		template<typename, typename...>
 		class MapOverlap4D;
+		
+		template<typename, typename...>
+		class MapPool1D;
+		
+		template<typename, typename...>
+		class MapPool2D;
+		
+		template<typename, typename...>
+		class MapPool3D;
+		
+		template<typename, typename...>
+		class MapPool4D;
 	}
 	
 	template<typename Ret, typename... Args, REQUIRES(mapoverlap_dimensionality<Args...>::value == 1)>
@@ -67,10 +79,64 @@ namespace skepu
 	}
 	
 	
+	
+	
+	
+	template<typename Ret, typename... Args, REQUIRES(mapoverlap_dimensionality<Args...>::value == 1)>
+	impl::MapPool1D<Ret, Args...> MapPoolWrapper(std::function<Ret(Args...)> mapo)
+	{
+		return impl::MapPool1D<Ret, Args...>(mapo);
+	}
+	/*
+	// For function pointers
+	template<typename Ret, typename... Args>
+	impl::MapPool1D<Ret, Args...> MapPool(Ret(*mapo)(Region1D<T>, Args...))
+	{
+		return MapPoolWrapper((std::function<Ret(Region1D<T>, Args...)>)mapo);
+	}*/
+	
+	
+	template<typename Ret, typename... Args, REQUIRES(mapoverlap_dimensionality<Args...>::value == 2)>
+	impl::MapPool2D<Ret, Args...> MapPoolWrapper(std::function<Ret(Args...)> mapo)
+	{
+		return impl::MapPool2D<Ret, Args...>(mapo);
+	}
+	
+	template<typename Ret, typename... Args, REQUIRES(mapoverlap_dimensionality<Args...>::value == 3)>
+	impl::MapPool3D<Ret, Args...> MapPoolWrapper(std::function<Ret(Args...)> mapo)
+	{
+		return impl::MapPool3D<Ret, Args...>(mapo);
+	}
+	
+	template<typename Ret, typename... Args, REQUIRES(mapoverlap_dimensionality<Args...>::value == 4)>
+	impl::MapPool4D<Ret, Args...> MapPoolWrapper(std::function<Ret(Args...)> mapo)
+	{
+		return impl::MapPool4D<Ret, Args...>(mapo);
+	}
+	
+	// For function pointers
+	template<typename Ret, typename... Args>
+	auto MapPool(Ret(*mapo)(Args...)) -> decltype(MapPoolWrapper((std::function<Ret(Args...)>)mapo))
+	{
+		return MapPoolWrapper((std::function<Ret(Args...)>)mapo);
+	}
+	
+	// For lambdas and functors
+	template<typename T>
+	auto MapPool(T mapo) -> decltype(MapPoolWrapper(lambda_cast(mapo)))
+	{
+		return MapPoolWrapper(lambda_cast(mapo));
+	}
+	
+	
+	
+	
+	
+	
 	namespace impl
 	{
 		template<typename T>
-		class MapOverlapBase: public SeqSkeletonBase
+		class MapOverlapBase
 		{
 		public:
 			
@@ -103,12 +169,14 @@ namespace skepu
 		
 		
 		template<typename Ret, typename... Args>
-		class MapOverlap1D: public MapOverlapBase<typename region_type<typename pack_element<is_indexed<Args...>::value ? 1 : 0, Args...>::type>::type>
+		class MapOverlap1D: public MapOverlapBase<typename region_type_ext<Args...>::type>, public SeqSkeletonBase
 		{
 			static constexpr bool indexed = is_indexed<Args...>::value;
+			static constexpr bool randomized = has_random<Args...>::value;
+			static constexpr size_t randomCount = get_random_count<Args...>::value;
 			static constexpr size_t InArity = 1;
 			static constexpr size_t OutArity = out_size<Ret>::value;
-			static constexpr size_t numArgs = sizeof...(Args) - (indexed ? 1 : 0) + OutArity;
+			static constexpr size_t numArgs = sizeof...(Args) - (indexed ? 1 : 0) - (randomized ? 1 : 0) + OutArity;
 			static constexpr size_t anyCont = trait_count_all<is_skepu_container_proxy, Args...>::value;
 			
 			static constexpr typename make_pack_indices<OutArity, 0>::type out_indices{};
@@ -117,9 +185,10 @@ namespace skepu
 			static constexpr typename make_pack_indices<numArgs, InArity + OutArity + anyCont>::type const_indices{};
 			
 			using MapFunc = std::function<Ret(Args...)>;
-			using F = ConditionalIndexForwarder<indexed, MapFunc>;
-			using RegionType = typename pack_element<indexed ? 1 : 0, Args...>::type;
+			using F = ConditionalIndexForwarder<indexed, randomized, MapFunc>;
+			using RegionType = typename pack_element<(indexed ? 1 : 0) + (randomized ? 1 : 0), Args...>::type;
 			using T = typename region_type<RegionType>::type;
+			static constexpr bool isPool = std::is_same<typename std::decay<RegionType>::type, Pool2D<T>>::value; 
 			
 		public:
 			
@@ -133,10 +202,15 @@ namespace skepu
 				return this->m_overlap;
 			}
 			
+			void setStride(size_t si)
+			{
+				this->m_strides = StrideList<1>(si);
+			}
+			
 			template<size_t... OI, size_t... EI, size_t... AI, size_t... CI, typename... CallArgs>
 			void apply(Parity p, pack_indices<OI...>, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args)
 			{
-				auto &arg = get<OutArity>(args...);
+				auto &arg = get<OutArity>(std::forward<CallArgs>(args)...);
 				
 				const int overlap = (int)this->m_overlap;
 				const size_t size = arg.size();
@@ -145,11 +219,13 @@ namespace skepu
 				if (size < this->m_overlap * 2)
 					SKEPU_ERROR("Non-matching overlap radius");
 				
-				if (disjunction(get<OI>(args...).size() < size...))
+				if (disjunction(get<OI>(std::forward<CallArgs>(args)...).size() < size...))
 					SKEPU_ERROR("Non-matching output container sizes");
 					
-				if (disjunction(get<EI>(args...).size() != size...))
+				if (disjunction(get<EI>(std::forward<CallArgs>(args)...).size() != size...))
 					SKEPU_ERROR("Non-matching input container sizes");
+				
+				auto random = this->template prepareRandom<randomCount>(size);
 				
 				if (this->m_edge != Edge::None)
 				{
@@ -186,8 +262,8 @@ namespace skepu
 					{
 						if (p == Parity::None || index_parity(p, i))
 						{
-							auto res = F::forward(this->mapFunc, Index1D{i}, Region1D<T>{overlap, 1, &start[i + overlap]}, get<AI>(args...).hostProxy()..., get<CI>(args...)...);
-							SKEPU_VARIADIC_RETURN(get<OI>(args...)(i)..., res);
+							auto res = F::forward(this->mapFunc, Index1D{i}, random, RegionType{overlap, 1, &start[i + overlap]}, get<AI>(std::forward<CallArgs>(args)...).hostProxy()..., get<CI>(std::forward<CallArgs>(args)...)...);
+							SKEPU_VARIADIC_RETURN(get<OI>(std::forward<CallArgs>(args)...)(i)..., res);
 						}
 					}
 					
@@ -195,8 +271,8 @@ namespace skepu
 					{
 						if (p == Parity::None || index_parity(p, i))
 						{
-							auto res = F::forward(this->mapFunc, Index1D{i}, Region1D<T>{overlap, 1, &end[i + 2 * overlap - size]}, get<AI>(args...).hostProxy()..., get<CI>(args...)...);
-							SKEPU_VARIADIC_RETURN(get<OI>(args...)(i)..., res);
+							auto res = F::forward(this->mapFunc, Index1D{i}, random, RegionType{overlap, 1, &end[i + 2 * overlap - size]}, get<AI>(std::forward<CallArgs>(args)...).hostProxy()..., get<CI>(std::forward<CallArgs>(args)...)...);
+							SKEPU_VARIADIC_RETURN(get<OI>(std::forward<CallArgs>(args)...)(i)..., res);
 						}
 					}
 				}
@@ -206,8 +282,8 @@ namespace skepu
 				{
 					if (p == Parity::None || index_parity(p, i))
 					{
-						auto res = F::forward(this->mapFunc, Index1D{i}, Region1D<T>{overlap, 1, &arg[i]}, get<AI>(args...).hostProxy()..., get<CI>(args...)...);
-						SKEPU_VARIADIC_RETURN(get<OI>(args...)(i)..., res);
+						auto res = F::forward(this->mapFunc, Index1D{i}, random, RegionType{overlap, 1, &arg[i]}, get<AI>(std::forward<CallArgs>(args)...).hostProxy()..., get<CI>(std::forward<CallArgs>(args)...)...);
+						SKEPU_VARIADIC_RETURN(get<OI>(std::forward<CallArgs>(args)...)(i)..., res);
 					}
 				}
 			}
@@ -215,7 +291,7 @@ namespace skepu
 			
 			template<typename... CallArgs,
 				REQUIRES(is_skepu_vector<typename std::remove_reference<typename pack_element<0, CallArgs...>::type>::type>::value)>
-			auto operator()(CallArgs&&... args) -> decltype(get<0>(args...))
+			auto operator()(CallArgs&&... args) -> decltype(get<0>(std::forward<CallArgs>(args)...))
 			{
 				if (this->m_updateMode == UpdateMode::Normal)
 				{
@@ -231,31 +307,31 @@ namespace skepu
 					DEBUG_TEXT_LEVEL1("Black");
 					this->apply(Parity::Even, out_indices, elwise_indices, any_indices, const_indices, std::forward<CallArgs>(args)...);
 				}
-				return get<0>(args...);
+				return get<0>(std::forward<CallArgs>(args)...);
 			}
 			
 			
 			template<size_t... OI, size_t... EI, size_t... AI, size_t... CI, typename... CallArgs>
 			void apply_colwise(Parity p, pack_indices<OI...>, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args)
 			{
-				size_t size_i = get<0>(args...).size_i();
-				size_t size_j = get<0>(args...).size_j();
+				size_t size_i = get<0>(std::forward<CallArgs>(args)...).size_i();
+				size_t size_j = get<0>(std::forward<CallArgs>(args)...).size_j();
 				
 				// Verify overlap radius is valid
 				if (this->m_edge != Edge::None && size_i < this->m_overlap * 2)
 					SKEPU_ERROR("Non-matching overlap radius");
 				
 				if (disjunction(
-					(get<OI>(args...).size_i() != size_i) &&
-					(get<OI>(args...).size_j() != size_j) ...))
+					(get<OI>(std::forward<CallArgs>(args)...).size_i() != size_i) &&
+					(get<OI>(std::forward<CallArgs>(args)...).size_j() != size_j) ...))
 					SKEPU_ERROR("Non-matching output container sizes");
 					
 				if (disjunction(
-					(get<EI>(args...).size_i() != size_i) &&
-					(get<EI>(args...).size_j() != size_j) ...))
+					(get<EI>(std::forward<CallArgs>(args)...).size_i() != size_i) &&
+					(get<EI>(std::forward<CallArgs>(args)...).size_j() != size_j) ...))
 					SKEPU_ERROR("Non-matching input container sizes");
 				
-				auto &arg = get<OutArity>(args...);
+				auto &arg = get<OutArity>(std::forward<CallArgs>(args)...);
 				
 				const int overlap = (int)this->m_overlap;
 				size_t size = arg.size();
@@ -267,6 +343,8 @@ namespace skepu
 				
 				const T *inputBegin = arg.getAddress();
 				const T *inputEnd = inputBegin + size;
+				
+				auto random = this->template prepareRandom<randomCount>(colWidth);
 				
 				for(size_t col = 0; col < arg.total_cols(); ++col)
 				{
@@ -305,9 +383,9 @@ namespace skepu
 						{
 							if (p == Parity::None || index_parity(p, i))
 							{
-								auto res = F::forward(this->mapFunc, Index1D{i}, Region1D<T>{overlap, 1, &start[i + overlap]},
-								get<AI>(args...).hostProxy()..., get<CI>(args...)...);
-								SKEPU_VARIADIC_RETURN(get<OI>(args...)(i, col)..., res);
+								auto res = F::forward(this->mapFunc, Index1D{i}, random, RegionType{overlap, 1, &start[i + overlap]},
+								get<AI>(std::forward<CallArgs>(args)...).hostProxy()..., get<CI>(std::forward<CallArgs>(args)...)...);
+								SKEPU_VARIADIC_RETURN(get<OI>(std::forward<CallArgs>(args)...)(i, col)..., res);
 							}
 						}
 						
@@ -315,9 +393,9 @@ namespace skepu
 						{
 							if (p == Parity::None || index_parity(p, i))
 							{
-								auto res = F::forward(this->mapFunc, Index1D{i}, Region1D<T>{overlap, 1, &end[i + 2 * overlap - colWidth]},
-									get<AI>(args...).hostProxy()..., get<CI>(args...)...);
-								SKEPU_VARIADIC_RETURN(get<OI>(args...)(i, col)..., res);
+								auto res = F::forward(this->mapFunc, Index1D{i}, random, RegionType{overlap, 1, &end[i + 2 * overlap - colWidth]},
+									get<AI>(std::forward<CallArgs>(args)...).hostProxy()..., get<CI>(std::forward<CallArgs>(args)...)...);
+								SKEPU_VARIADIC_RETURN(get<OI>(std::forward<CallArgs>(args)...)(i, col)..., res);
 							}
 						}
 					}
@@ -326,9 +404,9 @@ namespace skepu
 					{
 						if (p == Parity::None || index_parity(p, i))
 						{
-							auto res = F::forward(this->mapFunc, Index1D{i}, Region1D<T>{overlap, stride, &inputBegin[i*stride]},
-								get<AI>(args...).hostProxy()..., get<CI>(args...)...);
-							SKEPU_VARIADIC_RETURN(get<OI>(args...)(i, col)..., res);
+							auto res = F::forward(this->mapFunc, Index1D{i}, random, RegionType{overlap, stride, &inputBegin[i*stride]},
+								get<AI>(std::forward<CallArgs>(args)...).hostProxy()..., get<CI>(std::forward<CallArgs>(args)...)...);
+							SKEPU_VARIADIC_RETURN(get<OI>(std::forward<CallArgs>(args)...)(i, col)..., res);
 						}
 					}
 					
@@ -340,24 +418,24 @@ namespace skepu
 			template<size_t... OI, size_t... EI, size_t... AI, size_t... CI, typename... CallArgs>
 			void apply_rowwise(Parity p, pack_indices<OI...>, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args)
 			{
-				size_t size_i = get<0>(args...).size_i();
-				size_t size_j = get<0>(args...).size_j();
+				size_t size_i = get<0>(std::forward<CallArgs>(args)...).size_i();
+				size_t size_j = get<0>(std::forward<CallArgs>(args)...).size_j();
 				
 				// Verify overlap radius is valid
 				if (this->m_edge != Edge::None && size_j < this->m_overlap * 2)
 					SKEPU_ERROR("Non-matching overlap radius");
 				
 				if (disjunction(
-					(get<OI>(args...).size_i() != size_i) &&
-					(get<OI>(args...).size_j() != size_j) ...))
+					(get<OI>(std::forward<CallArgs>(args)...).size_i() != size_i) &&
+					(get<OI>(std::forward<CallArgs>(args)...).size_j() != size_j) ...))
 					SKEPU_ERROR("Non-matching output container sizes");
 					
 				if (disjunction(
-					(get<EI>(args...).size_i() != size_i) &&
-					(get<EI>(args...).size_j() != size_j) ...))
+					(get<EI>(std::forward<CallArgs>(args)...).size_i() != size_i) &&
+					(get<EI>(std::forward<CallArgs>(args)...).size_j() != size_j) ...))
 					SKEPU_ERROR("Non-matching input container sizes");
 				
-				auto &arg = get<OutArity>(args...);
+				auto &arg = get<OutArity>(std::forward<CallArgs>(args)...);
 				
 				int overlap = (int)this->m_overlap;
 				size_t size = arg.size();
@@ -368,6 +446,8 @@ namespace skepu
 				
 				const T *inputBegin = arg.getAddress();
 				const T *inputEnd = inputBegin + size;
+				
+				auto random = this->template prepareRandom<randomCount>(rowWidth);
 				
 				for (size_t row = 0; row < arg.total_rows(); ++row)
 				{
@@ -406,8 +486,8 @@ namespace skepu
 						{
 							if (p == Parity::None || index_parity(p, i))
 							{
-								auto res = F::forward(this->mapFunc, Index1D{i}, Region1D<T>{overlap, stride, &start[i + overlap]}, get<AI>(args...).hostProxy()..., get<CI>(args...)...);
-								SKEPU_VARIADIC_RETURN(get<OI>(args...)(row, i)..., res);
+								auto res = F::forward(this->mapFunc, Index1D{i}, random, RegionType{overlap, stride, &start[i + overlap]}, get<AI>(std::forward<CallArgs>(args)...).hostProxy()..., get<CI>(std::forward<CallArgs>(args)...)...);
+								SKEPU_VARIADIC_RETURN(get<OI>(std::forward<CallArgs>(args)...)(row, i)..., res);
 							}
 						}
 						
@@ -415,8 +495,8 @@ namespace skepu
 						{
 							if (p == Parity::None || index_parity(p, i))
 							{
-							 	auto res = F::forward(this->mapFunc, Index1D{i}, Region1D<T>{overlap, stride, &end[i + 2 * overlap - rowWidth]}, get<AI>(args...).hostProxy()..., get<CI>(args...)...);
-								SKEPU_VARIADIC_RETURN(get<OI>(args...)(row, i)..., res);
+							 	auto res = F::forward(this->mapFunc, Index1D{i}, random, RegionType{overlap, stride, &end[i + 2 * overlap - rowWidth]}, get<AI>(std::forward<CallArgs>(args)...).hostProxy()..., get<CI>(std::forward<CallArgs>(args)...)...);
+								SKEPU_VARIADIC_RETURN(get<OI>(std::forward<CallArgs>(args)...)(row, i)..., res);
 							}
 						}
 					}
@@ -425,8 +505,8 @@ namespace skepu
 					{
 						if (p == Parity::None || index_parity(p, i))
 						{
-							auto res = F::forward(this->mapFunc, Index1D{i}, Region1D<T>{overlap, stride, &inputBegin[i]}, get<AI>(args...).hostProxy()..., get<CI>(args...)...);
-							SKEPU_VARIADIC_RETURN(get<OI>(args...)(row, i)..., res);
+							auto res = F::forward(this->mapFunc, Index1D{i}, random, RegionType{overlap, stride, &inputBegin[i]}, get<AI>(std::forward<CallArgs>(args)...).hostProxy()..., get<CI>(std::forward<CallArgs>(args)...)...);
+							SKEPU_VARIADIC_RETURN(get<OI>(std::forward<CallArgs>(args)...)(row, i)..., res);
 						}
 					}
 					
@@ -437,7 +517,7 @@ namespace skepu
 			
 			template<typename... CallArgs, 
 				REQUIRES(is_skepu_matrix<typename std::remove_reference<typename pack_element<0, CallArgs...>::type>::type>::value)>
-			auto operator()(CallArgs&&... args) -> decltype(get<0>(args...))
+			auto operator()(CallArgs&&... args) -> decltype(get<0>(std::forward<CallArgs>(args)...))
 			{
 				switch (this->m_overlapPolicy)
 				{
@@ -478,11 +558,12 @@ namespace skepu
 					default:
 						SKEPU_ERROR("MapOverlap: Invalid overlap policy");
 				}
-				return get<0>(args...);
+				return get<0>(std::forward<CallArgs>(args)...);
 			}
 			
-		private:
+		protected:
 			MapFunc mapFunc;
+			StrideList<1> m_strides{};
 			MapOverlap1D(MapFunc map): mapFunc(map)
 			{
 				this->m_edge = Edge::Duplicate;
@@ -493,13 +574,18 @@ namespace skepu
 			friend MapOverlap1D<Ret, Args...> skepu::MapOverlapWrapper<Ret, Args...>(MapFunc);
 		};
 		
+		
+		
+		
 		template<typename Ret, typename... Args>
-		class MapOverlap2D: public MapOverlapBase<typename region_type<typename pack_element<is_indexed<Args...>::value ? 1 : 0, Args...>::type>::type>
+		class MapOverlap2D: public MapOverlapBase<typename region_type_ext<Args...>::type>, public SeqSkeletonBase
 		{
 			static constexpr bool indexed = is_indexed<Args...>::value;
+			static constexpr bool randomized = has_random<Args...>::value;
+			static constexpr size_t randomCount = get_random_count<Args...>::value;
 			static constexpr size_t InArity = 1;
 			static constexpr size_t OutArity = out_size<Ret>::value;
-			static constexpr size_t numArgs = sizeof...(Args) - (indexed ? 1 : 0) + OutArity;
+			static constexpr size_t numArgs = sizeof...(Args) - (indexed ? 1 : 0) - (randomized ? 1 : 0) + OutArity;
 			static constexpr size_t anyCont = trait_count_all<is_skepu_container_proxy, Args...>::value;
 			
 			static constexpr typename make_pack_indices<OutArity, 0>::type out_indices{};
@@ -508,9 +594,10 @@ namespace skepu
 			static constexpr typename make_pack_indices<numArgs, InArity + OutArity + anyCont>::type const_indices{};
 			
 			using MapFunc = std::function<Ret(Args...)>;
-			using F = ConditionalIndexForwarder<indexed, MapFunc>;
-			using RegionType = typename pack_element<indexed ? 1 : 0, Args...>::type;
+			using F = ConditionalIndexForwarder<indexed, randomized, MapFunc>;
+			using RegionType = typename pack_element<(indexed ? 1 : 0) + (randomized ? 1 : 0), Args...>::type;
 			using T = typename region_type<RegionType>::type;
+			static constexpr bool isPool = std::is_same<typename std::decay<RegionType>::type, Pool2D<T>>::value; 
 			
 		public:
 			void setBackend(BackendSpec) {}
@@ -518,60 +605,88 @@ namespace skepu
 			
 			void setOverlap(size_t o)
 			{
-				this->m_overlap_i = o;
-				this->m_overlap_j = o;
+				this->m_overlap[0] = o;
+				this->m_overlap[1] = o;
 			}
 			
 			void setOverlap(size_t i, size_t j)
 			{
-				this->m_overlap_i = i;
-				this->m_overlap_j = j;
+				this->m_overlap[0] = i;
+				this->m_overlap[1] = j;
 			}
 			
+			void setStride(size_t si, size_t sj)
+			{
+				this->m_strides = StrideList<2>(si, sj);
+			}
+			/*
 			std::pair<size_t, size_t> getOverlap() const
 			{
 				return std::make_pair(this->m_overlap_x, this->m_overlap_y);
+			}*/
+			
+			void setStride(size_t si, size_t sj, size_t sk)
+			{
+				this->m_strides = StrideList<3>(si, sj, sk);
+			}
+			
+		private:
+			
+			template<size_t dim>
+			size_t expectedInputSize(size_t size) const
+			{
+				if (isPool) return this->m_overlap[dim] + this->m_strides[dim] * (size - 1);
+				else if (this->m_edge == Edge::None) return size + 2 * this->m_overlap[dim];
+				else return size;
 			}
 			
 			template<size_t... OI, size_t... EI, size_t... AI, size_t... CI, typename... CallArgs>
 			void apply(Parity p, pack_indices<OI...>, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args)
 			{
-				size_t size_i = get<0>(args...).size_i();
-				size_t size_j = get<0>(args...).size_j();
+				size_t size_i = get<0>(std::forward<CallArgs>(args)...).size_i();
+				size_t size_j = get<0>(std::forward<CallArgs>(args)...).size_j();
 				
 				if (disjunction(
-					(get<OI>(args...).size_i() != size_i) &&
-					(get<OI>(args...).size_j() != size_j) ...))
+					(get<OI>(std::forward<CallArgs>(args)...).size_i() != size_i) &&
+					(get<OI>(std::forward<CallArgs>(args)...).size_j() != size_j) ...))
 					SKEPU_ERROR("Non-matching output container sizes");
 					
 				if (disjunction(
-					(get<EI>(args...).size_i() != size_i) &&
-					(get<EI>(args...).size_j() != size_j) ...))
+					(get<EI>(std::forward<CallArgs>(args)...).size_i() != expectedInputSize<0>(size_i)) &&
+					(get<EI>(std::forward<CallArgs>(args)...).size_j() != expectedInputSize<1>(size_j)) ...))
 					SKEPU_ERROR("Non-matching input container sizes");
 			
-				auto &arg = get<OutArity>(args...);
+				auto &arg = get<OutArity>(std::forward<CallArgs>(args)...);
 				
-				RegionType region{arg, this->m_overlap_i, this->m_overlap_j, this->m_edge, this->m_pad};
+				RegionType region{arg, this->m_overlap[0], this->m_overlap[1], this->m_edge, this->m_pad};
 				
-				Index2D start{0, 0}, end{size_i, size_j};
-				if (this->m_edge == Edge::None)
+		/*		Index2D start{0, 0}, end{size_i, size_j};
+				if (isPool)
 				{
-					start = Index2D{(size_t)this->m_overlap_i, (size_t)this->m_overlap_j};
-					end = Index2D{size_i - this->m_overlap_i, size_j - this->m_overlap_j};
+					end = Index2D{size_i, size_j};
 				}
+				else if (this->m_edge == Edge::None)
+				{
+					start = Index2D{(size_t)this->m_overlap[0], (size_t)this->m_overlap[1]};
+					end = Index2D{size_i - this->m_overlap[0], size_j - this->m_overlap[1]};
+				}*/
 				
-				for (size_t i = start.col; i < end.col; i++)
-					for (size_t j = start.row; j < end.row; j++)
+				auto random = this->template prepareRandom<randomCount>(size_i * size_j);
+				
+				for (size_t i = 0; i < size_i; ++i)
+					for (size_t j = 0; j < size_j; ++j)
 						if (p == Parity::None || index_parity(p, i, j))
 						{
-							region.idx = Index2D{i,j};
-							auto res = F::forward(this->mapFunc, Index2D{i,j}, region, get<AI>(args...).hostProxy()..., get<CI>(args...)...);
-							SKEPU_VARIADIC_RETURN(get<OI>(args...)(i, j)..., res);
+							region.idx = Index2D{i * this->m_strides[0], j * this->m_strides[1]};
+							auto res = F::forward(this->mapFunc, Index2D{i,j}, random, region, get<AI>(std::forward<CallArgs>(args)...).hostProxy()..., get<CI>(std::forward<CallArgs>(args)...)...);
+							SKEPU_VARIADIC_RETURN(get<OI>(std::forward<CallArgs>(args)...)(i, j)..., res);
 						}
 			}
 			
+		public:
+			
 			template<typename... CallArgs>
-			auto operator()(CallArgs&&... args) -> decltype(get<0>(args...))
+			auto operator()(CallArgs&&... args) -> decltype(get<0>(std::forward<CallArgs>(args)...))
 			{
 				if (this->m_updateMode == UpdateMode::Normal)
 				{
@@ -587,17 +702,18 @@ namespace skepu
 					DEBUG_TEXT_LEVEL1("Black");
 					this->apply(Parity::Even, out_indices, elwise_indices, any_indices, const_indices, std::forward<CallArgs>(args)...);
 				}
-				return get<0>(args...);
+				return get<0>(std::forward<CallArgs>(args)...);
 			}
 			
-		private:
+		protected:
 			MapFunc mapFunc;
+			StrideList<2> m_strides{};
 			MapOverlap2D(MapFunc map): mapFunc(map)
 			{
 				this->m_edge = Edge::None;
 			}
 			
-			int m_overlap_i = 1, m_overlap_j = 1;
+			int m_overlap[2] = {1,1};
 			
 			friend MapOverlap2D<Ret, Args...> skepu::MapOverlapWrapper<Ret, Args...>(MapFunc);
 		};
@@ -609,12 +725,14 @@ namespace skepu
 		
 		
 		template<typename Ret, typename... Args>
-		class MapOverlap3D: public MapOverlapBase<typename region_type<typename pack_element<is_indexed<Args...>::value ? 1 : 0, Args...>::type>::type>
+		class MapOverlap3D: public MapOverlapBase<typename region_type_ext<Args...>::type>, public SeqSkeletonBase
 		{
 			static constexpr bool indexed = is_indexed<Args...>::value;
+			static constexpr bool randomized = has_random<Args...>::value;
+			static constexpr size_t randomCount = get_random_count<Args...>::value;
 			static constexpr size_t InArity = 1;
 			static constexpr size_t OutArity = out_size<Ret>::value;
-			static constexpr size_t numArgs = sizeof...(Args) - (indexed ? 1 : 0) + OutArity;
+			static constexpr size_t numArgs = sizeof...(Args) - (indexed ? 1 : 0) - (randomized ? 1 : 0) + OutArity;
 			static constexpr size_t anyCont = trait_count_all<is_skepu_container_proxy, Args...>::value;
 			
 			static constexpr typename make_pack_indices<OutArity, 0>::type out_indices{};
@@ -623,9 +741,10 @@ namespace skepu
 			static constexpr typename make_pack_indices<numArgs, InArity + OutArity + anyCont>::type const_indices{};
 			
 			using MapFunc = std::function<Ret(Args...)>;
-			using F = ConditionalIndexForwarder<indexed, MapFunc>;
-			using RegionType = typename pack_element<indexed ? 1 : 0, Args...>::type;
+			using F = ConditionalIndexForwarder<indexed, randomized, MapFunc>;
+			using RegionType = typename pack_element<(indexed ? 1 : 0) + (randomized ? 1 : 0), Args...>::type;
 			using T = typename region_type<RegionType>::type;
+			static constexpr bool isPool = std::is_same<typename std::decay<RegionType>::type, Pool3D<T>>::value; 
 			
 		public:
 			void setBackend(BackendSpec) {}
@@ -633,66 +752,114 @@ namespace skepu
 			
 			void setOverlap(int o)
 			{
-				this->m_overlap_i = o;
-				this->m_overlap_j = o;
-				this->m_overlap_k = o;
+				this->m_overlap[0] = o;
+				this->m_overlap[1] = o;
+				this->m_overlap[2] = o;
 			}
 			
 			void setOverlap(int oi, int oj, int ok)
 			{
-				this->m_overlap_i = oi;
-				this->m_overlap_j = oj;
-				this->m_overlap_k = ok;
+				this->m_overlap[0] = oi;
+				this->m_overlap[1] = oj;
+				this->m_overlap[2] = ok;
 			}
-			
+			/*
 			std::tuple<int, int, int> getOverlap() const
 			{
 				return std::make_tuple(this->m_overlap_i, this->m_overlap_j, this->m_overlap_k);
+			}*/
+			
+			void setStride(size_t si, size_t sj, size_t sk)
+			{
+				this->m_strides = StrideList<3>(si, sj, sk);
+			}
+			
+		private:
+			
+			template<size_t dim>
+			size_t expectedInputSize(size_t size) const
+			{
+				size_t side = this->m_overlap[dim]; // With Pool
+				if (!isPool) side = 2*this->m_overlap[dim] + 1; // With Region
+				
+				size_t inputSize = side + this->m_strides[dim] * (size - 1);
+				
+				if (isPool && this->m_edge != Edge::None)
+					inputSize -= (side - 1) * 2;
+				else if (!isPool && this->m_edge != Edge::None)
+					inputSize -= 2 * this->m_overlap[dim];
+				
+				return inputSize;
 			}
 			
 			template<size_t... OI, size_t... EI, size_t... AI, size_t... CI, typename... CallArgs>
 			void apply(Parity p, pack_indices<OI...>, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args)
 			{
-				size_t size_i = get<0>(args...).size_i();
-				size_t size_j = get<0>(args...).size_j();
-				size_t size_k = get<0>(args...).size_k();
+				size_t size_i = get<0>(std::forward<CallArgs>(args)...).size_i();
+				size_t size_j = get<0>(std::forward<CallArgs>(args)...).size_j();
+				size_t size_k = get<0>(std::forward<CallArgs>(args)...).size_k();
 				
 				if (disjunction(
-					(get<OI>(args...).size_i() != size_i) &&
-					(get<OI>(args...).size_j() != size_j) &&
-					(get<OI>(args...).size_k() != size_k) ...))
+					(get<OI>(std::forward<CallArgs>(args)...).size_i() != size_i) &&
+					(get<OI>(std::forward<CallArgs>(args)...).size_j() != size_j) &&
+					(get<OI>(std::forward<CallArgs>(args)...).size_k() != size_k) ...))
 					SKEPU_ERROR("Non-matching output container sizes");
 				
 				if (disjunction(
-					(get<EI>(args...).size_i() != size_i) &&
-					(get<EI>(args...).size_j() != size_j) &&
-					(get<EI>(args...).size_k() != size_k) ...))
+					(get<EI>(std::forward<CallArgs>(args)...).size_i() != expectedInputSize<0>(size_i)) &&
+					(get<EI>(std::forward<CallArgs>(args)...).size_j() != expectedInputSize<1>(size_j)) &&
+					(get<EI>(std::forward<CallArgs>(args)...).size_k() != expectedInputSize<2>(size_k)) ...))
 					SKEPU_ERROR("Non-matching input container sizes");
 			
-				auto &arg = get<OutArity>(args...);
+				auto &arg = get<OutArity>(std::forward<CallArgs>(args)...);
 				
-				RegionType region{arg, this->m_overlap_i, this->m_overlap_j, this->m_overlap_k, this->m_edge, this->m_pad};
-				
-				Index3D start{0, 0, 0}, end{size_i, size_j, size_k};
-				if (this->m_edge == Edge::None)
+				size_t offset[3];
+				for (size_t d = 0; d < 3; ++d)
 				{
-					start = Index3D{(size_t)this->m_overlap_i, (size_t)this->m_overlap_j, (size_t)this->m_overlap_k};
-					end = Index3D{size_i - this->m_overlap_i, size_j - this->m_overlap_j, size_k - this->m_overlap_k};
+					if (!isPool && this->m_edge != Edge::None)
+					{
+						offset[d] = 0;
+					}
+					else if (!isPool && this->m_edge == Edge::None)
+					{
+						offset[d] = this->m_overlap[d];
+					}
+					else if (isPool && this->m_edge != Edge::None)
+					{
+						offset[d] = -this->m_overlap[d] / 2;
+					}
+					else if (isPool && this->m_edge == Edge::None)
+					{
+						offset[d] = 0;
+					}
 				}
 				
-				for (size_t i = start.i; i < end.i; i++)
-					for (size_t j = start.j; j < end.j; j++)
-						for (size_t k = start.k; k < end.k; k++)
+				RegionType region{arg, this->m_overlap[0], this->m_overlap[1], this->m_overlap[2], this->m_edge, this->m_pad};
+				
+				auto random = this->template prepareRandom<randomCount>(size_i * size_j * size_k);
+				
+				for (size_t i = 0; i < size_i; i++)
+					for (size_t j = 0; j < size_j; j++)
+						for (size_t k = 0; k < size_k; k++)
 							if (p == Parity::None || index_parity(p, i, j, k))
 							{
-								region.idx = Index3D{i,j,k};
-								auto res = F::forward(this->mapFunc, Index3D{i,j,k}, region, get<AI>(args...).hostProxy()..., get<CI>(args...)...);
-								SKEPU_VARIADIC_RETURN(get<OI>(args...)(i, j, k)..., res);
+								region.idx = Index3D{
+									i * this->m_strides[0],
+									j * this->m_strides[1],
+									k * this->m_strides[2]
+								};
+								auto res = F::forward(this->mapFunc, region.idx, random, region,
+									get<AI>(std::forward<CallArgs>(args)...).hostProxy()...,
+									get<CI>(std::forward<CallArgs>(args)...)...
+								);
+								SKEPU_VARIADIC_RETURN(get<OI>(std::forward<CallArgs>(args)...)(i, j, k)..., res);
 							}
 			}
 			
+		public:
+			
 			template<typename... CallArgs>
-			auto operator()(CallArgs&&... args) -> decltype(get<0>(args...))
+			auto operator()(CallArgs&&... args) -> decltype(get<0>(std::forward<CallArgs>(args)...))
 			{
 				if (this->m_updateMode == UpdateMode::Normal)
 				{
@@ -708,17 +875,18 @@ namespace skepu
 					DEBUG_TEXT_LEVEL1("Black");
 					this->apply(Parity::Even, out_indices, elwise_indices, any_indices, const_indices, std::forward<CallArgs>(args)...);
 				}
-				return get<0>(args...);
+				return get<0>(std::forward<CallArgs>(args)...);
 			}
 			
-		private:
+		protected:
 			MapFunc mapFunc;
+			StrideList<3> m_strides{};
 			MapOverlap3D(MapFunc map): mapFunc(map)
 			{
 				this->m_edge = Edge::None;
 			}
 			
-			int m_overlap_i = 1, m_overlap_j = 1, m_overlap_k = 1;
+			int m_overlap[3] = {1, 1, 1};
 			
 			friend MapOverlap3D<Ret, Args...> skepu::MapOverlapWrapper<Ret, Args...>(MapFunc);
 		};
@@ -728,12 +896,14 @@ namespace skepu
 		
 		
 		template<typename Ret, typename... Args>
-		class MapOverlap4D: public MapOverlapBase<typename region_type<typename pack_element<is_indexed<Args...>::value ? 1 : 0, Args...>::type>::type>
+		class MapOverlap4D: public MapOverlapBase<typename region_type_ext<Args...>::type>, public SeqSkeletonBase
 		{
 			static constexpr bool indexed = is_indexed<Args...>::value;
+			static constexpr bool randomized = has_random<Args...>::value;
+			static constexpr size_t randomCount = get_random_count<Args...>::value;
 			static constexpr size_t InArity = 1;
 			static constexpr size_t OutArity = out_size<Ret>::value;
-			static constexpr size_t numArgs = sizeof...(Args) - (indexed ? 1 : 0) + OutArity;
+			static constexpr size_t numArgs = sizeof...(Args) - (indexed ? 1 : 0) - (randomized ? 1 : 0) + OutArity;
 			static constexpr size_t anyCont = trait_count_all<is_skepu_container_proxy, Args...>::value;
 			
 			static constexpr typename make_pack_indices<OutArity, 0>::type out_indices{};
@@ -742,9 +912,10 @@ namespace skepu
 			static constexpr typename make_pack_indices<numArgs, InArity + OutArity + anyCont>::type const_indices{};
 			
 			using MapFunc = std::function<Ret(Args...)>;
-			using F = ConditionalIndexForwarder<indexed, MapFunc>;
-			using RegionType = typename pack_element<indexed ? 1 : 0, Args...>::type;
+			using F = ConditionalIndexForwarder<indexed, randomized, MapFunc>;
+			using RegionType = typename pack_element<(indexed ? 1 : 0) + (randomized ? 1 : 0), Args...>::type;
 			using T = typename region_type<RegionType>::type;
+			static constexpr bool isPool = std::is_same<typename std::decay<RegionType>::type, Pool4D<T>>::value; 
 			
 		public:
 			void setBackend(BackendSpec) {}
@@ -752,72 +923,93 @@ namespace skepu
 			
 			void setOverlap(int o)
 			{
-				this->m_overlap_i = o;
-				this->m_overlap_j = o;
-				this->m_overlap_k = o;
-				this->m_overlap_l = o;
+				this->m_overlap[0] = o;
+				this->m_overlap[1] = o;
+				this->m_overlap[2] = o;
+				this->m_overlap[3] = o;
 			}
 			
 			void setOverlap(int oi, int oj, int ok, int ol)
 			{
-				this->m_overlap_i = oi;
-				this->m_overlap_j = oj;
-				this->m_overlap_k = ok;
-				this->m_overlap_l = ol;
+				this->m_overlap[0] = oi;
+				this->m_overlap[1] = oj;
+				this->m_overlap[2] = ok;
+				this->m_overlap[3] = ol;
 			}
-			
+			/*
 			std::tuple<int, int, int, int> getOverlap() const
 			{
 				return std::make_tuple(this->m_overlap_i, this->m_overlap_j, this->m_overlap_k, this->m_overlap_l);
+			}*/
+			
+			
+			void setStride(size_t si, size_t sj, size_t sk, size_t sl)
+			{
+				this->m_strides = StrideList<4>(si, sj, sk, sl);
+			}
+			
+		private:
+			
+			template<size_t dim>
+			size_t expectedInputSize(size_t size) const
+			{
+				if (isPool) return this->m_overlap[dim] + this->m_strides[dim] * (size - 1);
+				else if (this->m_edge == Edge::None) return size + 2 * this->m_overlap[dim];
+				else return size;
 			}
 			
 			template<size_t... OI, size_t... EI, size_t... AI, size_t... CI, typename... CallArgs>
 			void apply(Parity p, pack_indices<OI...>, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args)
 			{
-				size_t size_i = get<0>(args...).size_i();
-				size_t size_j = get<0>(args...).size_j();
-				size_t size_k = get<0>(args...).size_k();
-				size_t size_l = get<0>(args...).size_l();
+				size_t size_i = get<0>(std::forward<CallArgs>(args)...).size_i();
+				size_t size_j = get<0>(std::forward<CallArgs>(args)...).size_j();
+				size_t size_k = get<0>(std::forward<CallArgs>(args)...).size_k();
+				size_t size_l = get<0>(std::forward<CallArgs>(args)...).size_l();
 				
 				if (disjunction(
-					(get<OI>(args...).size_i() < size_i) &&
-					(get<OI>(args...).size_j() < size_j) &&
-					(get<OI>(args...).size_k() < size_k) &&
-					(get<OI>(args...).size_l() < size_l)...))
+					(get<OI>(std::forward<CallArgs>(args)...).size_i() < size_i) &&
+					(get<OI>(std::forward<CallArgs>(args)...).size_j() < size_j) &&
+					(get<OI>(std::forward<CallArgs>(args)...).size_k() < size_k) &&
+					(get<OI>(std::forward<CallArgs>(args)...).size_l() < size_l)...))
 					SKEPU_ERROR("Non-matching output container sizes");
 				
 				if (disjunction(
-					(get<EI>(args...).size_i() != size_i) &&
-					(get<EI>(args...).size_j() != size_j) &&
-					(get<EI>(args...).size_k() != size_k) &&
-					(get<EI>(args...).size_l() != size_l)...))
+					(get<EI>(std::forward<CallArgs>(args)...).size_i() != expectedInputSize<0>(size_i)) &&
+					(get<EI>(std::forward<CallArgs>(args)...).size_j() != expectedInputSize<1>(size_j)) &&
+					(get<EI>(std::forward<CallArgs>(args)...).size_k() != expectedInputSize<2>(size_k)) &&
+					(get<EI>(std::forward<CallArgs>(args)...).size_l() != expectedInputSize<3>(size_l))...))
 					SKEPU_ERROR("Non-matching input container sizes");
 			
-				auto &arg = get<OutArity>(args...);
+				auto &arg = get<OutArity>(std::forward<CallArgs>(args)...);
 				
-				RegionType region{arg, this->m_overlap_i, this->m_overlap_j, this->m_overlap_k, this->m_overlap_l, this->m_edge, this->m_pad};
+				RegionType region{arg, this->m_overlap[0], this->m_overlap[1], this->m_overlap[2], this->m_overlap[3], this->m_edge, this->m_pad};
 				
-				Index4D start{0, 0, 0, 0}, end{size_i, size_j, size_k, size_l};
+		/*		Index4D start{0, 0, 0, 0}, end{size_i, size_j, size_k, size_l};
 				if (this->m_edge == Edge::None)
 				{
 					start = Index4D{(size_t)this->m_overlap_i, (size_t)this->m_overlap_j, (size_t)this->m_overlap_k, (size_t)this->m_overlap_l};
 					end = Index4D{size_i - this->m_overlap_i, size_j - this->m_overlap_j, size_k - this->m_overlap_k, size_l - this->m_overlap_l};
 				}
 				
-				for (size_t i = start.i; i < end.i; i++)
-					for (size_t j = start.j; j < end.j; j++)
-						for (size_t k = start.k; k < end.k; k++)
-							for (size_t l = start.l; l < end.l; l++)
+				size_t final_size = (end.i - start.i) * (end.j - start.j) * (end.k - start.k) * (end.l - start.l);*/
+				auto random = this->template prepareRandom<randomCount>(size_i * size_j * size_k * size_l);
+				
+				for (size_t i = 0; i < size_i; i++)
+					for (size_t j = 0; j < size_j; j++)
+						for (size_t k = 0; k < size_k; k++)
+							for (size_t l = 0; l < size_l; l++)
 								if (p == Parity::None || index_parity(p, i, j, k, l))
 								{
-									region.idx = Index4D{i,j,k,l};
-									auto res = F::forward(this->mapFunc, Index4D{i,j,k,l}, region, get<AI>(args...).hostProxy()..., get<CI>(args...)...);
-									SKEPU_VARIADIC_RETURN(get<OI>(args...)(i, j, k, l)..., res);
+									region.idx = Index4D{i * this->m_strides[0], j * this->m_strides[1], k * this->m_strides[2], l * this->m_strides[3]};
+									auto res = F::forward(this->mapFunc, Index4D{i,j,k,l}, random, region, get<AI>(std::forward<CallArgs>(args)...).hostProxy()..., get<CI>(std::forward<CallArgs>(args)...)...);
+									SKEPU_VARIADIC_RETURN(get<OI>(std::forward<CallArgs>(args)...)(i, j, k, l)..., res);
 								}
 			}
 			
+		public:
+			
 			template<typename... CallArgs>
-			auto operator()(CallArgs&&... args) -> decltype(get<0>(args...))
+			auto operator()(CallArgs&&... args) -> decltype(get<0>(std::forward<CallArgs>(args)...))
 			{
 				if (this->m_updateMode == UpdateMode::Normal)
 				{
@@ -833,19 +1025,116 @@ namespace skepu
 					DEBUG_TEXT_LEVEL1("Black");
 					this->apply(Parity::Even, out_indices, elwise_indices, any_indices, const_indices, std::forward<CallArgs>(args)...);
 				}
-				return get<0>(args...);
+				return get<0>(std::forward<CallArgs>(args)...);
 			}
 			
-		private:
+		protected:
 			MapFunc mapFunc;
+			StrideList<4> m_strides{};
 			MapOverlap4D(MapFunc map): mapFunc(map)
 			{
 				this->m_edge = Edge::None;
 			}
 			
-			int m_overlap_i = 1, m_overlap_j = 1, m_overlap_k = 1, m_overlap_l = 1;
+			int m_overlap[4] = {1, 1, 1, 1};
 			
 			friend MapOverlap4D<Ret, Args...> skepu::MapOverlapWrapper<Ret, Args...>(MapFunc);
+		};
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		template<typename Ret, typename... Args>
+		class MapPool1D: public MapOverlap1D<Ret, Args...>
+		{
+			using MapFunc = std::function<Ret(Args...)>;
+			
+		public:
+			void setOverlap(size_t) = delete;
+			void setEdgeMode(Edge) = delete;
+			void setUpdateMode(UpdateMode) = delete;
+			
+			void setPoolSize(size_t p)
+			{
+				
+			}
+			
+			MapPool1D(MapFunc map): MapOverlap1D<Ret, Args...>(map) {}
+		};
+		
+		
+		
+		
+		template<typename Ret, typename... Args>
+		class MapPool2D: public MapOverlap2D<Ret, Args...>
+		{
+			using MapFunc = std::function<Ret(Args...)>;
+			
+		public:
+			void setOverlap(size_t, size_t) = delete;
+			void setEdgeMode(Edge) = delete;
+			void setUpdateMode(UpdateMode) = delete;
+			
+			void setPoolSize(size_t pi, size_t pj)
+			{
+				this->m_overlap[0] = pi;
+				this->m_overlap[1] = pj;
+			}
+			
+			MapPool2D(MapFunc map): MapOverlap2D<Ret, Args...>(map) {}
+		};
+		
+		
+		
+		
+		template<typename Ret, typename... Args>
+		class MapPool3D: public MapOverlap3D<Ret, Args...>
+		{
+			using MapFunc = std::function<Ret(Args...)>;
+			
+		public:
+			void setOverlap(size_t, size_t, size_t) = delete;
+		//	void setEdgeMode(Edge) = delete;
+			void setUpdateMode(UpdateMode) = delete;
+			
+			void setPoolSize(size_t pi, size_t pj, size_t pk)
+			{
+				this->m_overlap[0] = pi;
+				this->m_overlap[1] = pj;
+				this->m_overlap[2] = pk;
+			}
+			
+			MapPool3D(MapFunc map): MapOverlap3D<Ret, Args...>(map) {}
+		};
+		
+		
+		
+		
+		template<typename Ret, typename... Args>
+		class MapPool4D: public MapOverlap4D<Ret, Args...>
+		{
+			using MapFunc = std::function<Ret(Args...)>;
+			
+		public:
+			void setOverlap(size_t, size_t, size_t, size_t) = delete;
+			void setEdgeMode(Edge) = delete;
+			void setUpdateMode(UpdateMode) = delete;
+			
+			void setPoolSize(size_t pi, size_t pj, size_t pk, size_t pl)
+			{
+				this->m_overlap[0] = pi;
+				this->m_overlap[1] = pj;
+				this->m_overlap[2] = pk;
+				this->m_overlap[3] = pl;
+			}
+			
+			MapPool4D(MapFunc map): MapOverlap4D<Ret, Args...>(map) {}
 		};
 		
 	}

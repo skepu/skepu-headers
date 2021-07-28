@@ -176,8 +176,8 @@ namespace skepu
 	public: //-- For Testing --//
 		
 		void setValidFlag(bool val);
-		T* GetArrayRep();
 		void randomize(int min = 0, int max = RAND_MAX);
+		void randomizeReal(double min = 0, double max = 1);
 		void save(const std::string& filename);
 		void load(const std::string& filename, size_type rowWidth, size_type numRows = 0);
 		
@@ -208,6 +208,17 @@ namespace skepu
 		Matrix(T * const ptr, size_type _rows, size_type _cols, bool deallocEnabled = true);
 		
 		~Matrix();
+		
+		
+		void operator=(std::initializer_list<T> l)
+		{
+			if (l.size() != this->size())
+				SKEPU_ERROR("Matrix: Invalid initializer list size");
+			
+			size_t i = 0;
+			for (const T& elem : l)
+				this->m_data[i++] = elem;
+		}
 		
 		void init(size_type _rows, size_type _cols);
 		void init(size_type _rows, size_type _cols, const T& val);
@@ -277,6 +288,16 @@ namespace skepu
 		}
 		
 		T *data()
+		{
+			return this->m_data;
+		}
+		
+		const T *getAddress() const
+		{
+			return this->m_data;
+		}
+		
+		const T *data() const
 		{
 			return this->m_data;
 		}
@@ -410,6 +431,10 @@ namespace skepu
 		const_iterator begin() const;
 		iterator begin(size_t row);
 		const_iterator begin(size_t row) const;
+		
+		// These do nothing special for now
+		iterator stridedBegin(size_t, int) { return this->begin(); };
+		const_iterator begin(size_t, int) const { return this->begin(); };
 		
 		iterator end();
 		const_iterator end() const;

@@ -18,11 +18,11 @@ namespace skepu
 		::mapPairsSingleThread_CU(size_t deviceID, size_t startIdx, size_t Vsize, size_t Hsize, pack_indices<OI...>, pack_indices<VEI...>, pack_indices<HEI...>, pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args)
 		{
 			const size_t size = Vsize * Hsize;
-			auto oArgs = std::forward_as_tuple(get<OI, CallArgs...>(std::forward<CallArgs>(args)...)...);
-			auto veArgs = std::forward_as_tuple(get<VEI, CallArgs...>(std::forward<CallArgs>(args)...)...);
-			auto heArgs = std::forward_as_tuple(get<HEI, CallArgs...>(std::forward<CallArgs>(args)...)...);
-			auto aArgs = std::forward_as_tuple(get<AI, CallArgs...>(std::forward<CallArgs>(args)...)...);
-			auto scArgs = std::forward_as_tuple(get<CI, CallArgs...>(std::forward<CallArgs>(args)...)...);
+			auto oArgs = std::forward_as_tuple(get<OI>(std::forward<CallArgs>(args)...)...);
+			auto veArgs = std::forward_as_tuple(get<VEI>(std::forward<CallArgs>(args)...)...);
+			auto heArgs = std::forward_as_tuple(get<HEI>(std::forward<CallArgs>(args)...)...);
+			auto aArgs = std::forward_as_tuple(get<AI>(std::forward<CallArgs>(args)...)...);
+			auto scArgs = std::forward_as_tuple(get<CI>(std::forward<CallArgs>(args)...)...);
 			static constexpr auto proxy_tags = typename MapPairsFunc::ProxyTags{};
 			
 			// Setup parameters
@@ -73,17 +73,17 @@ namespace skepu
 			size_t numElemPerSlice = size / numKernels;
 			size_t rest = size % numKernels;
 			
-			auto oArgs = std::forward_as_tuple(get<OI, CallArgs...>(args...)...);
-			auto veArgs = std::forward_as_tuple(get<VEI, CallArgs...>(args...)...);
-			auto heArgs = std::forward_as_tuple(get<HEI, CallArgs...>(args...)...);
-			auto aArgs = std::forward_as_tuple(get<AI, CallArgs...>(args...)...);
-			auto scArgs = std::forward_as_tuple(get<CI, CallArgs...>(args...)...);
+			auto oArgs = std::forward_as_tuple(get<OI>(std::forward<CallArgs>(args)...)...);
+			auto veArgs = std::forward_as_tuple(get<VEI>(std::forward<CallArgs>(args)...)...);
+			auto heArgs = std::forward_as_tuple(get<HEI>(std::forward<CallArgs>(args)...)...);
+			auto aArgs = std::forward_as_tuple(get<AI>(std::forward<CallArgs>(args)...)...);
+			auto scArgs = std::forward_as_tuple(get<CI>(std::forward<CallArgs>(args)...)...);
 			static constexpr auto proxy_tags = typename MapPairsFunc::ProxyTags{};
 			
-			typename to_device_pointer_cu<decltype(std::make_tuple(get<OI, CallArgs...>(args...).getParent()...))>::type    outMemP[numKernels];
-			typename to_device_pointer_cu<decltype(std::make_tuple(get<VEI, CallArgs...>(args...).getParent()...))>::type velwiseMemP[numKernels];
-			typename to_device_pointer_cu<decltype(std::make_tuple(get<HEI, CallArgs...>(args...).getParent()...))>::type helwiseMemP[numKernels];
-			typename to_proxy_cu<typename MapPairsFunc::ProxyTags, decltype(std::make_tuple(get<AI, CallArgs...>(args...).getParent()...))>::type anyMemP[numKernels];
+			typename to_device_pointer_cu<decltype(std::make_tuple(get<OI>(std::forward<CallArgs>(args)...).getParent()...))>::type    outMemP[numKernels];
+			typename to_device_pointer_cu<decltype(std::make_tuple(get<VEI>(std::forward<CallArgs>(args)...).getParent()...))>::type velwiseMemP[numKernels];
+			typename to_device_pointer_cu<decltype(std::make_tuple(get<HEI>(std::forward<CallArgs>(args)...).getParent()...))>::type helwiseMemP[numKernels];
+			typename to_proxy_cu<typename MapPairsFunc::ProxyTags, decltype(std::make_tuple(get<AI>(std::forward<CallArgs>(args)...).getParent()...))>::type anyMemP[numKernels];
 			
 			// First create CUDA memory if not created already.
 			for (size_t i = 0; i < numKernels; ++i)
@@ -159,11 +159,11 @@ namespace skepu
 			size_t streamRest[MAX_GPU_DEVICES];
 			size_t maxKernels = 0;
 			
-			auto oArgs = std::forward_as_tuple(get<OI, CallArgs...>(args...)...);
-			auto veArgs = std::forward_as_tuple(get<VEI, CallArgs...>(args...)...);
-			auto heArgs = std::forward_as_tuple(get<HEI, CallArgs...>(args...)...);
-			auto aArgs = std::forward_as_tuple(get<AI, CallArgs...>(args...)...);
-			auto scArgs = std::forward_as_tuple(get<CI, CallArgs...>(args...)...);
+			auto oArgs = std::forward_as_tuple(get<OI>(std::forward<CallArgs>(args)...)...);
+			auto veArgs = std::forward_as_tuple(get<VEI>(std::forward<CallArgs>(args)...)...);
+			auto heArgs = std::forward_as_tuple(get<HEI>(std::forward<CallArgs>(args)...)...);
+			auto aArgs = std::forward_as_tuple(get<AI>(std::forward<CallArgs>(args)...)...);
+			auto scArgs = std::forward_as_tuple(get<CI>(std::forward<CallArgs>(args)...)...);
 			static constexpr auto proxy_tags = typename MapPairsFunc::ProxyTags{};
 			
 			for (size_t i = 0; i < useNumGPU; ++i)
@@ -177,10 +177,10 @@ namespace skepu
 				streamRest[i] = temp % numKernels[i];
 			}
 			
-			typename to_device_pointer_cu<decltype(std::make_tuple(get<OI, CallArgs...>(args...).getParent()...))>::type    outMemP[MAX_GPU_DEVICES][maxKernels];
-			typename to_device_pointer_cu<decltype(std::make_tuple(get<VEI, CallArgs...>(args...).getParent()...))>::type velwiseMemP[MAX_GPU_DEVICES][maxKernels];
-			typename to_device_pointer_cu<decltype(std::make_tuple(get<HEI, CallArgs...>(args...).getParent()...))>::type helwiseMemP[MAX_GPU_DEVICES][maxKernels];
-			typename to_proxy_cu<typename MapPairsFunc::ProxyTags, decltype(std::make_tuple(get<AI, CallArgs...>(args...).getParent()...))>::type             anyMemP[MAX_GPU_DEVICES][maxKernels];
+			typename to_device_pointer_cu<decltype(std::make_tuple(get<OI>(std::forward<CallArgs>(args)...).getParent()...))>::type    outMemP[MAX_GPU_DEVICES][maxKernels];
+			typename to_device_pointer_cu<decltype(std::make_tuple(get<VEI>(std::forward<CallArgs>(args)...).getParent()...))>::type velwiseMemP[MAX_GPU_DEVICES][maxKernels];
+			typename to_device_pointer_cu<decltype(std::make_tuple(get<HEI>(std::forward<CallArgs>(args)...).getParent()...))>::type helwiseMemP[MAX_GPU_DEVICES][maxKernels];
+			typename to_proxy_cu<typename MapPairsFunc::ProxyTags, decltype(std::make_tuple(get<AI>(std::forward<CallArgs>(args)...).getParent()...))>::type             anyMemP[MAX_GPU_DEVICES][maxKernels];
 			
 			// First create CUDA memory if not created already.
 			for (size_t i = 0; i < useNumGPU; ++i)
@@ -253,17 +253,17 @@ namespace skepu
 			const size_t numElemPerSlice = size / numDevices;
 			const size_t rest = size % numDevices;
 			
-			auto oArgs = std::forward_as_tuple(get<OI, CallArgs...>(args...)...);
-			auto veArgs = std::forward_as_tuple(get<VEI, CallArgs...>(args...)...);
-			auto heArgs = std::forward_as_tuple(get<HEI, CallArgs...>(args...)...);
-			auto aArgs = std::forward_as_tuple(get<AI, CallArgs...>(args...)...);
-			auto scArgs = std::forward_as_tuple(get<CI, CallArgs...>(args...)...);
+			auto oArgs = std::forward_as_tuple(get<OI>(std::forward<CallArgs>(args)...)...);
+			auto veArgs = std::forward_as_tuple(get<VEI>(std::forward<CallArgs>(args)...)...);
+			auto heArgs = std::forward_as_tuple(get<HEI>(std::forward<CallArgs>(args)...)...);
+			auto aArgs = std::forward_as_tuple(get<AI>(std::forward<CallArgs>(args)...)...);
+			auto scArgs = std::forward_as_tuple(get<CI>(std::forward<CallArgs>(args)...)...);
 			static constexpr auto proxy_tags = typename MapPairsFunc::ProxyTags{};
 			
-			typename to_device_pointer_cu<decltype(std::make_tuple(get<OI, CallArgs...>(args...).getParent()...))>::type    outMemP[MAX_GPU_DEVICES];
-			typename to_device_pointer_cu<decltype(std::make_tuple(get<VEI, CallArgs...>(args...).getParent()...))>::type velwiseMemP[MAX_GPU_DEVICES];
-			typename to_device_pointer_cu<decltype(std::make_tuple(get<HEI, CallArgs...>(args...).getParent()...))>::type helwiseMemP[MAX_GPU_DEVICES];
-			typename to_proxy_cu<typename MapPairsFunc::ProxyTags, decltype(std::make_tuple(get<AI, CallArgs...>(args...).getParent()...))>::type anyMemP[MAX_GPU_DEVICES];
+			typename to_device_pointer_cu<decltype(std::make_tuple(get<OI>(std::forward<CallArgs>(args)...).getParent()...))>::type    outMemP[MAX_GPU_DEVICES];
+			typename to_device_pointer_cu<decltype(std::make_tuple(get<VEI>(std::forward<CallArgs>(args)...).getParent()...))>::type velwiseMemP[MAX_GPU_DEVICES];
+			typename to_device_pointer_cu<decltype(std::make_tuple(get<HEI>(std::forward<CallArgs>(args)...).getParent()...))>::type helwiseMemP[MAX_GPU_DEVICES];
+			typename to_proxy_cu<typename MapPairsFunc::ProxyTags, decltype(std::make_tuple(get<AI>(std::forward<CallArgs>(args)...).getParent()...))>::type anyMemP[MAX_GPU_DEVICES];
 			
 			// First create CUDA memory if not created already.
 			for (size_t i = 0; i < numDevices; ++i)
@@ -314,7 +314,7 @@ namespace skepu
 			}
 			
 			CHECK_CUDA_ERROR(cudaSetDevice(m_environment->bestCUDADevID));
-			pack_expand((get<OI, CallArgs...>(args...).getParent().setValidFlag(false), 0)...);
+			pack_expand((get<OI>(std::forward<CallArgs>(args)...).getParent().setValidFlag(false), 0)...);
 		}
 		
 		
@@ -336,11 +336,11 @@ namespace skepu
 				
 				// Checks whether or not the GPU supports MemoryTransfer/KernelExec overlapping, if not call mapPairsSingleThread function
 				if (this->m_environment->m_devices_CU.at(m_environment->bestCUDADevID)->isOverlapSupported())
-					return this->mapPairsMultiStream_CU(this->m_environment->bestCUDADevID, startIdx, Vsize, Hsize, oi, vei, hei, ai, ci, args...);
+					return this->mapPairsMultiStream_CU(this->m_environment->bestCUDADevID, startIdx, Vsize, Hsize, oi, vei, hei, ai, ci, std::forward<CallArgs>(args)...);
 				
 #endif // USE_PINNED_MEMORY
 				
-				return this->mapPairsSingleThread_CU(this->m_environment->bestCUDADevID, startIdx, Vsize, Hsize, oi, vei, hei, ai, ci, args...);
+				return this->mapPairsSingleThread_CU(this->m_environment->bestCUDADevID, startIdx, Vsize, Hsize, oi, vei, hei, ai, ci, std::forward<CallArgs>(args)...);
 			}
 			
 #endif // SKEPU_DEBUG_FORCE_MULTI_GPU_IMPL
@@ -350,11 +350,11 @@ namespace skepu
 			// if pinned memory is used but the device does not support overlap the function continues with the previous implementation.
 			// if the multistream version is being used the function will exit at this point.
 			if (this->m_environment->supportsCUDAOverlap())
-				return this->mapPairsMultiStreamMultiGPU_CU(numDevices, startIdx, Vsize, Hsize, oi, vei, hei, ai, ci, args...);
+				return this->mapPairsMultiStreamMultiGPU_CU(numDevices, startIdx, Vsize, Hsize, oi, vei, hei, ai, ci, std::forward<CallArgs>(args)...);
 			
 #endif // USE_PINNED_MEMORY
 			
-			this->mapPairsSingleThreadMultiGPU_CU(numDevices, startIdx, Vsize, Hsize, oi, vei, hei, ai, ci, args...);
+			this->mapPairsSingleThreadMultiGPU_CU(numDevices, startIdx, Vsize, Hsize, oi, vei, hei, ai, ci, std::forward<CallArgs>(args)...);
 		}
 	} // namespace backend
 } // namespace skepu

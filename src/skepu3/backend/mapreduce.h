@@ -51,6 +51,7 @@ namespace skepu
 			size_t default_size_j = 0;
 			size_t default_size_k = 0;
 			size_t default_size_l = 0;
+			StrideList<arity> m_strides{};
 
 			static constexpr size_t outArity = MapFunc::outArity;
 			static constexpr size_t numArgs = MapFunc::totalArity - (MapFunc::indexed ? 1 : 0)  - (MapFunc::usesPRNG ? 1 : 0);
@@ -62,7 +63,7 @@ namespace skepu
 
 			using defaultDim = index_dimension<typename std::conditional<MapFunc::indexed, typename MapFunc::IndexType, skepu::Index1D>::type>;
 
-			using F = ConditionalIndexForwarder<MapFunc::indexed, decltype(&MapFunc::CPU)>;
+			using F = ConditionalIndexForwarder<MapFunc::indexed, MapFunc::usesPRNG, decltype(&MapFunc::CPU)>;
 			using Ret = typename MapFunc::Ret;
 			using RedType = typename ReduceFunc::Ret;
 
@@ -81,6 +82,12 @@ namespace skepu
 				this->default_size_k = k;
 				this->default_size_l = l;
 			}
+			
+			template<typename... S>
+			void setStride(S... strides)
+			{
+				this->m_strides = StrideList<arity>(strides...);
+			}
 
 			template<typename... Args>
 			void tune(Args&&... args)
@@ -89,17 +96,25 @@ namespace skepu
 			}
 
 			// For first elwise argument as container
-			template<typename First, template<class> class Container, typename... CallArgs, REQUIRES(is_skepu_container<Container<First>>::value)>
+			template<typename First, template<class> class Container, typename... CallArgs, REQUIRES(arity > 0 && is_skepu_container<Container<First>>::value)>
 			Ret operator()(Container<First> &arg1, CallArgs&&... args)
 			{
-				return backendDispatch(out_indices, elwise_indices, any_indices, const_indices, arg1.size(), arg1, std::forward<CallArgs>(args)...);
+				return backendDispatch(
+					out_indices, elwise_indices, any_indices, const_indices,
+					arg1.size() / this->m_strides[0], arg1,
+					std::forward<CallArgs>(args)...
+				);
 			}
 
 			// For first elwise argument as iterator
 			template<typename Iterator, typename... CallArgs, REQUIRES(sizeof...(CallArgs) + 1 == numArgs)>
 			Ret operator()(Iterator arg1, Iterator arg1_end, CallArgs&&... args)
 			{
-				return backendDispatch(out_indices, elwise_indices, any_indices, const_indices, arg1_end - arg1, arg1, std::forward<CallArgs>(args)...);
+				return backendDispatch(
+					out_indices, elwise_indices, any_indices, const_indices,
+					(arg1_end - arg1) / this->m_strides[0], arg1,
+					std::forward<CallArgs>(args)...
+				);
 			}
 
 			// For no elwise arguments
@@ -114,7 +129,11 @@ namespace skepu
 				if (size == 0)
 					SKEPU_WARNING("MapReduce<0> default size not set or set to 0.")
 
-				return this->backendDispatch(out_indices, elwise_indices, any_indices, const_indices, size, std::forward<CallArgs>(args)...);
+				return this->backendDispatch(
+					out_indices, elwise_indices, any_indices, const_indices,
+					size,
+					std::forward<CallArgs>(args)...
+				);
 			}
 
 		private:
@@ -125,7 +144,7 @@ namespace skepu
 
 				Ret res = this->m_start;
 
-				if (disjunction((get<EI, CallArgs...>(args...).size() < size)...))
+				if (disjunction((get<EI>(std::forward<CallArgs>(args)...).size() < size)...))
 					SKEPU_ERROR("Non-matching container sizes");
 
 				this->selectBackend(size);
@@ -134,55 +153,59 @@ namespace skepu
 				{
 				case Backend::Type::Hybrid:
 #ifdef SKEPU_HYBRID
-					return  Hybrid(size, oi, ei, ai, ci, res, get<EI, CallArgs...>(args...).begin()..., get<AI, CallArgs...>(args...)..., get<CI, CallArgs...>(args...)...);
+					return this->Hybrid(size, oi, ei, ai, ci, res,
+						get<EI>(std::forward<CallArgs>(args)...).begin()...,
+						get<AI>(std::forward<CallArgs>(args)...)...,
+						get<CI>(std::forward<CallArgs>(args)...)...
+					);
 #endif
 				case Backend::Type::CUDA:
 #ifdef SKEPU_CUDA
-					return CUDA(0, size, oi, ei, ai, ci, res, get<EI, CallArgs...>(args...).begin()..., get<AI, CallArgs...>(args...)..., get<CI, CallArgs...>(args...)...);
+					return this->CUDA(0, size, oi, ei, ai, ci, res,
+						get<EI>(std::forward<CallArgs>(args)...).begin()...,
+						get<AI>(std::forward<CallArgs>(args)...)...,
+						get<CI>(std::forward<CallArgs>(args)...)...
+					);
 #endif
 				case Backend::Type::OpenCL:
 #ifdef SKEPU_OPENCL
-					return   CL(0, size, ei, ai, ci, res, get<EI, CallArgs...>(args...).begin()..., get<AI, CallArgs...>(args...)..., get<CI, CallArgs...>(args...)...);
+					return this->CL(0, size, ei, ai, ci, res,
+						get<EI>(std::forward<CallArgs>(args)...).begin()...,
+						get<AI>(std::forward<CallArgs>(args)...)...,
+						get<CI>(std::forward<CallArgs>(args)...)...
+					);
 #endif
 				case Backend::Type::OpenMP:
 #ifdef SKEPU_OPENMP
-					return  OMP(size, oi, ei, ai, ci, res, get<EI, CallArgs...>(args...).begin()..., get<AI, CallArgs...>(args...)..., get<CI, CallArgs...>(args...)...);
+					return this->OMP(size, oi, ei, ai, ci, res,
+						get<EI>(std::forward<CallArgs>(args)...).stridedBegin(size, this->m_strides[EI])...,
+						get<AI>(std::forward<CallArgs>(args)...)...,
+						get<CI>(std::forward<CallArgs>(args)...)...
+					);
 #endif
 				default:
-					return  CPU(size, oi, ei, ai, ci, res, get<EI, CallArgs...>(args...).begin()..., get<AI, CallArgs...>(args...)..., get<CI, CallArgs...>(args...)...);
+					return this->CPU(size, oi, ei, ai, ci, res,
+						get<EI>(std::forward<CallArgs>(args)...).stridedBegin(size, this->m_strides[EI])...,
+						get<AI>(std::forward<CallArgs>(args)...)...,
+						get<CI>(std::forward<CallArgs>(args)...)...
+					);
 				}
 			}
 
 
-			template<size_t... OI, size_t... EI, size_t... AI, size_t... CI, typename... CallArgs, REQUIRES(!MapFunc::usesPRNG && true && sizeof...(CallArgs) >= 0)>
+			template<size_t... OI, size_t... EI, size_t... AI, size_t... CI, typename... CallArgs>
 			Ret CPU(size_t size, pack_indices<OI...>, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, Ret &res, CallArgs&&... args);
 
-			template<size_t... OI, size_t... AI, size_t... CI, typename... CallArgs, REQUIRES(!MapFunc::usesPRNG && true && sizeof...(CallArgs) >= 0)>
-			Ret CPU(size_t size, pack_indices<OI...>, pack_indices<>, pack_indices<AI...>, pack_indices<CI...>, Ret &res, CallArgs&&... args);
-			
-			// PRNG
-			
-			template<size_t... OI, size_t... EI, size_t... AI, size_t... CI, typename... CallArgs, REQUIRES(!!MapFunc::usesPRNG && sizeof...(CallArgs) >= 0)>
-			Ret CPU(size_t size, pack_indices<OI...>, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, Ret &res, CallArgs&&... args);
-
-			template<size_t... OI, size_t... AI, size_t... CI, typename... CallArgs, REQUIRES(!!MapFunc::usesPRNG && sizeof...(CallArgs) >= 0)>
+			template<size_t... OI, size_t... AI, size_t... CI, typename... CallArgs>
 			Ret CPU(size_t size, pack_indices<OI...>, pack_indices<>, pack_indices<AI...>, pack_indices<CI...>, Ret &res, CallArgs&&... args);
 
 
 #ifdef SKEPU_OPENMP
 
-			template<size_t... OI, size_t... EI, size_t... AI, size_t... CI, typename ...CallArgs, REQUIRES(!MapFunc::usesPRNG && true && sizeof...(CallArgs) >= 0)>
+			template<size_t... OI, size_t... EI, size_t... AI, size_t... CI, typename ...CallArgs>
 			Ret OMP(size_t size, pack_indices<OI...>, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, Ret &res, CallArgs&&... args);
 
-			template<size_t... OI, size_t... AI, size_t... CI, typename ...CallArgs, REQUIRES(!MapFunc::usesPRNG && true && sizeof...(CallArgs) >= 0)>
-			Ret OMP(size_t size, pack_indices<OI...>, pack_indices<>, pack_indices<AI...>, pack_indices<CI...>, Ret &res, CallArgs&&... args);
-			
-			// PRNG
-			
-			template<size_t... OI, size_t... EI, size_t... AI, size_t... CI, typename ...CallArgs, REQUIRES(!!MapFunc::usesPRNG && sizeof...(CallArgs) >= 0)>
-			Ret OMP(size_t size, pack_indices<OI...>, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, Ret &res, CallArgs&&... args);
-
-			template<size_t... OI, size_t... AI, size_t... CI, typename ...CallArgs, REQUIRES(!!MapFunc::usesPRNG && sizeof...(CallArgs) >= 0)>
+			template<size_t... OI, size_t... AI, size_t... CI, typename ...CallArgs>
 			Ret OMP(size_t size, pack_indices<OI...>, pack_indices<>, pack_indices<AI...>, pack_indices<CI...>, Ret &res, CallArgs&&... args);
 
 #endif // SKEPU_OPENMP
@@ -211,18 +234,10 @@ namespace skepu
 			template<size_t... EI, size_t... AI, size_t... CI, typename... CallArgs>
 			Ret CL(size_t startIdx, size_t size, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, Ret &res, CallArgs&&... args);
 
-			template<size_t... EI, size_t... AI, size_t... CI, typename... CallArgs, REQUIRES(!MapFunc::usesPRNG && true && sizeof...(CallArgs) >= 0)>
+			template<size_t... EI, size_t... AI, size_t... CI, typename... CallArgs>
 			Ret mapReduceNumDevices_CL(size_t numDevices, size_t startIdx, size_t size, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, Ret &res, CallArgs&&... args);
 
-			template<size_t... EI, size_t... AI, size_t... CI, typename... CallArgs, REQUIRES(!MapFunc::usesPRNG && true && sizeof...(CallArgs) >= 0)>
-			Ret mapReduceSingle_CL(size_t deviceID, size_t startIdx, size_t size, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, Ret &res, CallArgs&&... args);
-			
-			// PRNG
-			
-			template<size_t... EI, size_t... AI, size_t... CI, typename... CallArgs, REQUIRES(!!MapFunc::usesPRNG && sizeof...(CallArgs) >= 0)>
-			Ret mapReduceNumDevices_CL(size_t numDevices, size_t startIdx, size_t size, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, Ret &res, CallArgs&&... args);
-			
-			template<size_t... EI, size_t... AI, size_t... CI, typename... CallArgs, REQUIRES(!!MapFunc::usesPRNG && sizeof...(CallArgs) >= 0)>
+			template<size_t... EI, size_t... AI, size_t... CI, typename... CallArgs>
 			Ret mapReduceSingle_CL(size_t deviceID, size_t startIdx, size_t size, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, Ret &res, CallArgs&&... args);
 
 #endif // SKEPU_OPENCL

@@ -14,41 +14,43 @@ namespace skepu
 			DEBUG_TEXT_LEVEL1("CPU MapPairsReduce: hsize = " << Hsize << ", vsize = " << Vsize);
 			
 			// Sync with device data
-			pack_expand((get<HEI, CallArgs...>(args...).getParent().updateHost(), 0)...);
-			pack_expand((get<VEI, CallArgs...>(args...).getParent().updateHost(), 0)...);
-			pack_expand((get<AI, CallArgs...>(args...).getParent().updateHost(hasReadAccess(MapPairsFunc::anyAccessMode[AI-Varity-Harity])), 0)...);
-			pack_expand((get<AI, CallArgs...>(args...).getParent().invalidateDeviceData(hasWriteAccess(MapPairsFunc::anyAccessMode[AI-Varity-Harity])), 0)...);
+			pack_expand((get<HEI>(std::forward<CallArgs>(args)...).getParent().updateHost(), 0)...);
+			pack_expand((get<VEI>(std::forward<CallArgs>(args)...).getParent().updateHost(), 0)...);
+			pack_expand((get<AI>(std::forward<CallArgs>(args)...).getParent().updateHost(hasReadAccess(MapPairsFunc::anyAccessMode[AI-Varity-Harity])), 0)...);
+			pack_expand((get<AI>(std::forward<CallArgs>(args)...).getParent().invalidateDeviceData(hasWriteAccess(MapPairsFunc::anyAccessMode[AI-Varity-Harity])), 0)...);
+			
+			auto random = this->template prepareRandom<MapPairsFunc::randomCount>(Vsize * Hsize);
 			
 			if (this->m_mode == ReduceMode::RowWise)
 				for (size_t i = 0; i < Vsize; ++i)
 				{
-					pack_expand((get<OI>(args...)(i) = get_or_return<OI>(this->m_start), 0)...);
+					pack_expand((get<OI>(std::forward<CallArgs>(args)...)(i) = get_or_return<OI>(this->m_start), 0)...);
 					for (size_t j = 0; j < Hsize; ++j)
 					{
 						Index2D index{ i, j };
-						auto temp = F::forward(MapPairsFunc::CPU, index,
-							get<VEI, CallArgs...>(args...)(i)...,
-							get<HEI, CallArgs...>(args...)(j)...,
-							get<AI, CallArgs...>(args...).hostProxy()...,
-							get<CI, CallArgs...>(args...)...
+						auto temp = F::forward(MapPairsFunc::CPU, index, random,
+							get<VEI>(std::forward<CallArgs>(args)...)(i)...,
+							get<HEI>(std::forward<CallArgs>(args)...)(j)...,
+							get<AI>(std::forward<CallArgs>(args)...).hostProxy()...,
+							get<CI>(std::forward<CallArgs>(args)...)...
 						);
-						pack_expand((get<OI>(args...)(i) = ReduceFunc::CPU(get<OI>(args...)(i), get_or_return<OI>(temp)), 0)...);
+						pack_expand((get<OI>(std::forward<CallArgs>(args)...)(i) = ReduceFunc::CPU(get<OI>(std::forward<CallArgs>(args)...)(i), get_or_return<OI>(temp)), 0)...);
 					}
 				}
 			else if (this->m_mode == ReduceMode::ColWise)
 				for (size_t j = 0; j < Hsize; ++j)
 				{
-					pack_expand((get<OI>(args...)(j) = get_or_return<OI>(this->m_start), 0)...);
+					pack_expand((get<OI>(std::forward<CallArgs>(args)...)(j) = get_or_return<OI>(this->m_start), 0)...);
 					for (size_t i = 0; i < Vsize; ++i)
 					{
 						Index2D index{ i, j };
-						auto temp = F::forward(MapPairsFunc::CPU, index,
-							get<VEI, CallArgs...>(args...)(i)...,
-							get<HEI, CallArgs...>(args...)(j)...,
-							get<AI, CallArgs...>(args...).hostProxy()...,
-							get<CI, CallArgs...>(args...)...
+						auto temp = F::forward(MapPairsFunc::CPU, index, random,
+							get<VEI>(std::forward<CallArgs>(args)...)(i)...,
+							get<HEI>(std::forward<CallArgs>(args)...)(j)...,
+							get<AI>(std::forward<CallArgs>(args)...).hostProxy()...,
+							get<CI>(std::forward<CallArgs>(args)...)...
 						);
-						pack_expand((get<OI>(args...)(j) = ReduceFunc::CPU(get<OI>(args...)(j), get_or_return<OI>(temp)), 0)...);
+						pack_expand((get<OI>(std::forward<CallArgs>(args)...)(j) = ReduceFunc::CPU(get<OI>(std::forward<CallArgs>(args)...)(j), get_or_return<OI>(temp)), 0)...);
 					}
 				}
 		}

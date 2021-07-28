@@ -43,7 +43,7 @@ namespace skepu
 			size_t default_size_j;
 			
 			static constexpr size_t outArity = MapPairsFunc::outArity;
-			static constexpr size_t numArgs = MapPairsFunc::totalArity - (MapPairsFunc::indexed ? 1 : 0) + outArity;
+			static constexpr size_t numArgs = MapPairsFunc::totalArity - (MapPairsFunc::indexed ? 1 : 0) - (MapPairsFunc::usesPRNG ? 1 : 0) + outArity;
 			static constexpr size_t anyArity = std::tuple_size<typename MapPairsFunc::ContainerArgs>::value;
 			
 			static constexpr typename make_pack_indices<outArity, 0>::type out_indices{};
@@ -53,9 +53,9 @@ namespace skepu
 			static constexpr typename make_pack_indices<numArgs, outArity + Varity + Harity + anyArity>::type const_indices{};
 			
 			using defaultDim = typename std::conditional<MapPairsFunc::indexed, index_dimension<typename MapPairsFunc::IndexType>, std::integral_constant<int, 1>>::type;
-			using First = typename parameter_type<MapPairsFunc::indexed ? 1 : 0, decltype(&MapPairsFunc::CPU)>::type;
+			using First = typename parameter_type<(MapPairsFunc::indexed ? 1 : 0) + (MapPairsFunc::usesPRNG ? 1 : 0), decltype(&MapPairsFunc::CPU)>::type;
 			
-			using F = ConditionalIndexForwarder<MapPairsFunc::indexed, decltype(&MapPairsFunc::CPU)>;
+			using F = ConditionalIndexForwarder<MapPairsFunc::indexed, MapPairsFunc::usesPRNG, decltype(&MapPairsFunc::CPU)>;
 			using Temp = typename MapPairsFunc::Ret;
 			using Ret = typename ReduceFunc::Ret;
 			
@@ -87,10 +87,15 @@ namespace skepu
 			}
 			
 			template<typename... CallArgs>
-			auto operator()(CallArgs&&... args) -> typename std::add_lvalue_reference<decltype(get<0>(args...))>::type
+			auto operator()(CallArgs&&... args) -> typename std::add_lvalue_reference<decltype(get<0>(std::forward<CallArgs>(args)...))>::type
 			{
-				backendDispatch(out_indices, Velwise_indices, Helwise_indices, any_indices, const_indices, get<0>(args...).size(), std::forward<CallArgs>(args)...);
-				return get<0>(args...);
+				backendDispatch(
+					out_indices, Velwise_indices, Helwise_indices, any_indices, const_indices,
+					get<0>(std::forward<CallArgs>(args)...).size(),
+					std::forward<CallArgs>(args)...
+				);
+				
+				return get<0>(std::forward<CallArgs>(args)...);
 			}
 			
 		private:
@@ -98,20 +103,20 @@ namespace skepu
 			void backendDispatch(pack_indices<OI...> oi, pack_indices<VEI...> vei, pack_indices<HEI...> hei, pack_indices<AI...> ai, pack_indices<CI...> ci, size_t size, CallArgs&&... args)
 			{
 			//	assert(this->m_execPlan != NULL && this->m_execPlan->isCalibrated());
+				
+				size_t Vsize = get<0>(get<VEI>(std::forward<CallArgs>(args)...).size()..., this->default_size_i);
+				size_t Hsize = get<0>(get<HEI>(std::forward<CallArgs>(args)...).size()..., this->default_size_j);
 
-				size_t Vsize = get_noref<0>(get_noref<VEI>(args...).size()..., this->default_size_i);
-				size_t Hsize = get_noref<0>(get_noref<HEI>(args...).size()..., this->default_size_j);
-
-				if (disjunction((get<VEI, CallArgs...>(args...).size() < Vsize)...))
+				if (disjunction((get<VEI>(std::forward<CallArgs>(args)...).size() < Vsize)...))
 					SKEPU_ERROR("Non-matching input container sizes");
 
-				if (disjunction((get<HEI, CallArgs...>(args...).size() < Hsize)...))
+				if (disjunction((get<HEI>(std::forward<CallArgs>(args)...).size() < Hsize)...))
 					SKEPU_ERROR("Non-matching input container sizes");
 				
-				if  ((this->m_mode == ReduceMode::RowWise && disjunction((get<OI>(args...).size() < Vsize)...))
-					|| (this->m_mode == ReduceMode::ColWise && disjunction((get<OI>(args...).size() < Hsize)...)))
+				if  ((this->m_mode == ReduceMode::RowWise && disjunction((get<OI>(std::forward<CallArgs>(args)...).size() < Vsize)...))
+					|| (this->m_mode == ReduceMode::ColWise && disjunction((get<OI>(std::forward<CallArgs>(args)...).size() < Hsize)...)))
 					SKEPU_ERROR("Non-matching output container size");
-
+				
 				this->selectBackend(Vsize + Hsize);
 
 				switch (this->m_selected_spec->activateBackend())
@@ -119,28 +124,57 @@ namespace skepu
 				case Backend::Type::Hybrid:
 #ifdef SKEPU_HYBRID
 					std::cerr << "MapPairsReduce Hybrid: Not implemented" << std::endl;
-					//this->Hybrid(Vsize, Hsize, vei, hei, ai, ci, get<OI, CallArgs...>(args...).begin()..., get<VEI, CallArgs...>(args...).begin()..., get<HEI, CallArgs...>(args...).begin()..., get<AI, CallArgs...>(args...)..., get<CI, CallArgs...>(args...)...);
+					this->Hybrid(Vsize, Hsize, vei, hei, ai, ci,
+						get<OI> (std::forward<CallArgs>(args)...).begin()...,
+						get<VEI>(std::forward<CallArgs>(args)...).begin()...,
+						get<HEI>(std::forward<CallArgs>(args)...).begin()...,
+						get<AI> (std::forward<CallArgs>(args)...)...,
+						get<CI> (std::forward<CallArgs>(args)...)...
+					);
 					break;
 #endif
 				case Backend::Type::CUDA:
 #ifdef SKEPU_CUDA
 					std::cerr << "MapPairsReduce CUDA: Not implemented" << std::endl;
-					//this->CUDA(0, Vsize, Hsize, oi, vei, hei, ai, ci, get<OI, CallArgs...>(args...).begin()..., get<VEI, CallArgs...>(args...).begin()..., get<HEI, CallArgs...>(args...).begin()..., get<AI, CallArgs...>(args...)..., get<CI, CallArgs...>(args...)...);
+					this->CUDA(0, Vsize, Hsize, oi, vei, hei, ai, ci,
+						get<OI> (std::forward<CallArgs>(args)...).begin()...,
+						get<VEI>(std::forward<CallArgs>(args)...).begin()...,
+						get<HEI>(std::forward<CallArgs>(args)...).begin()...,
+						get<AI> (std::forward<CallArgs>(args)...)...,
+						get<CI> (std::forward<CallArgs>(args)...)...
+					);
 					break;
 #endif
 				case Backend::Type::OpenCL:
 #ifdef SKEPU_OPENCL
-					std::cerr << "MapPairsReduce OpenCL: Not implemented" << std::endl;
-					this->CL(0, Vsize, Hsize, oi, vei, hei, ai, ci, get<OI, CallArgs...>(args...).begin()..., get<VEI, CallArgs...>(args...).begin()..., get<HEI, CallArgs...>(args...).begin()..., get<AI, CallArgs...>(args...)..., get<CI, CallArgs...>(args...)...);
+					this->CL(0, Vsize, Hsize, oi, vei, hei, ai, ci,
+						get<OI> (std::forward<CallArgs>(args)...).begin()...,
+						get<VEI>(std::forward<CallArgs>(args)...).begin()...,
+						get<HEI>(std::forward<CallArgs>(args)...).begin()...,
+						get<AI> (std::forward<CallArgs>(args)...)...,
+						get<CI> (std::forward<CallArgs>(args)...)...
+					);
 					break;
 #endif
 				case Backend::Type::OpenMP:
 #ifdef SKEPU_OPENMP
-					this->OMP(Vsize, Hsize, oi, vei, hei, ai, ci, get<OI, CallArgs...>(args...).begin()..., get<VEI, CallArgs...>(args...).begin()..., get<HEI, CallArgs...>(args...).begin()..., get<AI, CallArgs...>(args...)..., get<CI, CallArgs...>(args...)...);
+					this->OMP(Vsize, Hsize, oi, vei, hei, ai, ci,
+						get<OI> (std::forward<CallArgs>(args)...).begin()...,
+						get<VEI>(std::forward<CallArgs>(args)...).begin()...,
+						get<HEI>(std::forward<CallArgs>(args)...).begin()...,
+						get<AI> (std::forward<CallArgs>(args)...)...,
+						get<CI> (std::forward<CallArgs>(args)...)...
+					);
 					break;
 #endif
 				default:
-					this->CPU(Vsize, Hsize, oi, vei, hei, ai, ci, get<OI, CallArgs...>(args...).begin()..., get<VEI, CallArgs...>(args...).begin()..., get<HEI, CallArgs...>(args...).begin()..., get<AI, CallArgs...>(args...)..., get<CI, CallArgs...>(args...)...);
+					this->CPU(Vsize, Hsize, oi, vei, hei, ai, ci,
+						get<OI>(std::forward<CallArgs>(args)...).begin()...,
+						get<VEI>(std::forward<CallArgs>(args)...).begin()...,
+						get<HEI>(std::forward<CallArgs>(args)...).begin()...,
+						get<AI>(std::forward<CallArgs>(args)...)...,
+						get<CI>(std::forward<CallArgs>(args)...)...
+					);
 					break;
 				}
 			}
@@ -179,10 +213,10 @@ namespace skepu
 #ifdef SKEPU_OPENCL
 			
 			template<size_t... OI, size_t... VEI, size_t... HEI, size_t... AI, size_t... CI, typename... CallArgs>
-			void CL(size_t startIdx, size_t Vsize, size_t Hsize, pack_indices<VEI...> vei, pack_indices<HEI...> hei, pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args);
+			void CL(size_t startIdx, size_t Vsize, size_t Hsize, pack_indices<OI...> vei, pack_indices<VEI...>, pack_indices<HEI...> hei, pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args);
 			
 			template<size_t... OI, size_t... VEI, size_t... HEI, size_t... AI, size_t... CI, typename... CallArgs>
-			void mapPairsReduceNumDevices_CL(size_t numDevices, size_t startIdx, size_t Vsize, size_t Hsize, pack_indices<VEI...> vei, pack_indices<HEI...> hei, pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args);
+			void mapPairsReduceNumDevices_CL(size_t numDevices, size_t startIdx, size_t Vsize, size_t Hsize, pack_indices<OI...>, pack_indices<VEI...> vei, pack_indices<HEI...> hei, pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args);
 			
 #endif // SKEPU_OPENCL
 		
@@ -212,7 +246,7 @@ namespace skepu
 
 #include "impl/mappairsreduce/mappairsreduce_cpu.inl"
 #include "impl/mappairsreduce/mappairsreduce_omp.inl"
-//#include "impl/mappairsreduce/mappairsreduce_cl.inl"
+#include "impl/mappairsreduce/mappairsreduce_cl.inl"
 //#include "impl/mappairsreduce/mappairsreduce_cu.inl"
 //#include "impl/mappairsreduce/mappairsreduce_hy.inl"
 

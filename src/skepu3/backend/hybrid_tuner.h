@@ -1,6 +1,5 @@
 #pragma once
 
-#include <skepu3/backend/benchmark.h>
 #include <skepu3/backend/tuner.h>
 
 #define HYBRID_TUNE_CPU_THREADS 16

@@ -98,55 +98,17 @@ struct first_element<> { using type = empty_pack_error; };
 
 /////////////////////////////
 // get
-template <typename R, size_t Ip, size_t Ij, typename... Tp>
-struct get_impl
-{
-	static R& dispatch(Tp...);
-};
 
-template<class R,  size_t Ip, size_t Jp, typename Head, typename... Tp>
-struct get_impl<R, Ip, Jp, Head, Tp...>
+template <size_t I, typename... Args, typename std::enable_if<sizeof...(Args) != 0, bool>::type = 0>
+auto get(Args&&... as) noexcept -> decltype(std::get<I>(std::forward_as_tuple(std::forward<Args>(as)...)))
 {
-	static R& dispatch(Head&, Tp&... tps)
-	{
-		return get_impl<R, Ip, Jp + 1, Tp...>::dispatch(tps...);
-	}
-};
-
-template<size_t Ip, typename Head, typename... Tp>
-struct get_impl<Head, Ip, Ip, Head, Tp...>
-{
-	static Head& dispatch(Head& h, Tp&...)
-	{
-		return h;
-	}
-};
-
-/*template <size_t Ip, typename... Tp>
-typename pack_element<Ip, Tp...>::type&
-get(Tp&&... tps)
-{
-	return get_impl<typename pack_element<Ip, Tp...>::type, Ip, 0, Tp...>::dispatch(tps...);
-}*/
-
-template <size_t Ip, typename... Tp>
-inline typename pack_element<Ip, Tp...>::type&
-get(Tp&... tps)
-{
-	return get_impl<typename pack_element<Ip, Tp...>::type, Ip, 0, Tp...>::dispatch(tps...);
+	return std::get<I>(std::forward_as_tuple(std::forward<Args>(as)...));
 }
 
-template <size_t Ip, typename... Tp>
-inline typename pack_element<Ip, Tp...>::type
-get_noref(Tp... tps)
+template<size_t I>
+auto get() noexcept -> std::tuple<>
 {
-	return get_impl<typename pack_element<Ip, Tp...>::type, Ip, 0, Tp...>::dispatch(tps...);
-}
-
-template <typename... Tp>
-inline auto get_any(Tp&&... tps) -> decltype(get<0>(tps...))
-{
-	return get<0>(tps...);
+	return std::tuple<>{};
 }
 
 /////////////////////////////

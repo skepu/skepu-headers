@@ -118,21 +118,21 @@ namespace skepu
 				{
 				case Backend::Type::CUDA:
 #ifdef SKEPU_CUDA
-					this->CUDA(ai, ci, get<AI, CallArgs...>(args...)..., get<CI, CallArgs...>(args...)...);
+					this->CUDA(ai, ci, std::forward<CallArgs>(args)...);
 					break;
 #endif
 				case Backend::Type::OpenCL:
 #ifdef SKEPU_OPENCL
-					this->CL(ai, ci, get<AI, CallArgs...>(args...)..., get<CI, CallArgs...>(args...)...);
+					this->CL(ai, ci, std::forward<CallArgs>(args)...);
 					break;
 #endif
 				case Backend::Type::OpenMP:
 #ifdef SKEPU_OPENMP
-					this->OMP(ai, ci, get<AI, CallArgs...>(args...)..., get<CI, CallArgs...>(args...)...);
+					this->OMP(ai, ci, std::forward<CallArgs>(args)...);
 					break;
 #endif
 				default:
-					this->CPU(ai, ci, get<AI, CallArgs...>(args...)..., get<CI, CallArgs...>(args...)...);
+					this->CPU(ai, ci, std::forward<CallArgs>(args)...);
 					break;
 				}
 			}
@@ -148,7 +148,7 @@ class CallImpl: public SeqSkeletonBase
 {
 public:
 	CallImpl();
-	CallImpl(Ret (*)(Args...));
+	CallImpl(Ret (*)(std::forward<CallArgs>(args)...));
 
 	template<typename... CallArgs>
 	Ret operator()(CallArgs && ... args);
@@ -156,12 +156,12 @@ public:
 
 template<typename Ret, typename... Args>
 auto inline
-Call(Ret (*)(Args...))
+Call(Ret (*)(std::forward<CallArgs>(args)...))
 -> CallImpl<Ret, Args...>;
 
 template<typename Ret, typename... Args>
 auto inline
-Call(std::function<Ret(Args...)>)
+Call(std::function<Ret(std::forward<CallArgs>(args)...)>)
 -> CallImpl<Ret, Args...>;
 
 template<typename T>

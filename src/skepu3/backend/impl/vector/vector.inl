@@ -215,6 +215,7 @@ namespace skepu
 				SKEPU_ERROR("The container size must be positive.");
 			this->m_size = size;
 			backend::allocateHostMemory<T>(this->m_data, this->m_size);
+	    this->m_deallocEnabled = true;
 		}
 		else SKEPU_ERROR("Container is already initialized");
 	}
@@ -438,43 +439,42 @@ namespace skepu
 // Regular interface functions START
 ///////////////////////////////////////////////
 	
-	/*!
-	 *  Please refer to the documentation of \p std::vector.
-	 */
 	template <typename T>
 	typename Vector<T>::iterator Vector<T>::begin()
 	{
-		return iterator(*this, &m_data[0]);
+		return iterator(*this, &this->m_data[0]);
 	}
 	
-	
-	/*!
-	 *  Please refer to the documentation of \p std::vector.
-	 */
 	template <typename T>
 	typename Vector<T>::iterator Vector<T>::end()
 	{
-		return iterator(*this, &m_data[m_size]);
+		return iterator(*this, &this->m_data[this->m_size]);
 	}
 	
+	// Returns begin() if s >= 0, else returns end() - 1
+	template <typename T>
+	typename Vector<T>::strided_iterator Vector<T>::stridedBegin(size_t n, int s)
+	{
+		return strided_iterator(*this, &this->m_data[(s < 0) ? (-n + 1) * s : 0], s);
+	}
 	
-		/*!
-	 *  Please refer to the documentation of \p std::vector.
-	 */
 	template <typename T>
 	typename Vector<T>::const_iterator Vector<T>::begin() const
 	{
-		return const_iterator(*this, &m_data[0]);
+		return const_iterator(*this, &this->m_data[0]);
 	}
 	
-	
-	/*!
-	 *  Please refer to the documentation of \p std::vector.
-	 */
 	template <typename T>
 	typename Vector<T>::const_iterator Vector<T>::end() const
 	{
-		return const_iterator(*this, &m_data[m_size]);
+		return const_iterator(*this, &this->m_data[this->m_size]);
+	}
+	
+	// Returns begin() if s >= 0, else returns end() - 1
+	template <typename T>
+	typename Vector<T>::const_strided_iterator Vector<T>::stridedBegin(size_t n, int s) const
+	{
+		return const_strided_iterator(*this, &this->m_data[(s < 0) ? (-n + 1) * s : 0], s);
 	}
 	
 	

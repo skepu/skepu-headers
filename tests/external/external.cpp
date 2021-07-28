@@ -18,12 +18,20 @@ TEST_CASE("External calls the supplied operator")
 struct container_stub
 {
 	bool flushed;
+	bool invalidated;
 
 	auto inline
 	flush()
 	-> void
 	{
 		flushed = true;
+	}
+	
+	auto inline
+	invalidateDeviceData() noexcept
+	-> void
+	{
+		invalidated = true;
 	}
 };
 

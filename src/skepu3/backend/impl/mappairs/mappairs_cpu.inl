@@ -14,23 +14,25 @@ namespace skepu
 			DEBUG_TEXT_LEVEL1("CPU MapPairs: hsize = " << Hsize << ", vsize = " << Vsize);
 			
 			// Sync with device data
-			pack_expand((get<OI, CallArgs...>(args...).getParent().invalidateDeviceData(), 0)...);
-			pack_expand((get<HEI, CallArgs...>(args...).getParent().updateHost(), 0)...);
-			pack_expand((get<VEI, CallArgs...>(args...).getParent().updateHost(), 0)...);
-			pack_expand((get<AI, CallArgs...>(args...).getParent().updateHost(hasReadAccess(MapPairsFunc::anyAccessMode[AI-Varity-Harity])), 0)...);
-			pack_expand((get<AI, CallArgs...>(args...).getParent().invalidateDeviceData(hasWriteAccess(MapPairsFunc::anyAccessMode[AI-Varity-Harity])), 0)...);
+			pack_expand((get<OI>(std::forward<CallArgs>(args)...).getParent().invalidateDeviceData(), 0)...);
+			pack_expand((get<HEI>(std::forward<CallArgs>(args)...).getParent().updateHost(), 0)...);
+			pack_expand((get<VEI>(std::forward<CallArgs>(args)...).getParent().updateHost(), 0)...);
+			pack_expand((get<AI>(std::forward<CallArgs>(args)...).getParent().updateHost(hasReadAccess(MapPairsFunc::anyAccessMode[AI-Varity-Harity])), 0)...);
+			pack_expand((get<AI>(std::forward<CallArgs>(args)...).getParent().invalidateDeviceData(hasWriteAccess(MapPairsFunc::anyAccessMode[AI-Varity-Harity])), 0)...);
+			
+			auto random = this->template prepareRandom<MapPairsFunc::randomCount>(Vsize * Hsize);
 			
 			for (size_t i = 0; i < Vsize; ++i)
 			{
 				for (size_t j = 0; j < Hsize; ++j)
 				{
 					Index2D index{ i, j };
-					auto res = F::forward(MapPairsFunc::CPU, index,
-						get<VEI, CallArgs...>(args...)(i)...,
-						get<HEI, CallArgs...>(args...)(j)...,
-						get<AI, CallArgs...>(args...).hostProxy(std::get<AI-Varity-Harity-outArity>(typename MapPairsFunc::ProxyTags{}), index)...,
-						get<CI, CallArgs...>(args...)...);
-					SKEPU_VARIADIC_RETURN(get<OI>(args...)(i, j)..., res);
+					auto res = F::forward(MapPairsFunc::CPU, index, random,
+						get<VEI>(std::forward<CallArgs>(args)...)(i)...,
+						get<HEI>(std::forward<CallArgs>(args)...)(j)...,
+						get<AI>(std::forward<CallArgs>(args)...).hostProxy(std::get<AI-Varity-Harity-outArity>(typename MapPairsFunc::ProxyTags{}), index)...,
+						get<CI>(std::forward<CallArgs>(args)...)...);
+					SKEPU_VARIADIC_RETURN_INPLACE(this->m_in_place, get<OI>(std::forward<CallArgs>(args)...)(i, j)..., res);
 				}
 			}
 		}

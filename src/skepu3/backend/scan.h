@@ -7,11 +7,6 @@
 
 namespace skepu
 {
-	enum class ScanMode
-	{
-		Inclusive, Exclusive
-	};
-	
 	namespace backend
 	{
 		/*!

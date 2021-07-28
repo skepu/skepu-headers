@@ -31,8 +31,10 @@ namespace skepu
 	class MapPairsReduceImpl: public SeqSkeletonBase
 	{
 		static constexpr bool indexed = is_indexed<Args...>::value;
+		static constexpr bool randomized = has_random<Args...>::value;
+		static constexpr size_t randomCount = get_random_count<Args...>::value;
 		static constexpr size_t OutArity = out_size<RetType>::value;
-		static constexpr size_t numArgs = sizeof...(Args) - (indexed ? 1 : 0) + OutArity;
+		static constexpr size_t numArgs = sizeof...(Args) - (indexed ? 1 : 0) - (randomized ? 1 : 0) + OutArity;
 		static constexpr size_t anyCont = trait_count_all<is_skepu_container_proxy, Args...>::value;
 		
 		// Supports the "index trick": using a variant of tag dispatching to index template parameter packs
@@ -44,58 +46,60 @@ namespace skepu
 		
 		using MapPairsFunc = std::function<RetType(Args...)>;
 		using RedFunc = std::function<RedType(RedType, RedType)>;
-		using F = ConditionalIndexForwarder<indexed, MapPairsFunc>;
+		using F = ConditionalIndexForwarder<indexed, randomized, MapPairsFunc>;
 		
 		// For iterators
 		template<size_t... OI, size_t... VEI, size_t... HEI, size_t... AI, size_t... CI, typename... CallArgs>
 		void apply(pack_indices<OI...>, pack_indices<VEI...>, pack_indices<HEI...>, pack_indices<AI...>, pack_indices<CI...>, size_t size, CallArgs&&... args)
 		{
-			size_t Vsize = get_noref<0>(get_noref<VEI>(args...).size()..., this->default_size_y);
-			size_t Hsize = get_noref<0>(get_noref<HEI>(args...).size()..., this->default_size_x);
+			size_t Vsize = get<0>(get<VEI>(std::forward<CallArgs>(args)...).size()..., this->default_size_y);
+			size_t Hsize = get<0>(get<HEI>(std::forward<CallArgs>(args)...).size()..., this->default_size_x);
 			
-			if (disjunction((get<VEI>(args...).size() < Vsize)...))
+			if (disjunction((get<VEI>(std::forward<CallArgs>(args)...).size() < Vsize)...))
 				SKEPU_ERROR("Non-matching input container sizes");
 			
-			if (disjunction((get<HEI>(args...).size() < Hsize)...))
+			if (disjunction((get<HEI>(std::forward<CallArgs>(args)...).size() < Hsize)...))
 				SKEPU_ERROR("Non-matching input container sizes");
 				
-			if  ((this->m_mode == ReduceMode::RowWise && disjunction((get<OI>(args...).size() < Vsize)...))
-				|| (this->m_mode == ReduceMode::ColWise && disjunction((get<OI>(args...).size() < Hsize)...)))
+			if  ((this->m_mode == ReduceMode::RowWise && disjunction((get<OI>(std::forward<CallArgs>(args)...).size() < Vsize)...))
+				|| (this->m_mode == ReduceMode::ColWise && disjunction((get<OI>(std::forward<CallArgs>(args)...).size() < Hsize)...)))
 				SKEPU_ERROR("Non-matching output container size");
 			
-			auto VelwiseIterators = std::make_tuple(get<VEI>(args...).begin()...);
-			auto HelwiseIterators = std::make_tuple(get<HEI>(args...).begin()...);
+			auto VelwiseIterators = std::make_tuple(get<VEI>(std::forward<CallArgs>(args)...).begin()...);
+			auto HelwiseIterators = std::make_tuple(get<HEI>(std::forward<CallArgs>(args)...).begin()...);
+			
+			auto random = this->template prepareRandom<randomCount>(Vsize * Hsize);
 			
 			if (this->m_mode == ReduceMode::RowWise)
 				for (size_t i = 0; i < Vsize; ++i)
 				{
-					pack_expand((get<OI>(args...)(i) = get_or_return<OI>(this->m_start), 0)...);
+					pack_expand((get<OI>(std::forward<CallArgs>(args)...)(i) = get_or_return<OI>(this->m_start), 0)...);
 					for (size_t j = 0; j < Hsize; ++j)
 					{
 						Index2D index{ i, j };
-						RetType temp = F::forward(mapPairsFunc, index,
+						RetType temp = F::forward(mapPairsFunc, index, random,
 							std::get<VEI-OutArity>(VelwiseIterators)(i)...,
 							std::get<HEI-OutArity-Varity>(HelwiseIterators)(j)...,
-							get<AI>(args...).hostProxy()...,
-							get<CI>(args...)...
+							get<AI>(std::forward<CallArgs>(args)...).hostProxy()...,
+							get<CI>(std::forward<CallArgs>(args)...)...
 						);
-						pack_expand((get<OI>(args...)(i) = redFunc(get<OI>(args...)(i), get_or_return<OI>(temp)), 0)...);
+						pack_expand((get<OI>(std::forward<CallArgs>(args)...)(i) = redFunc(get<OI>(std::forward<CallArgs>(args)...)(i), get_or_return<OI>(temp)), 0)...);
 					}
 				}
 			else if (this->m_mode == ReduceMode::ColWise)
 				for (size_t j = 0; j < Hsize; ++j)
 				{
-					pack_expand((get<OI>(args...)(j) = get_or_return<OI>(this->m_start), 0)...);
+					pack_expand((get<OI>(std::forward<CallArgs>(args)...)(j) = get_or_return<OI>(this->m_start), 0)...);
 					for (size_t i = 0; i < Vsize; ++i)
 					{
 						Index2D index{ i, j };
-						RetType temp = F::forward(mapPairsFunc, index,
+						RetType temp = F::forward(mapPairsFunc, index, random,
 							std::get<VEI-OutArity>(VelwiseIterators)(i)...,
 							std::get<HEI-OutArity-Varity>(HelwiseIterators)(j)...,
-							get<AI>(args...).hostProxy()...,
-							get<CI>(args...)...
+							get<AI>(std::forward<CallArgs>(args)...).hostProxy()...,
+							get<CI>(std::forward<CallArgs>(args)...)...
 						);
-						pack_expand((get<OI>(args...)(j) = redFunc(get<OI>(args...)(j), get_or_return<OI>(temp)), 0)...);
+						pack_expand((get<OI>(std::forward<CallArgs>(args)...)(j) = redFunc(get<OI>(std::forward<CallArgs>(args)...)(j), get_or_return<OI>(temp)), 0)...);
 					}
 				}
 			
@@ -121,11 +125,11 @@ namespace skepu
 		}
 		
 		template<typename... CallArgs>
-		auto operator()(CallArgs&&... args) -> typename std::add_lvalue_reference<decltype(get<0>(args...))>::type
+		auto operator()(CallArgs&&... args) -> typename std::add_lvalue_reference<decltype(get<0>(std::forward<CallArgs>(args)...))>::type
 		{
 			static_assert(sizeof...(CallArgs) == numArgs, "Number of arguments not matching Map function");
-			this->apply(out_indices, Velwise_indices, Helwise_indices, any_indices, const_indices, get<0>(args...).size(), std::forward<CallArgs>(args)...);
-			return get<0>(args...);
+			this->apply(out_indices, Velwise_indices, Helwise_indices, any_indices, const_indices, get<0>(std::forward<CallArgs>(args)...).size(), std::forward<CallArgs>(args)...);
+			return get<0>(std::forward<CallArgs>(args)...);
 		}
 		
 	private:

@@ -124,7 +124,10 @@ namespace skepu
 	{
 		// deallocs all device mem for vector for now
 		if (!this->m_deviceMemPointers_CL.empty())
+		{
+			DEBUG_TEXT_LEVEL3("Invalidate device data OpenCL (" << this->size() << " elements)");
 			releaseDeviceAllocations_CL();
+		}
 		// Could maybe be made better by only setting a flag that data is not valid
 	}
 	

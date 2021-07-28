@@ -77,6 +77,18 @@ prepare_read(
 	pack_expand((std::get<CI>(cs).flush(),0)...);
 }
 
+template<
+	size_t ... CI,
+	typename ... Containers>
+auto inline
+complete_write(
+	pack_indices<CI...>,
+	std::tuple<Containers...> & cs) noexcept
+-> void
+{
+	pack_expand((std::get<CI>(cs).invalidateDeviceData(),0)...);
+}
+
 template<typename OP>
 auto inline
 external(OP && op) noexcept
@@ -108,10 +120,14 @@ template<
 auto inline
 external(
 	OP && op,
-	std::tuple<label::write, ContW...>) noexcept
+	std::tuple<label::write, ContW...> cw) noexcept
 -> void
 {
+	auto constexpr write_indices =
+		typename make_pack_indices<sizeof...(ContW) +1, 1>::type{};
+	
 	op();
+	complete_write(write_indices, cw);
 }
 
 template<
@@ -122,15 +138,17 @@ auto inline
 external(
 	std::tuple<label::read, ContR...> cr,
 	OP && op,
-	std::tuple<label::write, ContW...>) noexcept
+	std::tuple<label::write, ContW...> cw) noexcept
 -> void
 {
 	auto constexpr read_indices =
 		typename make_pack_indices<sizeof...(ContR) +1, 1>::type{};
+	auto constexpr write_indices =
+		typename make_pack_indices<sizeof...(ContW) +1, 1>::type{};
 
 	prepare_read(read_indices, cr);
-
 	op();
+	complete_write(write_indices, cw);
 }
 
 } // namespace skepu

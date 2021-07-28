@@ -26,14 +26,14 @@ namespace skepu
 			// If one partition is considered too small, fall back to GPU-only or CPU-only
 			if(gpuSize == 0) {
 				DEBUG_TEXT_LEVEL1("Hybrid MapReduce: Too small GPU size, fall back to CPU-only.");
-				return this->OMP(size, oi, ei, ai, ci, res, args...);
+				return this->OMP(size, oi, ei, ai, ci, res, std::forward<CallArgs>(args)...);
 			}
 			else if(cpuSize < 2) {
 				DEBUG_TEXT_LEVEL1("Hybrid MapReduce: Too small CPU size, fall back to GPU-only.");
 #ifdef SKEPU_HYBRID_USE_CUDA
-				return this->CUDA(0, size, oi, ei, ai, ci, res, args...);
+				return this->CUDA(0, size, oi, ei, ai, ci, res, std::forward<CallArgs>(args)...);
 #else
-				return this->CL(0, size, ei, ai, ci, res, args...);
+				return this->CL(0, size, ei, ai, ci, res, std::forward<CallArgs>(args)...);
 #endif
 			}
 			
@@ -48,9 +48,9 @@ namespace skepu
 			const size_t rest = cpuSize % numCPUThreads;
 			
 			// Sync with device data
-			pack_expand((get<EI, CallArgs...>(args...).getParent().updateHost(), 0)...);
-			pack_expand((get<AI, CallArgs...>(args...).getParent().updateHost(hasReadAccess(MapFunc::anyAccessMode[AI-arity])), 0)...);
-			pack_expand((get<AI, CallArgs...>(args...).getParent().invalidateDeviceData(hasWriteAccess(MapFunc::anyAccessMode[AI-arity])), 0)...);
+			pack_expand((get<EI>(std::forward<CallArgs>(args)...).getParent().updateHost(), 0)...);
+			pack_expand((get<AI>(std::forward<CallArgs>(args)...).getParent().updateHost(hasReadAccess(MapFunc::anyAccessMode[AI-arity])), 0)...);
+			pack_expand((get<AI>(std::forward<CallArgs>(args)...).getParent().invalidateDeviceData(hasWriteAccess(MapFunc::anyAccessMode[AI-arity])), 0)...);
 			
 			std::vector<Ret> parsums(numCPUThreads);
 			
@@ -62,9 +62,9 @@ namespace skepu
 				if(myId == 0) {
 					// Let first thread take care of GPU part.
 #ifdef SKEPU_HYBRID_USE_CUDA
-					res = this->CUDA(cpuSize, gpuSize, oi, ei, ai, ci, res, args...);
+					res = this->CUDA(cpuSize, gpuSize, oi, ei, ai, ci, res, std::forward<CallArgs>(args)...);
 #else
-					res = this->CL(cpuSize, gpuSize, ei, ai, ci, res, args...);
+					res = this->CL(cpuSize, gpuSize, ei, ai, ci, res, std::forward<CallArgs>(args)...);
 #endif
 				}
 				else {
@@ -75,19 +75,19 @@ namespace skepu
 					const size_t last = (myId + 1) * q + (myId == numCPUThreads - 1 ? rest : 0);
 					
 					Ret psum = F::forward(MapFunc::OMP,
-						(get<0, CallArgs...>(args...) + first).getIndex(),
-						get<EI, CallArgs...>(args...)(first)...,
-						get<AI, CallArgs...>(args...).hostProxy()...,
-						get<CI, CallArgs...>(args...)...
+						(get<0>(std::forward<CallArgs>(args)...) + first).getIndex(),
+						get<EI>(std::forward<CallArgs>(args)...)(first)...,
+						get<AI>(std::forward<CallArgs>(args)...).hostProxy()...,
+						get<CI>(std::forward<CallArgs>(args)...)...
 					);
 					
 					for (size_t i = first+1; i < last; ++i)
 					{
 						Ret tempMap = F::forward(MapFunc::OMP,
-							(get<0, CallArgs...>(args...) + i).getIndex(),
-							get<EI, CallArgs...>(args...)(i)...,
-							get<AI, CallArgs...>(args...).hostProxy()...,
-							get<CI, CallArgs...>(args...)...
+							(get<0>(std::forward<CallArgs>(args)...) + i).getIndex(),
+							get<EI>(std::forward<CallArgs>(args)...)(i)...,
+							get<AI>(std::forward<CallArgs>(args)...).hostProxy()...,
+							get<CI>(std::forward<CallArgs>(args)...)...
 						);
 						pack_expand((get_or_return<OI>(psum) = ReduceFunc::OMP(get_or_return<OI>(psum), get_or_return<OI>(tempMap)), 0)...);
 					}
@@ -117,14 +117,14 @@ namespace skepu
 			// If one partition is considered too small, fall back to GPU-only or CPU-only
 			if(gpuSize == 0) {
 				DEBUG_TEXT_LEVEL1("Hybrid MapReduce: Too small GPU size, fall back to CPU-only.");
-				return this->OMP(size, oi, ei, ai, ci, res, args...);
+				return this->OMP(size, oi, ei, ai, ci, res, std::forward<CallArgs>(args)...);
 			}
 			else if(cpuSize < 2) {
 				DEBUG_TEXT_LEVEL1("Hybrid MapReduce: Too small CPU size, fall back to GPU-only.");
 #ifdef SKEPU_HYBRID_USE_CUDA
-				return this->CUDA(0, size, oi, ei, ai, ci, res, args...);
+				return this->CUDA(0, size, oi, ei, ai, ci, res, std::forward<CallArgs>(args)...);
 #else
-				return this->CL(0, size, ei, ai, ci, res, args...);
+				return this->CL(0, size, ei, ai, ci, res, std::forward<CallArgs>(args)...);
 #endif
 			}
 			
@@ -139,8 +139,8 @@ namespace skepu
 			const size_t rest = cpuSize % numCPUThreads;
 			
 			// Sync with device data
-			pack_expand((get<AI, CallArgs...>(args...).getParent().updateHost(hasReadAccess(MapFunc::anyAccessMode[AI-arity])), 0)...);
-			pack_expand((get<AI, CallArgs...>(args...).getParent().invalidateDeviceData(hasWriteAccess(MapFunc::anyAccessMode[AI-arity])), 0)...);
+			pack_expand((get<AI>(std::forward<CallArgs>(args)...).getParent().updateHost(hasReadAccess(MapFunc::anyAccessMode[AI-arity])), 0)...);
+			pack_expand((get<AI>(std::forward<CallArgs>(args)...).getParent().invalidateDeviceData(hasWriteAccess(MapFunc::anyAccessMode[AI-arity])), 0)...);
 			
 			std::vector<Ret> parsums(numCPUThreads);
 			
@@ -153,9 +153,9 @@ namespace skepu
 				if(myId == lastThreadId) {
 					// Let last thread take care of GPU part.
 #ifdef SKEPU_HYBRID_USE_CUDA
-					res = this->CUDA(cpuSize, gpuSize, oi, ei, ai, ci, res, args...);
+					res = this->CUDA(cpuSize, gpuSize, oi, ei, ai, ci, res, std::forward<CallArgs>(args)...);
 #else
-					res = this->CL(cpuSize, gpuSize, ei, ai, ci, res, args...);
+					res = this->CL(cpuSize, gpuSize, ei, ai, ci, res, std::forward<CallArgs>(args)...);
 #endif
 				}
 				else {
@@ -166,8 +166,8 @@ namespace skepu
 					auto index = make_index(defaultDim{}, first, this->default_size_j, this->default_size_k, this->default_size_l);
 					Ret psum = F::forward(MapFunc::OMP,
 						index,
-						get<AI, CallArgs...>(args...).hostProxy()...,
-						get<CI, CallArgs...>(args...)...
+						get<AI>(std::forward<CallArgs>(args)...).hostProxy()...,
+						get<CI>(std::forward<CallArgs>(args)...)...
 					);
 					
 					for (size_t i = first+1; i < last; ++i)
@@ -175,8 +175,8 @@ namespace skepu
 						auto index = make_index(defaultDim{}, i, this->default_size_j, this->default_size_k, this->default_size_l);
 						Ret tempMap = F::forward(MapFunc::OMP,
 							index,
-							get<AI, CallArgs...>(args...).hostProxy()...,
-							get<CI, CallArgs...>(args...)...
+							get<AI>(std::forward<CallArgs>(args)...).hostProxy()...,
+							get<CI>(std::forward<CallArgs>(args)...)...
 						);
 						pack_expand((get_or_return<OI>(psum) = ReduceFunc::OMP(get_or_return<OI>(psum), get_or_return<OI>(tempMap)), 0)...);
 					}

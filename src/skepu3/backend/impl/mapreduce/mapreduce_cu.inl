@@ -21,9 +21,9 @@ namespace skepu
 			Ret startValue = res;
 			// Setup parameters
 			Device_CU *device = this->m_environment->m_devices_CU[deviceID];
-			auto eArgs  = std::forward_as_tuple(get<EI, CallArgs...>(args...)...);
-			auto aArgs  = std::forward_as_tuple(get<AI, CallArgs...>(args...)...);
-			auto scArgs = std::forward_as_tuple(get<CI, CallArgs...>(args...)...);
+			auto eArgs  = std::forward_as_tuple(get<EI>(std::forward<CallArgs>(args)...)...);
+			auto aArgs  = std::forward_as_tuple(get<AI>(std::forward<CallArgs>(args)...)...);
+			auto scArgs = std::forward_as_tuple(get<CI>(std::forward<CallArgs>(args)...)...);
 			
 			// Number of threads per block, taken from NVIDIA source
 			size_t numBlocks, numThreads;
@@ -92,9 +92,9 @@ namespace skepu
 			const size_t numElemPerSlice = size / numKernels;
 			const size_t rest = size % numKernels;
 			
-			auto eArgs  = std::forward_as_tuple(get<EI, CallArgs...>(args...)...);
-			auto aArgs  = std::forward_as_tuple(get<AI, CallArgs...>(args...)...);
-			auto scArgs = std::forward_as_tuple(get<CI, CallArgs...>(args...)...);
+			auto eArgs  = std::forward_as_tuple(get<EI>(std::forward<CallArgs>(args)...)...);
+			auto aArgs  = std::forward_as_tuple(get<AI>(std::forward<CallArgs>(args)...)...);
+			auto scArgs = std::forward_as_tuple(get<CI>(std::forward<CallArgs>(args)...)...);
 			
 			Ret result[numKernels];
 			typename to_device_pointer_cu<decltype(eArgs)>::type elwiseMemP[numKernels];
@@ -196,9 +196,9 @@ namespace skepu
 			size_t streamRest[MAX_GPU_DEVICES];
 			size_t maxKernels = 0;
 			
-			auto eArgs  = std::forward_as_tuple(get<EI, CallArgs...>(args...)...);
-			auto aArgs  = std::forward_as_tuple(get<AI, CallArgs...>(args...)...);
-			auto scArgs = std::forward_as_tuple(get<CI, CallArgs...>(args...)...);
+			auto eArgs  = std::forward_as_tuple(get<EI>(std::forward<CallArgs>(args)...)...);
+			auto aArgs  = std::forward_as_tuple(get<AI>(std::forward<CallArgs>(args)...)...);
+			auto scArgs = std::forward_as_tuple(get<CI>(std::forward<CallArgs>(args)...)...);
 			
 			for (size_t i = 0; i < useNumGPU; ++i)
 			{
@@ -312,9 +312,9 @@ namespace skepu
 			const size_t numElemPerSlice = size / numDevices;
 			const size_t rest = size % numDevices;
 			
-			auto eArgs  = std::forward_as_tuple(get<EI, CallArgs...>(args...)...);
-			auto aArgs  = std::forward_as_tuple(get<AI, CallArgs...>(args...)...);
-			auto scArgs = std::forward_as_tuple(get<CI, CallArgs...>(args...)...);
+			auto eArgs  = std::forward_as_tuple(get<EI>(std::forward<CallArgs>(args)...)...);
+			auto aArgs  = std::forward_as_tuple(get<AI>(std::forward<CallArgs>(args)...)...);
+			auto scArgs = std::forward_as_tuple(get<CI>(std::forward<CallArgs>(args)...)...);
 			
 			typename to_device_pointer_cu<decltype(eArgs)>::type elwiseMemP[MAX_GPU_DEVICES];
 			typename to_proxy_cu<typename MapFunc::ProxyTags, decltype(aArgs)>::type anyMemP[MAX_GPU_DEVICES];
@@ -418,10 +418,10 @@ namespace skepu
 				
 				//Checks whether or not the GPU supports MemoryTransfer/KernelExec overlapping, if not call mapReduceSingleThread function
 				if (this->m_environment->m_devices_CU.at(this->m_environment->bestCUDADevID)->isOverlapSupported())
-					return mapReduceMultiStream_CU(this->m_environment->bestCUDADevID, startIdx, size, oi, ei, ai, ci, res, args...);
+					return mapReduceMultiStream_CU(this->m_environment->bestCUDADevID, startIdx, size, oi, ei, ai, ci, res, std::forward<CallArgs>(args)...);
 				
 #endif
-				return mapReduceSingleThread_CU(this->m_environment->bestCUDADevID, startIdx, size, oi, ei, ai, ci, res, args...);
+				return mapReduceSingleThread_CU(this->m_environment->bestCUDADevID, startIdx, size, oi, ei, ai, ci, res, std::forward<CallArgs>(args)...);
 			}
 			
 #endif // SKEPU_DEBUG_FORCE_MULTI_GPU_IMPL
@@ -431,10 +431,10 @@ namespace skepu
 			// if pinned memory is used but the device does not support overlap the function continues with the previous implementation.
 			// if the multistream version is being used the function will exit at this point.
 			if (this->m_environment->supportsCUDAOverlap())
-				return mapReduceMultiStreamMultiGPU_CU(numDevices, startIdx, size, oi, ei, ai, ci, res, args...);
+				return mapReduceMultiStreamMultiGPU_CU(numDevices, startIdx, size, oi, ei, ai, ci, res, std::forward<CallArgs>(args)...);
 			
 #endif
-			return mapReduceSingleThreadMultiGPU_CU(numDevices, startIdx, size, oi, ei, ai, ci, res, args...);
+			return mapReduceSingleThreadMultiGPU_CU(numDevices, startIdx, size, oi, ei, ai, ci, res, std::forward<CallArgs>(args)...);
 		}
 	} // namespace backend
 } // namespace skepu

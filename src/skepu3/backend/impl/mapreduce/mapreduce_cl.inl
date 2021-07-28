@@ -9,12 +9,12 @@ namespace skepu
 	namespace backend
 	{
 		template<size_t arity, typename MapFunc, typename ReduceFunc, typename CUDAKernel, typename CUDAReduceKernel, typename CLKernel>
-		template<size_t... EI, size_t... AI, size_t... CI, typename ...CallArgs, REQUIRES_B(!MapFunc::usesPRNG && true && sizeof...(CallArgs) >= 0)>
+		template<size_t... EI, size_t... AI, size_t... CI, typename ...CallArgs>
 		typename MapFunc::Ret MapReduce<arity, MapFunc, ReduceFunc, CUDAKernel, CUDAReduceKernel, CLKernel>
 		::mapReduceSingle_CL(size_t deviceID, size_t startIdx, size_t size, pack_indices<EI...> ei, pack_indices<AI...> ai, pack_indices<CI...> ci, Ret &res, CallArgs&&... args)
 		{
 			Ret startValue = res;
-			auto aArgs  = std::forward_as_tuple(get<AI, CallArgs...>(args...)...);
+			auto aArgs  = std::forward_as_tuple(get<AI>(std::forward<CallArgs>(args)...)...);
 			
 			const size_t numThreads = this->m_selected_spec->GPUThreads();
 			const size_t numBlocks = std::max<size_t>(1, std::min(size / numThreads, this->m_selected_spec->GPUBlocks()));
@@ -23,22 +23,26 @@ namespace skepu
 			DEBUG_TEXT_LEVEL1("OpenCL MapReduce: numThreads = " << numThreads << ", numBlocks = " << numBlocks);
 			
 			// Copies the elements to the device
-			auto elwiseMemP = std::make_tuple(get<EI, CallArgs...>(args...).getParent().updateDevice_CL(get<EI, CallArgs...>(args...).getAddress() + startIdx, size, device, true)...);
-			auto anyMemP    = std::make_tuple(std::get<AI-arity>(aArgs).getParent().updateDevice_CL(get<AI, CallArgs...>(args...).getAddress(),
-				get<AI, CallArgs...>(args...).size(), device, hasReadAccess(MapFunc::anyAccessMode[AI-arity]))...);
+			auto elwiseMemP = std::make_tuple(get<EI>(std::forward<CallArgs>(args)...).getParent().updateDevice_CL(get<EI>(std::forward<CallArgs>(args)...).getAddress() + startIdx, size * abs(this->m_strides[EI]), device, true)...);
+			auto anyMemP    = std::make_tuple(std::get<AI-arity>(aArgs).getParent().updateDevice_CL(get<AI>(std::forward<CallArgs>(args)...).getAddress(),
+				get<AI>(std::forward<CallArgs>(args)...).size(), device, hasReadAccess(MapFunc::anyAccessMode[AI-arity]))...);
 			
 			// Create the output memory
 			DeviceMemPointer_CL<Ret> outMemP(&res, numBlocks, device);
 			
+			size_t threads = std::min<size_t>(size, numBlocks * numThreads);
+			auto random = this->template prepareRandom_CL<MapFunc::randomCount>(size, threads);
+			auto randomMemP = random.updateDevice_CL(random.getAddress(), threads, device, true);
+			
 			CLKernel::mapReduce (
 				deviceID, numThreads, numBlocks * numThreads,
+				randomMemP,
 				device_mem_pointer_const_cast(std::get<EI>(elwiseMemP))...,
-				std::make_tuple(&get<AI, CallArgs...>(args...).getParent(), std::get<AI-arity>(anyMemP))...,
-				get<CI, CallArgs...>(args...)...,
+				std::make_tuple(&get<AI>(std::forward<CallArgs>(args)...).getParent(), std::get<AI-arity>(anyMemP))...,
+				get<CI>(std::forward<CallArgs>(args)...)...,
 				&outMemP,
-				size_info(defaultDim{}, this->default_size_i, this->default_size_j, this->default_size_k, this->default_size_l, get<EI, CallArgs...>(args...)...),
-				size,
-				startIdx,
+				size_info(defaultDim{}, this->default_size_i, this->default_size_j, this->default_size_k, this->default_size_l, get<EI>(std::forward<CallArgs>(args)...)...),
+				size, startIdx, this->m_strides,
 				sizeof(Ret) * numThreads
 			);
 			
@@ -57,11 +61,11 @@ namespace skepu
 		
 		
 		template<size_t arity, typename MapFunc, typename ReduceFunc, typename CUDAKernel, typename CUDAReduceKernel, typename CLKernel>
-		template<size_t... EI, size_t... AI, size_t... CI, typename ...CallArgs, REQUIRES_B(!MapFunc::usesPRNG && true && sizeof...(CallArgs) >= 0)>
+		template<size_t... EI, size_t... AI, size_t... CI, typename ...CallArgs>
 		typename MapFunc::Ret MapReduce<arity, MapFunc, ReduceFunc, CUDAKernel, CUDAReduceKernel, CLKernel>
 		::mapReduceNumDevices_CL(size_t numDevices, size_t startIdx, size_t size, pack_indices<EI...> ei, pack_indices<AI...> ai, pack_indices<CI...> ci, Ret &res, CallArgs&&... args)
 		{
-			auto aArgs  = std::forward_as_tuple(get<AI, CallArgs...>(args...)...);
+			auto aArgs  = std::forward_as_tuple(get<AI>(std::forward<CallArgs>(args)...)...);
 			
 			const size_t numElemPerSlice = size / numDevices;
 			const size_t rest = size % numDevices;
@@ -80,22 +84,26 @@ namespace skepu
 				DEBUG_TEXT_LEVEL1("OpenCL MapReduce: device = " << i << ", numThreads = " << numThreads << ", numBlocks = " << numBlocks);
 				
 				// Copies the elements to the device
-				auto elwiseMemP = std::make_tuple(get<EI, CallArgs...>(args...).getParent().updateDevice_CL(get<EI, CallArgs...>(args...).getAddress() + baseIndex, numElem, device, true)...);
-				auto anyMemP    = std::make_tuple(std::get<AI-arity>(aArgs).getParent().updateDevice_CL(get<AI, CallArgs...>(args...).getAddress(),
-					get<AI, CallArgs...>(args...).size(), device, hasReadAccess(MapFunc::anyAccessMode[AI-arity]))...);
+				auto elwiseMemP = std::make_tuple(get<EI>(std::forward<CallArgs>(args)...).getParent().updateDevice_CL(get<EI>(std::forward<CallArgs>(args)...).getAddress() + baseIndex, numElem * abs(this->m_strides[EI]), device, true)...);
+				auto anyMemP    = std::make_tuple(std::get<AI-arity>(aArgs).getParent().updateDevice_CL(get<AI>(std::forward<CallArgs>(args)...).getAddress(),
+					get<AI>(std::forward<CallArgs>(args)...).size(), device, hasReadAccess(MapFunc::anyAccessMode[AI-arity]))...);
 			
 				// Create the output memory
 				outMemP.emplace_back(&result[i], numBlocks, device);
+			
+				size_t threads = std::min<size_t>(size, numBlocks * numThreads);
+				auto random = this->template prepareRandom_CL<MapFunc::randomCount>(size, threads);
+				auto randomMemP = random.updateDevice_CL(random.getAddress(), threads, device, true);
 				
 				CLKernel::mapReduce (
 					i, numThreads, numBlocks * numThreads,
+					randomMemP,
 					device_mem_pointer_const_cast(std::get<EI>(elwiseMemP))...,
-					std::make_tuple(&get<AI, CallArgs...>(args...).getParent(), std::get<AI-arity>(anyMemP))...,
-					get<CI, CallArgs...>(args...)...,
+					std::make_tuple(&get<AI>(std::forward<CallArgs>(args)...).getParent(), std::get<AI-arity>(anyMemP))...,
+					get<CI>(std::forward<CallArgs>(args)...)...,
 					&outMemP[i],
-					size_info(defaultDim{}, this->default_size_i, this->default_size_j, this->default_size_k, this->default_size_l, get<EI, CallArgs...>(args...)...),
-					numElem,
-					baseIndex,
+					size_info(defaultDim{}, this->default_size_i, this->default_size_j, this->default_size_k, this->default_size_l, get<EI>(std::forward<CallArgs>(args)...)...),
+					numElem, baseIndex, this->m_strides,
 					sizeof(Ret) * numThreads
 				);
 				
@@ -132,152 +140,11 @@ namespace skepu
 #ifndef SKEPU_DEBUG_FORCE_MULTI_GPU_IMPL
 			
 			if (numDevices <= 1)
-				return mapReduceSingle_CL(0, startIdx, size, elwise_indices, ai, ci, res, args...);
+				return mapReduceSingle_CL(0, startIdx, size, elwise_indices, ai, ci, res, std::forward<CallArgs>(args)...);
 			
 #endif // SKEPU_DEBUG_FORCE_MULTI_GPU_IMPL
 				
-			return mapReduceNumDevices_CL(numDevices, startIdx, size, elwise_indices, ai, ci, res, args...);
-		}
-		
-		
-		
-		
-		
-		// PRNG
-		
-		template<size_t arity, typename MapFunc, typename ReduceFunc, typename CUDAKernel, typename CUDAReduceKernel, typename CLKernel>
-		template<size_t... EI, size_t... AI, size_t... CI, typename ...CallArgs, REQUIRES_B(!!MapFunc::usesPRNG && sizeof...(CallArgs) >= 0)>
-		typename MapFunc::Ret MapReduce<arity, MapFunc, ReduceFunc, CUDAKernel, CUDAReduceKernel, CLKernel>
-		::mapReduceSingle_CL(size_t deviceID, size_t startIdx, size_t size, pack_indices<EI...> ei, pack_indices<AI...> ai, pack_indices<CI...> ci, Ret &res, CallArgs&&... args)
-		{
-			Ret startValue = res;
-			auto aArgs  = std::forward_as_tuple(get<AI, CallArgs...>(args...)...);
-			
-			const size_t numThreads = this->m_selected_spec->GPUThreads();
-			const size_t numBlocks = std::max<size_t>(1, std::min(size / numThreads, this->m_selected_spec->GPUBlocks()));
-			Device_CL *device = this->m_environment->m_devices_CL[deviceID];
-			
-			DEBUG_TEXT_LEVEL1("OpenCL MapReduce: numThreads = " << numThreads << ", numBlocks = " << numBlocks);
-			
-			// Copies the elements to the device
-			auto elwiseMemP = std::make_tuple(get<EI, CallArgs...>(args...).getParent().updateDevice_CL(get<EI, CallArgs...>(args...).getAddress() + startIdx, size, device, true)...);
-			auto anyMemP    = std::make_tuple(std::get<AI-arity>(aArgs).getParent().updateDevice_CL(get<AI, CallArgs...>(args...).getAddress(),
-				get<AI, CallArgs...>(args...).size(), device, hasReadAccess(MapFunc::anyAccessMode[AI-arity]))...);
-			
-			// Create the output memory
-			DeviceMemPointer_CL<Ret> outMemP(&res, numBlocks, device);
-			
-			// Random
-			if (this->m_prng == nullptr)
-				SKEPU_ERROR("No random stream set in skeleton instance");
-
-			size_t threads = numBlocks * numThreads;
-			auto randoms = this->m_prng->template asRandomB<MapFunc::randomCount>(size, threads);
-			
-		//	for (auto &r : randoms)
-		//		std::cout << "state: " << r.m_state << "\n";
-			
-			auto randomMemP = randoms.updateDevice_CL(randoms.getAddress(), threads, device, true);
-			
-			CLKernel::mapReduce (
-				deviceID, numThreads, numBlocks * numThreads,
-				randomMemP,
-				device_mem_pointer_const_cast(std::get<EI>(elwiseMemP))...,
-				std::make_tuple(&get<AI, CallArgs...>(args...).getParent(), std::get<AI-arity>(anyMemP))...,
-				get<CI, CallArgs...>(args...)...,
-				&outMemP,
-				size_info(defaultDim{}, this->default_size_i, this->default_size_j, this->default_size_k, this->default_size_l, get<EI, CallArgs...>(args...)...),
-				size,
-				startIdx,
-				sizeof(Ret) * numThreads
-			);
-			
-			CLKernel::reduceOnly (
-				deviceID, numThreads, numThreads,
-				&outMemP, &outMemP, numBlocks, sizeof(Ret) * numThreads
-			);
-			
-			// Copy back result
-			pack_expand((std::get<AI-arity>(anyMemP)->changeDeviceData(hasWriteAccess(MapFunc::anyAccessMode[AI-arity])), 0)...);
-			outMemP.changeDeviceData();
-			outMemP.copyDeviceToHost(1);
-			
-			return ReduceFunc::CPU(res, startValue);
-		}
-		
-		
-		template<size_t arity, typename MapFunc, typename ReduceFunc, typename CUDAKernel, typename CUDAReduceKernel, typename CLKernel>
-		template<size_t... EI, size_t... AI, size_t... CI, typename ...CallArgs, REQUIRES_B(!!MapFunc::usesPRNG && sizeof...(CallArgs) >= 0)>
-		typename MapFunc::Ret MapReduce<arity, MapFunc, ReduceFunc, CUDAKernel, CUDAReduceKernel, CLKernel>
-		::mapReduceNumDevices_CL(size_t numDevices, size_t startIdx, size_t size, pack_indices<EI...> ei, pack_indices<AI...> ai, pack_indices<CI...> ci, Ret &res, CallArgs&&... args)
-		{
-			auto aArgs  = std::forward_as_tuple(get<AI, CallArgs...>(args...)...);
-			
-			const size_t numElemPerSlice = size / numDevices;
-			const size_t rest = size % numDevices;
-			
-			Ret result[numDevices];
-			std::vector<DeviceMemPointer_CL<Ret>> outMemP;
-			
-			for (size_t i = 0; i < numDevices; ++i)
-			{
-				Device_CL *device = this->m_environment->m_devices_CL[i];
-				const size_t numElem = numElemPerSlice + (i == numDevices - 1 ? rest : 0);
-				const size_t numThreads = this->m_selected_spec->GPUThreads();
-				const size_t numBlocks = std::max<size_t>(1, std::min(numElem / numThreads, this->m_selected_spec->GPUBlocks()));
-				const size_t baseIndex = startIdx + i * numElemPerSlice;
-				
-				DEBUG_TEXT_LEVEL1("OpenCL MapReduce: device = " << i << ", numThreads = " << numThreads << ", numBlocks = " << numBlocks);
-				
-				// Copies the elements to the device
-				auto elwiseMemP = std::make_tuple(get<EI, CallArgs...>(args...).getParent().updateDevice_CL(get<EI, CallArgs...>(args...).getAddress() + baseIndex, numElem, device, true)...);
-				auto anyMemP    = std::make_tuple(std::get<AI-arity>(aArgs).getParent().updateDevice_CL(get<AI, CallArgs...>(args...).getAddress(),
-					get<AI, CallArgs...>(args...).size(), device, hasReadAccess(MapFunc::anyAccessMode[AI-arity]))...);
-			
-				// Create the output memory
-				outMemP.emplace_back(&result[i], numBlocks, device);
-				
-				// Random
-				if (this->m_prng == nullptr)
-					SKEPU_ERROR("No random stream set in skeleton instance");
-
-				size_t threads = numBlocks * numThreads;
-				auto randoms = this->m_prng->template asRandomB<MapFunc::randomCount>(size, threads);
-				// TODO: Split properly over multiple devices
-				
-				auto randomMemP = randoms.updateDevice_CL(randoms.getAddress(), threads, device, true);
-				
-				CLKernel::mapReduce (
-					i, numThreads, numBlocks * numThreads,
-					randomMemP,
-					device_mem_pointer_const_cast(std::get<EI>(elwiseMemP))...,
-					std::make_tuple(&get<AI, CallArgs...>(args...).getParent(), std::get<AI-arity>(anyMemP))...,
-					get<CI, CallArgs...>(args...)...,
-					&outMemP[i],
-					size_info(defaultDim{}, this->default_size_i, this->default_size_j, this->default_size_k, this->default_size_l, get<EI, CallArgs...>(args...)...),
-					numElem,
-					baseIndex,
-					sizeof(Ret) * numThreads
-				);
-				
-				CLKernel::reduceOnly (
-					i, numThreads, numThreads,
-					&outMemP[i], &outMemP[i], numBlocks, sizeof(Ret) * numThreads
-				);
-				
-				// Copy back result
-				pack_expand((std::get<AI-arity>(anyMemP)->changeDeviceData(hasWriteAccess(MapFunc::anyAccessMode[AI-arity])), 0)...);
-				outMemP[i].changeDeviceData();
-			}
-			
-			// Reduces results from each device on the CPU to yield the total result.
-			for (size_t i = 0; i < numDevices; ++i)
-			{
-				outMemP[i].copyDeviceToHost(1);
-				res = ReduceFunc::CPU(res, result[i]);
-			}
-			
-			return res;
+			return mapReduceNumDevices_CL(numDevices, startIdx, size, elwise_indices, ai, ci, res, std::forward<CallArgs>(args)...);
 		}
 		
 	} // end namespace backend

@@ -30,8 +30,8 @@ namespace skepu
 		class MapOverlap1D: public SkeletonBase
 		{
 			using Ret = typename MapOverlapFunc::Ret;
-			using T = typename region_type<typename parameter_type<(MapOverlapFunc::indexed ? 1 : 0), decltype(&MapOverlapFunc::CPU)>::type>::type;
-			using F = ConditionalIndexForwarder<MapOverlapFunc::indexed, decltype(&MapOverlapFunc::CPU)>;
+			using T = typename region_type<typename parameter_type<(MapOverlapFunc::indexed ? 1 : 0) + (MapOverlapFunc::usesPRNG ? 1 : 0), decltype(&MapOverlapFunc::CPU)>::type>::type;
+			using F = ConditionalIndexForwarder<MapOverlapFunc::indexed, MapOverlapFunc::usesPRNG, decltype(&MapOverlapFunc::CPU)>;
 			
 		public:
 			
@@ -44,7 +44,7 @@ namespace skepu
 			
 			static constexpr size_t arity = 1;
 			static constexpr size_t outArity = MapOverlapFunc::outArity;
-			static constexpr size_t numArgs = MapOverlapFunc::totalArity - (MapOverlapFunc::indexed ? 1 : 0) + outArity;
+			static constexpr size_t numArgs = MapOverlapFunc::totalArity - (MapOverlapFunc::indexed ? 1 : 0) - (MapOverlapFunc::usesPRNG ? 1 : 0) + outArity;
 			static constexpr size_t anyArity = std::tuple_size<typename MapOverlapFunc::ContainerArgs>::value;
 			
 			static constexpr typename make_pack_indices<outArity, 0>::type out_indices{};
@@ -235,19 +235,19 @@ namespace skepu
 		public:
 			template<size_t... OI, size_t... EI, size_t... AI, size_t... CI, typename... CallArgs,
 				REQUIRES(is_skepu_vector<typename std::remove_reference<typename pack_element<0, CallArgs...>::type>::type>::value)>
-			auto backendDispatch(Parity p, pack_indices<OI...>, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args) -> decltype(get<0>(args...))
+			auto backendDispatch(Parity p, pack_indices<OI...>, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args) -> decltype(get<0>(std::forward<CallArgs>(args)...))
 			{
-				auto &res = get<0>(args...);
-				auto size = get<outArity>(args...).size();
+				auto &res = get<0>(std::forward<CallArgs>(args)...);
+				auto size = get<outArity>(std::forward<CallArgs>(args)...).size();
 				
 				// Verify overlap radius is valid
 				if (this->m_edge != Edge::None && size < this->m_overlap * 2)
 					SKEPU_ERROR("Non-matching overlap radius");
 				
-				if (disjunction(get<OI>(args...).size() < size...))
+				if (disjunction(get<OI>(std::forward<CallArgs>(args)...).size() < size...))
 					SKEPU_ERROR("Non-matching output container sizes");
 					
-				if (disjunction(get<EI>(args...).size() != size...))
+				if (disjunction(get<EI>(std::forward<CallArgs>(args)...).size() != size...))
 					SKEPU_ERROR("Non-matching input container sizes");
 				
 				
@@ -280,24 +280,24 @@ namespace skepu
 					break;
 				}
 				
-				return get<0>(args...);
+				return get<0>(std::forward<CallArgs>(args)...);
 			}
 			
 			template<size_t... OI, size_t... EI, size_t... AI, size_t... CI, typename... CallArgs,
 				REQUIRES(is_skepu_matrix<typename std::remove_reference<typename pack_element<0, CallArgs...>::type>::type>::value)>
-			auto backendDispatch(Parity p, pack_indices<OI...>, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args) -> decltype(get<0>(args...))
+			auto backendDispatch(Parity p, pack_indices<OI...>, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args) -> decltype(get<0>(std::forward<CallArgs>(args)...))
 			{
-				size_t size_i = get<0>(args...).size_i();
-				size_t size_j = get<0>(args...).size_j();
+				size_t size_i = get<0>(std::forward<CallArgs>(args)...).size_i();
+				size_t size_j = get<0>(std::forward<CallArgs>(args)...).size_j();
 				
 				if (disjunction(
-					(get<OI>(args...).size_i() != size_i) &&
-					(get<OI>(args...).size_j() != size_j) ...))
+					(get<OI>(std::forward<CallArgs>(args)...).size_i() != size_i) &&
+					(get<OI>(std::forward<CallArgs>(args)...).size_j() != size_j) ...))
 					SKEPU_ERROR("Non-matching output container sizes");
 					
 				if (disjunction(
-					(get<EI>(args...).size_i() != size_i) &&
-					(get<EI>(args...).size_j() != size_j) ...))
+					(get<EI>(std::forward<CallArgs>(args)...).size_i() != size_i) &&
+					(get<EI>(std::forward<CallArgs>(args)...).size_j() != size_j) ...))
 					SKEPU_ERROR("Non-matching input container sizes");
 					
 				// Verify overlap radius is valid
@@ -309,7 +309,7 @@ namespace skepu
 					SKEPU_ERROR("Non-matching overlap radius");
 				
 				
-				this->selectBackend(get<outArity>(args...).size());
+				this->selectBackend(get<outArity>(std::forward<CallArgs>(args)...).size());
 				
 				switch (this->m_overlapPolicy)
 				{	
@@ -328,7 +328,7 @@ namespace skepu
 #endif
 						case Backend::Type::OpenCL:
 #ifdef SKEPU_OPENCL
-							this->colwise_OpenCL(p, size_j, out_indices, elwise_indices, any_indices, const_indices, std::forward<CallArgs>(args)...);
+							this->colwise_OpenCL(size_j, p, out_indices, elwise_indices, any_indices, const_indices, std::forward<CallArgs>(args)...);
 							break;
 #endif
 						case Backend::Type::OpenMP:
@@ -357,7 +357,7 @@ namespace skepu
 #endif
 						case Backend::Type::OpenCL:
 #ifdef SKEPU_OPENCL
-							this->rowwise_OpenCL(p, size_i, out_indices, elwise_indices, any_indices, const_indices, std::forward<CallArgs>(args)...);
+							this->rowwise_OpenCL(size_i, p, out_indices, elwise_indices, any_indices, const_indices, std::forward<CallArgs>(args)...);
 							break;
 #endif
 						case Backend::Type::OpenMP:
@@ -375,11 +375,11 @@ namespace skepu
 						SKEPU_ERROR("MapOverlap: Invalid overlap mode");
 				}
 				
-				return get<0>(args...);
+				return get<0>(std::forward<CallArgs>(args)...);
 			}
 			
 			template<typename... CallArgs>
-			auto operator()(CallArgs&&... args) -> decltype(get<0>(args...))
+			auto operator()(CallArgs&&... args) -> decltype(get<0>(std::forward<CallArgs>(args)...))
 			{
 				if (this->m_updateMode == UpdateMode::Normal)
 				{
@@ -395,7 +395,7 @@ namespace skepu
 					DEBUG_TEXT_LEVEL1("Black");
 					this->backendDispatch(Parity::Even, out_indices, elwise_indices, any_indices, const_indices, std::forward<CallArgs>(args)...);
 				}
-				return get<0>(args...);
+				return get<0>(std::forward<CallArgs>(args)...);
 			}
 		};
 		
@@ -407,8 +407,8 @@ namespace skepu
 		class MapOverlap2D: public SkeletonBase
 		{
 			using Ret = typename MapOverlapFunc::Ret;
-			using T = typename region_type<typename parameter_type<(MapOverlapFunc::indexed ? 1 : 0), decltype(&MapOverlapFunc::CPU)>::type>::type;
-			using F = ConditionalIndexForwarder<MapOverlapFunc::indexed, decltype(&MapOverlapFunc::CPU)>;
+			using T = typename region_type<typename parameter_type<(MapOverlapFunc::indexed ? 1 : 0) + (MapOverlapFunc::usesPRNG ? 1 : 0), decltype(&MapOverlapFunc::CPU)>::type>::type;
+			using F = ConditionalIndexForwarder<MapOverlapFunc::indexed, MapOverlapFunc::usesPRNG, decltype(&MapOverlapFunc::CPU)>;
 			
 		public:
 			
@@ -421,7 +421,7 @@ namespace skepu
 			
 			static constexpr size_t arity = 1;
 			static constexpr size_t outArity = MapOverlapFunc::outArity;
-			static constexpr size_t numArgs = MapOverlapFunc::totalArity - (MapOverlapFunc::indexed ? 1 : 0) + outArity;
+			static constexpr size_t numArgs = MapOverlapFunc::totalArity - (MapOverlapFunc::indexed ? 1 : 0) - (MapOverlapFunc::usesPRNG ? 1 : 0) + outArity;
 			static constexpr size_t anyArity = std::tuple_size<typename MapOverlapFunc::ContainerArgs>::value;
 			
 			static constexpr typename make_pack_indices<outArity, 0>::type out_indices{};
@@ -530,27 +530,27 @@ namespace skepu
 			
 		public:
 			template<size_t... OI, size_t... EI, size_t... AI, size_t... CI, typename... CallArgs>
-			auto backendDispatch(Parity p, pack_indices<OI...>, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args) -> decltype(get<0>(args...))
+			auto backendDispatch(Parity p, pack_indices<OI...>, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args) -> decltype(get<0>(std::forward<CallArgs>(args)...))
 			{
-				size_t size_i = get<0>(args...).size_i();
-				size_t size_j = get<0>(args...).size_j();
+				size_t size_i = get<0>(std::forward<CallArgs>(args)...).size_i();
+				size_t size_j = get<0>(std::forward<CallArgs>(args)...).size_j();
 				
 				if (disjunction(
-					(get<OI>(args...).size_i() != size_i) &&
-					(get<OI>(args...).size_j() != size_j) ...))
+					(get<OI>(std::forward<CallArgs>(args)...).size_i() != size_i) &&
+					(get<OI>(std::forward<CallArgs>(args)...).size_j() != size_j) ...))
 					SKEPU_ERROR("Non-matching container sizes");
 				
 				if (disjunction(
-					(get<EI>(args...).size_i() != size_i) &&
-					(get<EI>(args...).size_j() != size_j) ...))
+					(get<EI>(std::forward<CallArgs>(args)...).size_i() != size_i) &&
+					(get<EI>(std::forward<CallArgs>(args)...).size_j() != size_j) ...))
 					SKEPU_ERROR("Non-matching input container sizes");
 				
 				// Remove later
-				auto &res = get<0>(args...);
-				auto &arg = get<outArity>(args...);
+				auto &res = get<0>(std::forward<CallArgs>(args)...);
+				auto &arg = get<outArity>(std::forward<CallArgs>(args)...);
 				// End remove
 				
-				this->selectBackend(get<0>(args...).size());
+				this->selectBackend(get<0>(std::forward<CallArgs>(args)...).size());
 					
 				switch (this->m_selected_spec->activateBackend())
 				{
@@ -579,11 +579,11 @@ namespace skepu
 					break;
 				}
 				
-				return get<0>(args...);
+				return get<0>(std::forward<CallArgs>(args)...);
 			}
 			
 			template<typename... CallArgs>
-			auto operator()(CallArgs&&... args) -> decltype(get<0>(args...))
+			auto operator()(CallArgs&&... args) -> decltype(get<0>(std::forward<CallArgs>(args)...))
 			{
 				if (this->m_updateMode == UpdateMode::Normal)
 				{
@@ -599,7 +599,7 @@ namespace skepu
 					DEBUG_TEXT_LEVEL1("Black");
 					this->backendDispatch(Parity::Even, out_indices, elwise_indices, any_indices, const_indices, std::forward<CallArgs>(args)...);
 				}
-				return get<0>(args...);
+				return get<0>(std::forward<CallArgs>(args)...);
 			}
 		};
 		
@@ -614,8 +614,8 @@ namespace skepu
 		class MapOverlap3D: public SkeletonBase
 		{
 			using Ret = typename MapOverlapFunc::Ret;
-			using T = typename region_type<typename parameter_type<(MapOverlapFunc::indexed ? 1 : 0), decltype(&MapOverlapFunc::CPU)>::type>::type;
-			using F = ConditionalIndexForwarder<MapOverlapFunc::indexed, decltype(&MapOverlapFunc::CPU)>;
+			using T = typename region_type<typename parameter_type<(MapOverlapFunc::indexed ? 1 : 0) + (MapOverlapFunc::usesPRNG ? 1 : 0), decltype(&MapOverlapFunc::CPU)>::type>::type;
+			using F = ConditionalIndexForwarder<MapOverlapFunc::indexed, MapOverlapFunc::usesPRNG, decltype(&MapOverlapFunc::CPU)>;
 			
 		public:
 			
@@ -628,7 +628,7 @@ namespace skepu
 			
 			static constexpr size_t arity = 1;
 			static constexpr size_t outArity = MapOverlapFunc::outArity;
-			static constexpr size_t numArgs = MapOverlapFunc::totalArity - (MapOverlapFunc::indexed ? 1 : 0) + outArity;
+			static constexpr size_t numArgs = MapOverlapFunc::totalArity - (MapOverlapFunc::indexed ? 1 : 0) - (MapOverlapFunc::usesPRNG ? 1 : 0) + outArity;
 			static constexpr size_t anyArity = std::tuple_size<typename MapOverlapFunc::ContainerArgs>::value;
 			
 			static constexpr typename make_pack_indices<outArity, 0>::type out_indices{};
@@ -710,10 +710,10 @@ namespace skepu
 			void helper_OpenCL(Parity p, pack_indices<OI...>, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args);
 			
 			template<size_t... OI, size_t... EI, size_t... AI, size_t... CI, typename... CallArgs>
-			void mapOverlapSingleThread_CL(size_t deviceID, pack_indices<OI...>, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args);
+			void mapOverlapSingleThread_CL(size_t deviceID, Parity p, pack_indices<OI...>, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args);
 			
 			template<size_t... OI, size_t... EI, size_t... AI, size_t... CI, typename... CallArgs>
-			void mapOverlapMultipleThread_CL(size_t numDevices, pack_indices<OI...>, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args);
+			void mapOverlapMultipleThread_CL(size_t numDevices, Parity p, pack_indices<OI...>, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args);
 			
 #endif
 		
@@ -740,36 +740,30 @@ namespace skepu
 		public:
 			
 			template<size_t... OI, size_t... EI, size_t... AI, size_t... CI, typename... CallArgs>
-			auto backendDispatch(Parity p, pack_indices<OI...>, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args) -> decltype(get<0>(args...))
+			auto backendDispatch(Parity p, pack_indices<OI...>, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args) -> decltype(get<0>(std::forward<CallArgs>(args)...))
 			{
-				size_t size_i = get<0>(args...).size_i();
-				size_t size_j = get<0>(args...).size_j();
-				size_t size_k = get<0>(args...).size_k();
+				size_t size_i = get<0>(std::forward<CallArgs>(args)...).size_i();
+				size_t size_j = get<0>(std::forward<CallArgs>(args)...).size_j();
+				size_t size_k = get<0>(std::forward<CallArgs>(args)...).size_k();
 				
 				if (disjunction(
-					(get<OI>(args...).size_i() < size_i) &&
-					(get<OI>(args...).size_j() < size_j) &&
-					(get<OI>(args...).size_k() < size_k) ...))
+					(get<OI>(std::forward<CallArgs>(args)...).size_i() < size_i) &&
+					(get<OI>(std::forward<CallArgs>(args)...).size_j() < size_j) &&
+					(get<OI>(std::forward<CallArgs>(args)...).size_k() < size_k) ...))
 					SKEPU_ERROR("Non-matching output container sizes");
 				
-				if (this->m_edge != Edge::None && disjunction(
-					(get<EI>(args...).size_i() != size_i) &&
-					(get<EI>(args...).size_j() != size_j) &&
-					(get<EI>(args...).size_k() != size_k) ...))
-					SKEPU_ERROR("Non-matching input container sizes");
-				
-				if (this->m_edge == Edge::None && disjunction(
-					(get<EI>(args...).size_i() - this->m_overlap_i*2 != size_i) &&
-					(get<EI>(args...).size_j() - this->m_overlap_j*2 != size_j) &&
-					(get<EI>(args...).size_k() - this->m_overlap_k*2 != size_k) ...))
+				if (disjunction(
+					(get<EI>(std::forward<CallArgs>(args)...).size_i() != size_i) &&
+					(get<EI>(std::forward<CallArgs>(args)...).size_j() != size_j) &&
+					(get<EI>(std::forward<CallArgs>(args)...).size_k() != size_k) ...))
 					SKEPU_ERROR("Non-matching input container sizes");
 				
 				// Remove later
-				auto &res = get<0>(args...);
-				auto &arg = get<outArity>(args...);
+				auto &res = get<0>(std::forward<CallArgs>(args)...);
+				auto &arg = get<outArity>(std::forward<CallArgs>(args)...);
 				// End remove
 				
-				this->selectBackend(get<0>(args...).size());
+				this->selectBackend(get<0>(std::forward<CallArgs>(args)...).size());
 					
 				switch (this->m_selected_spec->activateBackend())
 				{
@@ -798,11 +792,11 @@ namespace skepu
 					break;
 				}
 				
-				return get<0>(args...);
+				return get<0>(std::forward<CallArgs>(args)...);
 			}
 			
 			template<typename... CallArgs>
-			auto operator()(CallArgs&&... args) -> decltype(get<0>(args...))
+			auto operator()(CallArgs&&... args) -> decltype(get<0>(std::forward<CallArgs>(args)...))
 			{
 				if (this->m_updateMode == UpdateMode::Normal)
 				{
@@ -818,7 +812,7 @@ namespace skepu
 					DEBUG_TEXT_LEVEL1("Black");
 					this->backendDispatch(Parity::Even, out_indices, elwise_indices, any_indices, const_indices, std::forward<CallArgs>(args)...);
 				}
-				return get<0>(args...);
+				return get<0>(std::forward<CallArgs>(args)...);
 			}
 		};
 		
@@ -834,7 +828,7 @@ namespace skepu
 		{
 			using Ret = typename MapOverlapFunc::Ret;
 			using T = typename region_type<typename parameter_type<(MapOverlapFunc::indexed ? 1 : 0) + (MapOverlapFunc::usesPRNG ? 1 : 0), decltype(&MapOverlapFunc::CPU)>::type>::type;
-			using F = ConditionalIndexForwarder<MapOverlapFunc::indexed, decltype(&MapOverlapFunc::CPU)>;
+			using F = ConditionalIndexForwarder<MapOverlapFunc::indexed, MapOverlapFunc::usesPRNG, decltype(&MapOverlapFunc::CPU)>;
 			
 		public:
 			
@@ -915,18 +909,12 @@ namespace skepu
 			
 			
 		private:
-			template<size_t... OI, size_t... EI, size_t... AI, size_t... CI, typename... CallArgs, REQUIRES(!MapOverlapFunc::usesPRNG && true && sizeof...(CallArgs) > 0)>
-			void helper_CPU(Parity p, pack_indices<OI...>, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args);
-			
-			template<size_t... OI, size_t... EI, size_t... AI, size_t... CI, typename... CallArgs, REQUIRES(!!MapOverlapFunc::usesPRNG && sizeof...(CallArgs) > 0)>
+			template<size_t... OI, size_t... EI, size_t... AI, size_t... CI, typename... CallArgs>
 			void helper_CPU(Parity p, pack_indices<OI...>, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args);
 			
 #ifdef SKEPU_OPENMP
 			
-			template<size_t... OI, size_t... EI, size_t... AI, size_t... CI, typename... CallArgs, REQUIRES(!MapOverlapFunc::usesPRNG && true && sizeof...(CallArgs) > 0)>
-			void helper_OpenMP(Parity p, pack_indices<OI...>, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args);
-			
-			template<size_t... OI, size_t... EI, size_t... AI, size_t... CI, typename... CallArgs, REQUIRES(!!MapOverlapFunc::usesPRNG && sizeof...(CallArgs) > 0)>
+			template<size_t... OI, size_t... EI, size_t... AI, size_t... CI, typename... CallArgs>
 			void helper_OpenMP(Parity p, pack_indices<OI...>, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args);
 			
 #endif
@@ -937,10 +925,10 @@ namespace skepu
 			void helper_OpenCL(Parity p, pack_indices<OI...>, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args);
 			
 			template<size_t... OI, size_t... EI, size_t... AI, size_t... CI, typename... CallArgs>
-			void mapOverlapSingleThread_CL(size_t deviceID, pack_indices<OI...>, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args);
+			void mapOverlapSingleThread_CL(size_t deviceID, Parity p, pack_indices<OI...>, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args);
 			
 			template<size_t... OI, size_t... EI, size_t... AI, size_t... CI, typename... CallArgs>
-			void mapOverlapMultipleThread_CL(size_t numDevices, pack_indices<OI...>, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args);
+			void mapOverlapMultipleThread_CL(size_t numDevices, Parity p, pack_indices<OI...>, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args);
 			
 #endif
 		
@@ -966,40 +954,33 @@ namespace skepu
 			
 		public:
 			template<size_t... OI, size_t... EI, size_t... AI, size_t... CI, typename... CallArgs>
-			auto backendDispatch(Parity p, pack_indices<OI...>, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args) -> decltype(get<0>(args...))
+			auto backendDispatch(Parity p, pack_indices<OI...>, pack_indices<EI...>, pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args) -> decltype(get<0>(std::forward<CallArgs>(args)...))
 			{
-				size_t size_i = get<0>(args...).size_i();
-				size_t size_j = get<0>(args...).size_j();
-				size_t size_k = get<0>(args...).size_k();
-				size_t size_l = get<0>(args...).size_l();
+				size_t size_i = get<0>(std::forward<CallArgs>(args)...).size_i();
+				size_t size_j = get<0>(std::forward<CallArgs>(args)...).size_j();
+				size_t size_k = get<0>(std::forward<CallArgs>(args)...).size_k();
+				size_t size_l = get<0>(std::forward<CallArgs>(args)...).size_l();
 				
 				if (disjunction(
-					(get<OI>(args...).size_i() < size_i) &&
-					(get<OI>(args...).size_j() < size_j) &&
-					(get<OI>(args...).size_k() < size_k) &&
-					(get<OI>(args...).size_l() < size_l)...))
+					(get<OI>(std::forward<CallArgs>(args)...).size_i() < size_i) &&
+					(get<OI>(std::forward<CallArgs>(args)...).size_j() < size_j) &&
+					(get<OI>(std::forward<CallArgs>(args)...).size_k() < size_k) &&
+					(get<OI>(std::forward<CallArgs>(args)...).size_l() < size_l)...))
 					SKEPU_ERROR("Non-matching output container sizes");
 				
-				if (this->m_edge != Edge::None && disjunction(
-					(get<EI>(args...).size_i() != size_i) &&
-					(get<EI>(args...).size_j() != size_j) &&
-					(get<EI>(args...).size_k() != size_k) &&
-					(get<EI>(args...).size_l() != size_l)...))
-					SKEPU_ERROR("Non-matching input container sizes");
-				
-				if (this->m_edge == Edge::None && disjunction(
-					(get<EI>(args...).size_i() - this->m_overlap_i*2 != size_i) &&
-					(get<EI>(args...).size_j() - this->m_overlap_j*2 != size_j) &&
-					(get<EI>(args...).size_k() - this->m_overlap_k*2 != size_k) &&
-					(get<EI>(args...).size_l() - this->m_overlap_l*2 != size_l)...))
+				if (disjunction(
+					(get<EI>(std::forward<CallArgs>(args)...).size_i() != size_i) &&
+					(get<EI>(std::forward<CallArgs>(args)...).size_j() != size_j) &&
+					(get<EI>(std::forward<CallArgs>(args)...).size_k() != size_k) &&
+					(get<EI>(std::forward<CallArgs>(args)...).size_l() != size_l)...))
 					SKEPU_ERROR("Non-matching input container sizes");
 				
 				// Remove later
-				auto &res = get<0>(args...);
-				auto &arg = get<outArity>(args...);
+				auto &res = get<0>(std::forward<CallArgs>(args)...);
+				auto &arg = get<outArity>(std::forward<CallArgs>(args)...);
 				// End remove
 				
-				this->selectBackend(get<0>(args...).size());
+				this->selectBackend(get<0>(std::forward<CallArgs>(args)...).size());
 					
 				switch (this->m_selected_spec->activateBackend())
 				{
@@ -1028,11 +1009,11 @@ namespace skepu
 					break;
 				}
 				
-				return get<0>(args...);
+				return get<0>(std::forward<CallArgs>(args)...);
 			}
 			
 			template<typename... CallArgs>
-			auto operator()(CallArgs&&... args) -> decltype(get<0>(args...))
+			auto operator()(CallArgs&&... args) -> decltype(get<0>(std::forward<CallArgs>(args)...))
 			{
 				if (this->m_updateMode == UpdateMode::Normal)
 				{
@@ -1048,7 +1029,7 @@ namespace skepu
 					DEBUG_TEXT_LEVEL1("Black");
 					this->backendDispatch(Parity::Even, out_indices, elwise_indices, any_indices, const_indices, std::forward<CallArgs>(args)...);
 				}
-				return get<0>(args...);
+				return get<0>(std::forward<CallArgs>(args)...);
 			}
 		};
 		
