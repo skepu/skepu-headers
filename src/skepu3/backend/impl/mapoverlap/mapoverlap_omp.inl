@@ -30,11 +30,11 @@ namespace skepu
 			const size_t stride = 1;
 			
 			T start[3*overlap], end[3*overlap];
-
-			size_t threads = std::min<size_t>(size, omp_get_max_threads());
-			auto random = this->template prepareRandom<MapOverlapFunc::randomCount>(size, threads);
 			
-//			omp_set_num_threads(this->m_selected_spec->CPUThreads());
+			auto random_pre = this->template prepareRandom<MapOverlapFunc::randomCount>(overlap);
+			size_t threads = std::min<size_t>(size - 2*overlap, omp_get_max_threads());
+			auto random = this->template prepareRandom<MapOverlapFunc::randomCount>(size - 2*overlap, threads);
+			auto random_post = this->template prepareRandom<MapOverlapFunc::randomCount>(overlap);
 			
 #pragma omp parallel for schedule(runtime)
 			for (size_t i = 0; i < overlap; ++i)
@@ -63,7 +63,7 @@ namespace skepu
 			
 			for (size_t i = 0; i < overlap; ++i)
 			{
-				auto res = F::forward(MapOverlapFunc::OMP, Index1D{i}, random(omp_get_thread_num()), Region1D<T>{overlap, stride, &start[i + overlap]},
+				auto res = F::forward(MapOverlapFunc::OMP, Index1D{i}, random_pre, Region1D<T>{overlap, stride, &start[i + overlap]},
 						get<AI>(std::forward<CallArgs>(args)...).hostProxy()..., get<CI>(std::forward<CallArgs>(args)...)...);
 				SKEPU_VARIADIC_RETURN(get<OI>(std::forward<CallArgs>(args)...)(i)..., res);
 			}
@@ -78,7 +78,7 @@ namespace skepu
 				
 			for (size_t i = size - overlap; i < size; ++i)
 			{
-				auto res = F::forward(MapOverlapFunc::OMP, Index1D{i}, random(omp_get_thread_num()), Region1D<T>{overlap, stride, &end[i + 2 * overlap - size]},
+				auto res = F::forward(MapOverlapFunc::OMP, Index1D{i}, random_post, Region1D<T>{overlap, stride, &end[i + 2 * overlap - size]},
 					get<AI>(std::forward<CallArgs>(args)...).hostProxy()..., get<CI>(std::forward<CallArgs>(args)...)...);
 				SKEPU_VARIADIC_RETURN(get<OI>(std::forward<CallArgs>(args)...)(i)..., res);
 			}
@@ -110,14 +110,14 @@ namespace skepu
 			
 			const T *inputBegin = arg.getAddress();
 			const T *inputEnd = inputBegin + size;
-
-			size_t threads = std::min<size_t>(rowWidth, omp_get_max_threads());
-			auto random = this->template prepareRandom<MapOverlapFunc::randomCount>(rowWidth, threads);
-			
-//			omp_set_num_threads(this->m_selected_spec->CPUThreads());
 			
 			for (size_t row = 0; row < arg.total_rows(); ++row)
 			{
+				auto random_pre = this->template prepareRandom<MapOverlapFunc::randomCount>(overlap);
+				size_t threads = std::min<size_t>(rowWidth - 2*overlap, omp_get_max_threads());
+				auto random = this->template prepareRandom<MapOverlapFunc::randomCount>(rowWidth - 2*overlap, threads);
+				auto random_post = this->template prepareRandom<MapOverlapFunc::randomCount>(overlap);
+				
 				inputEnd = inputBegin + rowWidth;
 				
 #pragma omp parallel for schedule(runtime)
@@ -148,7 +148,7 @@ namespace skepu
 				
 				for (size_t i = 0; i < overlap; ++i)
 				{
-					auto res = F::forward(MapOverlapFunc::OMP, Index1D{i}, random(omp_get_thread_num()), Region1D<T>{overlap, stride, &start[i + overlap]}, get<AI>(std::forward<CallArgs>(args)...).hostProxy()..., get<CI>(std::forward<CallArgs>(args)...)...);
+					auto res = F::forward(MapOverlapFunc::OMP, Index1D{i}, random_pre, Region1D<T>{overlap, stride, &start[i + overlap]}, get<AI>(std::forward<CallArgs>(args)...).hostProxy()..., get<CI>(std::forward<CallArgs>(args)...)...);
 					SKEPU_VARIADIC_RETURN(get<OI>(std::forward<CallArgs>(args)...)(row, i)..., res);
 				}
 					
@@ -161,7 +161,7 @@ namespace skepu
 					
 				for (size_t i = rowWidth - overlap; i < rowWidth; ++i)
 				{
-					auto res = F::forward(MapOverlapFunc::OMP, Index1D{i}, random(omp_get_thread_num()), Region1D<T>{overlap, stride, &end[i + 2 * overlap - rowWidth]}, get<AI>(std::forward<CallArgs>(args)...).hostProxy()..., get<CI>(std::forward<CallArgs>(args)...)...);
+					auto res = F::forward(MapOverlapFunc::OMP, Index1D{i}, random_post, Region1D<T>{overlap, stride, &end[i + 2 * overlap - rowWidth]}, get<AI>(std::forward<CallArgs>(args)...).hostProxy()..., get<CI>(std::forward<CallArgs>(args)...)...);
 					SKEPU_VARIADIC_RETURN(get<OI>(std::forward<CallArgs>(args)...)(row, i)..., res);
 				}
 				
@@ -197,13 +197,13 @@ namespace skepu
 			const T *inputBegin = arg.getAddress();
 			const T *inputEnd = inputBegin + size;
 
-			size_t threads = std::min<size_t>(colWidth, omp_get_max_threads());
-			auto random = this->template prepareRandom<MapOverlapFunc::randomCount>(colWidth, threads);
-			
-	//		omp_set_num_threads(this->m_selected_spec->CPUThreads());
-			
 			for (size_t col = 0; col < arg.total_cols(); ++col)
 			{
+				auto random_pre = this->template prepareRandom<MapOverlapFunc::randomCount>(overlap);
+				size_t threads = std::min<size_t>(colWidth - 2*overlap, omp_get_max_threads());
+				auto random = this->template prepareRandom<MapOverlapFunc::randomCount>(colWidth - 2*overlap, threads);
+				auto random_post = this->template prepareRandom<MapOverlapFunc::randomCount>(overlap);
+				
 				inputEnd = inputBegin + (rowWidth * (colWidth-1));
 				
 #pragma omp parallel for schedule(runtime)
@@ -234,7 +234,7 @@ namespace skepu
 				
 				for (size_t i = 0; i < overlap; ++i)
 				{
-					auto res = F::forward(MapOverlapFunc::OMP, Index1D{i}, random(omp_get_thread_num()), Region1D<T>{overlap, 1, &start[i + overlap]},
+					auto res = F::forward(MapOverlapFunc::OMP, Index1D{i}, random_pre, Region1D<T>{overlap, 1, &start[i + overlap]},
 						get<AI>(std::forward<CallArgs>(args)...).hostProxy()..., get<CI>(std::forward<CallArgs>(args)...)...);
 					SKEPU_VARIADIC_RETURN(get<OI>(std::forward<CallArgs>(args)...)(i, col)..., res);
 				}
@@ -249,7 +249,7 @@ namespace skepu
 					
 				for (size_t i = colWidth - overlap; i < colWidth; ++i)
 				{
-					auto res = F::forward(MapOverlapFunc::OMP, Index1D{i}, random(omp_get_thread_num()), Region1D<T>{overlap, 1, &end[i + 2 * overlap - colWidth]},
+					auto res = F::forward(MapOverlapFunc::OMP, Index1D{i}, random_post, Region1D<T>{overlap, 1, &end[i + 2 * overlap - colWidth]},
 						get<AI>(std::forward<CallArgs>(args)...).hostProxy()..., get<CI>(std::forward<CallArgs>(args)...)...);
 					SKEPU_VARIADIC_RETURN(get<OI>(std::forward<CallArgs>(args)...)(i, col)..., res);
 				}

@@ -13,20 +13,31 @@ struct complex
   
   using value_type = T;
   
+#ifdef SKEPU_CUDA
+	__host__ __device__
+#endif
   constexpr complex()
   : re{0}, im{0}
   {}
   
+#ifdef SKEPU_CUDA
+	__host__ __device__
+#endif
   constexpr complex(T real)
   : re{real}, im{0}
   {}
     
+#ifdef SKEPU_CUDA
+	__host__ __device__
+#endif
   constexpr complex(T real, T im)
   : re{real}, im{0}
   {}
   
-  
   template<typename T1, typename T2>
+#ifdef SKEPU_CUDA
+__host__ __device__
+#endif
   constexpr complex(T1 real, T2 imaginary) 
   : re(real), im(imaginary)
   {}
@@ -74,6 +85,9 @@ constexpr FComplex FOne = {1.0, 0.0};
 // Functions
 
 template<typename C>
+#ifdef SKEPU_CUDA
+	__host__ __device__
+#endif
 inline
 C add(C lhs, C rhs)
 {
@@ -84,6 +98,9 @@ C add(C lhs, C rhs)
 }
 
 template<typename C>
+#ifdef SKEPU_CUDA
+	__host__ __device__
+#endif
 inline
 C sub(C lhs, C rhs)
 {
@@ -94,6 +111,9 @@ C sub(C lhs, C rhs)
 }
 
 template<typename C>
+#ifdef SKEPU_CUDA
+	__host__ __device__
+#endif
 inline
 C mul(C lhs, C rhs)
 {
@@ -104,6 +124,9 @@ C mul(C lhs, C rhs)
 }
 
 template<typename C>
+#ifdef SKEPU_CUDA
+	__host__ __device__
+#endif
 inline
 C real_div(C z, typename value_type<C>::type div)
 {
@@ -114,6 +137,9 @@ C real_div(C z, typename value_type<C>::type div)
 }
 
 template<typename R, typename std::enable_if<!is_skepu_complex<R>::value, bool>::type = 0>
+#ifdef SKEPU_CUDA
+	__host__ __device__
+#endif
 inline
 R conj(R x)
 {
@@ -121,6 +147,9 @@ R conj(R x)
 }
 
 template<typename C, typename std::enable_if<is_skepu_complex<C>::value, bool>::type = 0>
+#ifdef SKEPU_CUDA
+	__host__ __device__
+#endif
 inline
 C conj(C z)
 {
@@ -185,18 +214,27 @@ operator<<(std::ostream &o, C z)
 // OPERATOR +
 
 template<typename T>
+#ifdef SKEPU_CUDA
+	__host__ __device__
+#endif
 complex<T> operator+(complex<T> lhs, complex<T> rhs)
 {
   return add(lhs, rhs);
 }
 
 template<typename T>
+#ifdef SKEPU_CUDA
+	__host__ __device__
+#endif
 complex<T> operator+(complex<T> lhs, T rhs)
 {
   return {lhs.re + rhs, lhs.im};
 }
 
 template<typename T>
+#ifdef SKEPU_CUDA
+	__host__ __device__
+#endif
 complex<T> operator+(T lhs, complex<T> rhs)
 {
   return {rhs.re + lhs, rhs.im};
@@ -206,6 +244,9 @@ complex<T> operator+(T lhs, complex<T> rhs)
 // OPERATOR +=
 
 template<typename T>
+#ifdef SKEPU_CUDA
+	__host__ __device__
+#endif
 complex<T>& operator+=(complex<T> &lhs, complex<T> rhs)
 {
   lhs.re += rhs.re;
@@ -214,6 +255,9 @@ complex<T>& operator+=(complex<T> &lhs, complex<T> rhs)
 }
 
 template<typename T>
+#ifdef SKEPU_CUDA
+	__host__ __device__
+#endif
 complex<T>& operator+=(complex<T> &lhs, T rhs)
 {
   lhs.re += rhs;
@@ -224,18 +268,27 @@ complex<T>& operator+=(complex<T> &lhs, T rhs)
 // OPERATOR -
 
 template<typename T>
+#ifdef SKEPU_CUDA
+	__host__ __device__
+#endif
 complex<T> operator-(complex<T> lhs, complex<T> rhs)
 {
   return sub(lhs, rhs);
 }
 
 template<typename T>
+#ifdef SKEPU_CUDA
+	__host__ __device__
+#endif
 complex<T> operator-(complex<T> lhs, T rhs)
 {
   return {lhs.re - rhs, lhs.im};
 }
 
 template<typename T>
+#ifdef SKEPU_CUDA
+	__host__ __device__
+#endif
 complex<T> operator-(T lhs, complex<T> rhs)
 {
   return {lhs - rhs.re, -rhs.im};
@@ -245,6 +298,9 @@ complex<T> operator-(T lhs, complex<T> rhs)
 // OPERATOR -=
 
 template<typename T>
+#ifdef SKEPU_CUDA
+	__host__ __device__
+#endif
 complex<T>& operator-=(complex<T> &lhs, complex<T> rhs)
 {
   lhs.re -= rhs.re;
@@ -253,6 +309,9 @@ complex<T>& operator-=(complex<T> &lhs, complex<T> rhs)
 }
 
 template<typename T>
+#ifdef SKEPU_CUDA
+	__host__ __device__
+#endif
 complex<T>& operator-=(complex<T> &lhs, T rhs)
 {
   lhs.re -= rhs;
@@ -263,18 +322,27 @@ complex<T>& operator-=(complex<T> &lhs, T rhs)
 // OPERATOR *
 
 template<typename T>
+#ifdef SKEPU_CUDA
+	__host__ __device__
+#endif
 complex<T> operator*(complex<T> lhs, complex<T> rhs)
 {
   return mul(lhs, rhs);
 }
 
 template<typename T>
+#ifdef SKEPU_CUDA
+	__host__ __device__
+#endif
 complex<T> operator*(complex<T> lhs, T rhs)
 {
   return {lhs.re * rhs, lhs.im * rhs};
 }
 
 template<typename T>
+#ifdef SKEPU_CUDA
+	__host__ __device__
+#endif
 complex<T> operator*(T lhs, complex<T> rhs)
 {
   return {rhs.re * lhs, rhs.im * lhs};
@@ -283,12 +351,18 @@ complex<T> operator*(T lhs, complex<T> rhs)
 // OPERATOR /
 
 /*template<typename T>
+#ifdef SKEPU_CUDA
+	__host__ __device__
+#endif
 complex<T> operator/(complex<T> lhs, complex<T> rhs)
 {
   return mul(lhs, rhs);
 }*/
 
 template<typename T>
+#ifdef SKEPU_CUDA
+	__host__ __device__
+#endif
 complex<T> operator/(complex<T> lhs, T rhs)
 {
   return real_div(lhs, rhs);
@@ -298,18 +372,27 @@ complex<T> operator/(complex<T> lhs, T rhs)
 // OPERATOR ==
 
 template<typename T>
+#ifdef SKEPU_CUDA
+	__host__ __device__
+#endif
 bool operator==(complex<T> lhs, complex<T> rhs)
 {
   return (lhs.re == rhs.re) && (lhs.im == rhs.im);
 }
 
 template<typename T>
+#ifdef SKEPU_CUDA
+	__host__ __device__
+#endif
 bool operator==(complex<T> lhs, T rhs)
 {
   return lhs.im == 0 && (lhs.re == rhs);
 }
 
 template<typename T>
+#ifdef SKEPU_CUDA
+	__host__ __device__
+#endif
 bool operator==(T lhs, complex<T> rhs)
 {
   return rhs.im == 0 && (rhs.re == lhs);
@@ -319,18 +402,27 @@ bool operator==(T lhs, complex<T> rhs)
 // OPERATOR !=
 
 template<typename T>
+#ifdef SKEPU_CUDA
+	__host__ __device__
+#endif
 bool operator!=(complex<T> lhs, complex<T> rhs)
 {
   return (lhs.re != rhs.re) || (lhs.im != rhs.im);
 }
 
 template<typename T>
+#ifdef SKEPU_CUDA
+	__host__ __device__
+#endif
 bool operator!=(complex<T> lhs, T rhs)
 {
   return lhs.im != 0 || (lhs.re != rhs);
 }
 
 template<typename T>
+#ifdef SKEPU_CUDA
+	__host__ __device__
+#endif
 bool operator!=(T lhs, complex<T> rhs)
 {
   return rhs.im != 0 || (rhs.re != lhs);

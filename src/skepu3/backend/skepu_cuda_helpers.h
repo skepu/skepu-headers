@@ -48,6 +48,21 @@
 #define MAX(a,b) ((a > b) ? a : b)
 #endif
 
+namespace skepu {
+namespace cuda {
+
+template<typename T>
+#ifdef SKEPU_CUDA
+	__host__ __device__
+#endif
+T clamp(T d, T min, T max)
+{
+  const T t = d < min ? min : d;
+  return t > max ? max : t;
+}
+
+}}
+
 
 inline cudaError cutilDeviceSynchronize()
 {
@@ -120,6 +135,11 @@ inline void __checkCudaError( cudaError_t err, const char *file, const int line 
    if( cudaSuccess != err)
    {
       FPRINTF((stderr, "CUDA ERROR at %s: %i. Error is %d: %s.\n",file, line, (int)err, cudaGetErrorString(err)));
+#ifdef SKEPU_ENABLE_EXCEPTIONS
+      throw("CUDA error exception");
+#else
+      exit(1);
+#endif
    }
 }
 

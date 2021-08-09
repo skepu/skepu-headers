@@ -500,6 +500,17 @@ namespace skepu
 			proxy.cols = this->m_cols;
 			return {devptr, proxy};
 		}
+		
+		std::pair<device_pointer_type_cu, MatCol<T>>
+		cudaProxy(size_t deviceID, AccessMode accessMode, ProxyTag::MatCol, Index1D col)
+		{
+			// TODO: Optimize
+			device_pointer_type_cu devptr = this->updateDevice_CU(this->m_data, this->m_rows * this->m_cols, deviceID, accessMode);
+			MatCol<T> proxy;
+			proxy.data = devptr->getDeviceDataPointer() + col.i;
+			proxy.rows = this->m_rows;
+			return {devptr, proxy};
+		}
 	#endif
 		
 		// Don't Care about device data

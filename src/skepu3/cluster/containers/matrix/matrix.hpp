@@ -119,6 +119,20 @@ public:
 	{
 		return m_data.data();
 	}
+	
+	auto
+	data() noexcept
+	-> pointer
+	{
+		return m_data.data();
+	}
+	
+	auto
+	local_storage_handle() noexcept
+	-> starpu_data_handle_t
+	{
+		return m_data.local_storage_handle();
+	}
 
 	auto
 	size() const noexcept
@@ -131,6 +145,9 @@ public:
 	auto size_j() const noexcept -> size_type { return m_data.cols(); }
 	constexpr auto size_k() const noexcept -> size_type { return 0; }
 	constexpr auto size_l() const noexcept -> size_type { return 0; }
+	
+	auto total_rows() const noexcept -> size_type { return m_data.rows(); }
+	auto total_cols() const noexcept -> size_type { return m_data.cols(); }
 
 	void change_layout()
 	{
@@ -345,6 +362,14 @@ private:
 
 template<typename T>
 struct is_skepu_matrix<Matrix<T>> : std::true_type
+{};
+
+template<typename T>
+struct is_skepu_matrix<Matrix<T>&> : std::true_type
+{};
+
+template<typename T>
+struct is_skepu_matrix<Matrix<T> const&> : std::true_type
 {};
 
 template<typename T>

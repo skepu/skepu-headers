@@ -29,6 +29,13 @@ namespace skepu
 	constexpr bool no_dealloc = false;
 	
 	struct PrecompilerMarker {};
+	
+	inline size_t closestPow2(size_t x)
+	{
+		size_t guess = 1;
+		while (guess < x) { guess *= 2; }
+		return guess;
+	}
 
 	// ----------------------------------------------------------------
 	// sizes and indices structures
@@ -257,6 +264,7 @@ namespace skepu
 #include "skepu3/tensor.hpp"
 #include "skepu3/sparse_matrix.hpp"
 #include "random.hpp"
+#include "stride_list.hpp"
 
 namespace skepu
 {
@@ -314,36 +322,6 @@ namespace skepu
 		}
 		
 		PRNG *m_prng = nullptr;
-	};
-	
-
-	// For Map with strides
-	
-	template<size_t count>
-	class StrideList
-	{
-	public:
-		StrideList<count>()
-		{
-			for (size_t i = 0; i < count; ++i)
-				this->values[i] = 1;
-		}
-		
-		template<typename... S>
-		StrideList<count>(S... strides)
-		{
-			static_assert(sizeof...(S) == count, "Unexpected stride count");
-		//	if (get<0>(strides...) == 0) SKEPU_ERROR("First stride cannot be 0.");
-			this->values = std::array<int, count>{(int)strides...};
-		}
-		
-		int operator[](size_t i) const
-		{
-			return this->values[i];
-		}
-		
-	private:
-		std::array<int, count> values{};
 	};
 	
 	

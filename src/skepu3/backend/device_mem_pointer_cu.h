@@ -17,8 +17,12 @@
 namespace skepu
 {
 	
-		template<typename T>
-		struct MatRow;
+	template<typename T>
+	struct MatRow;
+	
+	template<typename T>
+	struct MatCol;
+	
 	namespace backend
 	{
 
@@ -563,11 +567,11 @@ namespace skepu
 			{
 				if(updateStruct[i].srcIsHost)
 				{ 
-					DEBUG_TEXT_LEVEL1(m_nameVerbose + " HOST_TO_DEVICE: Host -> GPU_" << m_deviceID << ", size: " << (updateStruct[i].copySize/sizeof(T)) << " # " << updateStruct[i].srcOffset << " -- " << updateStruct[i].srcOffset + (updateStruct[i].copySize/sizeof(T)) <<"!!!\n")
+					DEBUG_TEXT_LEVEL1(m_nameVerbose + " HOST_TO_DEVICE: Host -> GPU_" << m_deviceID << ", size: " << (updateStruct[i].copySize/sizeof(T)) << " # " << updateStruct[i].srcOffset << " -- " << updateStruct[i].srcOffset + (updateStruct[i].copySize/sizeof(T)) << "x" << sizeof(T) << "\n")
 				}
 				else
 				{
-					DEBUG_TEXT_LEVEL1(m_nameVerbose + " DEVICE_TO_DEVICE: From GPU_" << updateStruct[i].srcDevId << " -> GPU_" << m_deviceID << ", size: " << (updateStruct[i].copySize/sizeof(T)) << " # " << updateStruct[i].srcOffset << " -- " << updateStruct[i].srcOffset + (updateStruct[i].copySize/sizeof(T)) <<"!!!\n")
+					DEBUG_TEXT_LEVEL1(m_nameVerbose + " DEVICE_TO_DEVICE: From GPU_" << updateStruct[i].srcDevId << " -> GPU_" << m_deviceID << ", size: " << (updateStruct[i].copySize/sizeof(T)) << " # " << updateStruct[i].srcOffset << " -- " << updateStruct[i].srcOffset + (updateStruct[i].copySize/sizeof(T)) << "x" << sizeof(T) << "\n")
 				}
       
 				/*!
@@ -622,7 +626,7 @@ namespace skepu
 		{
 			if(m_hostDataPointer != NULL)
 			{
-				DEBUG_TEXT_LEVEL1(m_nameVerbose + " HOST_TO_DEVICE: Host -> GPU_" << m_deviceID << ", size: " << ((numElements<1)? m_numElements: numElements)<<" !!!\n")
+				DEBUG_TEXT_LEVEL1(m_nameVerbose + " HOST_TO_DEVICE: Host -> GPU_" << m_deviceID << ", size: " << ((numElements<1)? m_numElements: numElements) << "x" << sizeof(T) << "\n")
 
 					if(m_valid == true)
 				{
@@ -688,7 +692,7 @@ namespace skepu
 
 			if(m_deviceDataHasChanged && m_hostDataPointer != NULL)
 			{
-				DEBUG_TEXT_LEVEL1(m_nameVerbose + " DEVICE_TO_HOST: GPU_" << m_deviceID << " -> Host, size: " << ((numElements<1)? m_numElements: numElements)<<" !!!\n")
+				DEBUG_TEXT_LEVEL1(m_nameVerbose + " DEVICE_TO_HOST: GPU_" << m_deviceID << " -> Host, size: " << ((numElements<1)? m_numElements: numElements) << "x" << sizeof(T) << "\n")
 				
 				size_t sizeVec;
 				
@@ -756,10 +760,10 @@ namespace skepu
 			if (!condition)
 				return;
 			
-			DEBUG_TEXT_LEVEL2(m_nameVerbose + " DEVICE_DATA_CHANGED: GPU_" << m_deviceID << ", size: " <<  m_numElements <<" !!!\n")
+			DEBUG_TEXT_LEVEL2(m_nameVerbose + " DEVICE_DATA_CHANGED: GPU_" << m_deviceID << ", size: " <<  m_numElements << "x" << sizeof(T) << "\n")
 				if(m_valid == false) // this is for data that is directly written on gpu....
 			{
-				DEBUG_TEXT_LEVEL2(m_nameVerbose + " DEVICE_DATA_MARKED_VALID: GPU_" << m_deviceID << ", size: " <<  m_numElements <<" !!!\n")
+				DEBUG_TEXT_LEVEL2(m_nameVerbose + " DEVICE_DATA_MARKED_VALID: GPU_" << m_deviceID << ", size: " <<  m_numElements << "x" << sizeof(T) << "\n")
 					m_valid = true;
 			}
 			m_deviceDataHasChanged = true;
@@ -784,7 +788,7 @@ namespace skepu
 		{
 			if(m_valid)
 			{
-				DEBUG_TEXT_LEVEL2(m_nameVerbose + " DEVICE_DATA_MARKED_INVALID: GPU_" << m_deviceID << ", size: " <<  m_numElements <<" !!!\n")
+				DEBUG_TEXT_LEVEL2(m_nameVerbose + " DEVICE_DATA_MARKED_INVALID: GPU_" << m_deviceID << ", size: " <<  m_numElements << "x" << sizeof(T) << "\n")
 					m_valid = false;
 				m_deviceDataHasChanged = false;
 				
@@ -844,13 +848,28 @@ namespace skepu
 		template<typename T>
 		struct to_proxy_cu<ProxyTag::Default, T>
 		{
-			using type = std::pair<typename std::remove_reference<T>::type::device_pointer_type_cu, typename std::remove_reference<T>::type::proxy_type>;
+			using type = std::pair<
+				typename std::remove_reference<T>::type::device_pointer_type_cu,
+				typename std::remove_reference<T>::type::proxy_type
+			>;
 		};
 		
 		template<typename T>
 		struct to_proxy_cu<ProxyTag::MatRow, T>
 		{
-			using type = std::pair<typename T::device_pointer_type_cu, MatRow<typename T::value_type>>;
+			using type = std::pair<
+				typename std::remove_reference<T>::type::device_pointer_type_cu,
+				MatRow<typename std::remove_reference<T>::type::value_type>
+			>;
+		};
+		
+		template<typename T>
+		struct to_proxy_cu<ProxyTag::MatCol, T>
+		{
+			using type = std::pair<
+				typename std::remove_reference<T>::type::device_pointer_type_cu,
+				MatCol<typename std::remove_reference<T>::type::value_type>
+			>;
 		};
 		
 		template<typename... Rs, typename...Ts>

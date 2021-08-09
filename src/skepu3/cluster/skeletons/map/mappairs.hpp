@@ -230,14 +230,14 @@ private:
 		CallArgs&&... args)
 	-> void
 	{
-		if(disjunction((get<OI, CallArgs...>(args...).size_i() < Vsize)...)
-				|| disjunction((get<OI, CallArgs...>(args...).size_j() < Hsize)...))
+		if(disjunction((get<OI>(std::forward<CallArgs>(args)...).size_i() < Vsize)...)
+				|| disjunction((get<OI>(std::forward<CallArgs>(args)...).size_j() < Hsize)...))
 			SKEPU_ERROR("Non-matching output container sizes");
 
-		if(disjunction((get<VEI, CallArgs...>(args...).size() < Vsize)...))
+		if(disjunction((get<VEI>(std::forward<CallArgs>(args)...).size() < Vsize)...))
 			SKEPU_ERROR("Non-matching vertical container sizes");
 
-		if(disjunction((get<HEI, CallArgs...>(args...).size() < Hsize)...))
+		if(disjunction((get<HEI>(std::forward<CallArgs>(args)...).size() < Hsize)...))
 			SKEPU_ERROR("Non-matching horizontal container sizes");
 
 		/* Data locality

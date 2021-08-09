@@ -149,6 +149,13 @@ public:
 	{
 		return m_data.data();
 	}
+	
+	auto
+	local_storage_handle() noexcept
+	-> starpu_data_handle_t
+	{
+		return m_data.local_storage_handle();
+	}
 
 	/* Element access */
 	auto
@@ -397,6 +404,14 @@ private:
 
 template<typename T>
 struct is_skepu_vector<Vector<T>> : std::true_type
+{};
+
+template<typename T>
+struct is_skepu_vector<Vector<T>&> : std::true_type
+{};
+
+template<typename T>
+struct is_skepu_vector<Vector<T> const&> : std::true_type
 {};
 
 template<typename T>

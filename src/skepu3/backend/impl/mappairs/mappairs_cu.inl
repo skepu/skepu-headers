@@ -36,6 +36,11 @@ namespace skepu
 			auto velwiseMemP = std::make_tuple(std::get<VEI-outArity>(veArgs).getParent().updateDevice_CU(std::get<VEI-outArity>(veArgs).getAddress() + startIdx, Vsize, deviceID, AccessMode::Read)...);
 			auto helwiseMemP = std::make_tuple(std::get<HEI-Varity-outArity>(heArgs).getParent().updateDevice_CU(std::get<HEI-Varity-outArity>(heArgs).getAddress() + startIdx, Hsize, deviceID, AccessMode::Read)...);
 			auto anyMemP    = std::make_tuple(std::get<AI-Varity-Harity-outArity>(aArgs).getParent().cudaProxy(deviceID, MapPairsFunc::anyAccessMode[AI-Varity-Harity-outArity], std::get<AI-Varity-Harity-outArity>(proxy_tags), Index1D{0})...);
+		
+			// PRNG support
+			size_t prng_threads = std::min<size_t>(size, numBlocks * numThreads);
+			auto random = this->template prepareRandom<MapPairsFunc::randomCount>(size, prng_threads);
+			auto randomMemP = random.updateDevice_CU(random.getAddress(), prng_threads, deviceID, AccessMode::ReadWrite);
 			
 			// Launches the kernel (asynchronous)
 #ifdef USE_PINNED_MEMORY
@@ -45,6 +50,7 @@ namespace skepu
 #endif // USE_PINNED_MEMORY
 			(
 				std::get<OI>(outMemP)->getDeviceDataPointer()...,
+				randomMemP->getDeviceDataPointer(),
 				std::get<VEI-outArity>(velwiseMemP)->getDeviceDataPointer()...,
 				std::get<HEI-Varity-outArity>(helwiseMemP)->getDeviceDataPointer()...,
 				std::get<AI-Varity-Harity-outArity>(anyMemP).second...,
@@ -117,6 +123,11 @@ namespace skepu
 				const size_t baseIndex = startIdx + i * numElemPerSlice;
 				const size_t numThreads = std::min(this->m_selected_spec->GPUThreads(), numElem);
 				const size_t numBlocks = std::min(numElem / numThreads + (numElem % numThreads == 0 ? 0:1), this->m_selected_spec->GPUBlocks());
+		
+				// PRNG support
+				size_t prng_threads = std::min<size_t>(size, numBlocks * numThreads);
+				auto random = this->template prepareRandom<MapPairsFunc::randomCount>(size, prng_threads);
+				auto randomMemP = random.updateDevice_CU(random.getAddress(), prng_threads, i, AccessMode::ReadWrite);
 				
 				DEBUG_TEXT_LEVEL1("CUDA MapPairs (MS): Kernel " << i << ", numElem = " << numElem << ", numBlocks = " << numBlocks << ", numThreads = " << numThreads);
 				
@@ -127,6 +138,7 @@ namespace skepu
 #endif // USE_PINNED_MEMORY
 				(
 					std::get<OI>(outMemP[i])->getDeviceDataPointer()...,
+					randomMemP->getDeviceDataPointer(),
 					std::get<VEI-outArity>(velwiseMemP[i])->getDeviceDataPointer()...,
 					std::get<HEI-Varity-outArity>(helwiseMemP[i])->getDeviceDataPointer()...,
 					std::get<AI-Varity-Harity-outArity>(anyMemP[i]).second...,
@@ -225,10 +237,16 @@ namespace skepu
 					const size_t numThreads = std::min(this->m_selected_spec->GPUThreads(), numElem);
 					const size_t numBlocks = std::max<size_t>(1, std::min( (numElem / numThreads + (numElem % numThreads == 0 ? 0:1)), this->m_selected_spec->GPUBlocks()));
 					
+					// PRNG support
+					size_t prng_threads = std::min<size_t>(size, numBlocks * numThreads);
+					auto random = this->template prepareRandom<MapPairsFunc::randomCount>(size, prng_threads);
+					auto randomMemP = random.updateDevice_CU(random.getAddress(), prng_threads, i, AccessMode::ReadWrite);
+					
 					DEBUG_TEXT_LEVEL1("CUDA MapPairs (MSMD): Device " << i << ", kernel = " << j << "numElem = " << numElem << ", numBlocks = " << numBlocks << ", numThreads = " << numThreads);
 					
 					this->m_cuda_kernel<<<numBlocks, numThreads, 0, this->m_environment->m_devices_CU.at(i)->m_streams[j]>>>(
 						std::get<OI>(outMemP[i][j])->getDeviceDataPointer()...,
+						randomMemP->getDeviceDataPointer(),
 						std::get<VEI-outArity>(velwiseMemP[i][j])->getDeviceDataPointer()...,
 						std::get<HEI-Varity-outArity>(helwiseMemP[i][j])->getDeviceDataPointer()...,
 						std::get<AI-Varity-Harity-outArity>(anyMemP[i][j]).second...,
@@ -292,6 +310,11 @@ namespace skepu
 				velwiseMemP[i] = std::make_tuple(std::get<VEI-outArity>(veArgs).getParent().updateDevice_CU((std::get<VEI-outArity>(veArgs) + startIdx).getAddress(), Vsize, i, AccessMode::Read)...);
 				helwiseMemP[i] = std::make_tuple(std::get<HEI-Varity-outArity>(heArgs).getParent().updateDevice_CU((std::get<HEI-Varity-outArity>(heArgs) + startIdx).getAddress(), Hsize, i, AccessMode::Read)...);
 				anyMemP[i]    = std::make_tuple(std::get<AI-Varity-Harity-outArity>(aArgs).cudaProxy(i, MapPairsFunc::anyAccessMode[AI-Varity-Harity-outArity], std::get<AI-Varity-Harity-outArity>(proxy_tags), Index1D{0})...);
+		
+				// PRNG support
+				size_t prng_threads = std::min<size_t>(size, numBlocks * numThreads);
+				auto random = this->template prepareRandom<MapPairsFunc::randomCount>(size, prng_threads);
+				auto randomMemP = random.updateDevice_CU(random.getAddress(), prng_threads, i, AccessMode::ReadWrite);
 				
 				// Launches the kernel (asynchronous)
 #ifdef USE_PINNED_MEMORY
@@ -301,6 +324,7 @@ namespace skepu
 #endif // USE_PINNED_MEMORY
 				(
 					std::get<OI>(outMemP[i])->getDeviceDataPointer()...,
+					randomMemP->getDeviceDataPointer(),
 					std::get<VEI-outArity>(velwiseMemP[i])->getDeviceDataPointer()...,
 					std::get<HEI-Varity-outArity>(helwiseMemP[i])->getDeviceDataPointer()...,
 					std::get<AI-Varity-Harity-outArity>(anyMemP[i]).second...,

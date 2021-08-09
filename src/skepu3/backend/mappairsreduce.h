@@ -17,12 +17,12 @@ namespace skepu
 		*
 		*  \brief A class representing the MapPairsReduce skeleton.
 		*/
-		template<size_t Varity, size_t Harity, typename MapPairsFunc, typename ReduceFunc, typename CUDAKernel, typename CUDAReduceKernel, typename CLKernel>
+		template<size_t Varity, size_t Harity, typename MapPairsFunc, typename ReduceFunc, typename CUDAKernel, typename CLKernel>
 		class MapPairsReduce : public SkeletonBase
 		{
 		public:
-			MapPairsReduce(CUDAKernel mappairsreduce, CUDAReduceKernel reduce)
-			: m_cuda_kernel(mappairsreduce), m_cuda_reduce_kernel(reduce)
+			MapPairsReduce(CUDAKernel mappairsreduce)
+			: m_cuda_kernel(mappairsreduce)
 			{
 #ifdef SKEPU_OPENCL
 				CLKernel::initialize();
@@ -38,7 +38,6 @@ namespace skepu
 			
 		private:
 			CUDAKernel m_cuda_kernel;
-			CUDAReduceKernel m_cuda_reduce_kernel;
 			size_t default_size_i;
 			size_t default_size_j;
 			
@@ -135,7 +134,6 @@ namespace skepu
 #endif
 				case Backend::Type::CUDA:
 #ifdef SKEPU_CUDA
-					std::cerr << "MapPairsReduce CUDA: Not implemented" << std::endl;
 					this->CUDA(0, Vsize, Hsize, oi, vei, hei, ai, ci,
 						get<OI> (std::forward<CallArgs>(args)...).begin()...,
 						get<VEI>(std::forward<CallArgs>(args)...).begin()...,
@@ -193,7 +191,7 @@ namespace skepu
 #ifdef SKEPU_CUDA
 			
 			template<size_t... OI, size_t... VEI, size_t... HEI, size_t... AI, size_t... CI, typename... CallArgs>
-			void CUDA(size_t startIdx, size_t Vsize, size_t Hsize, pack_indices<OI...> oi, pack_indices<VEI...> vei, pack_indices<HEI...> hei, pack_indices<AI...>, pack_indices<CI...>, Ret &res, CallArgs&&... args);
+			void CUDA(size_t startIdx, size_t Vsize, size_t Hsize, pack_indices<OI...> oi, pack_indices<VEI...> vei, pack_indices<HEI...> hei, pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args);
 			
 			template<size_t... OI, size_t... VEI, size_t... HEI, size_t... AI, size_t... CI, typename... CallArgs>
 			void mapPairsReduceSingleThread_CU(size_t deviceID, size_t startIdx, size_t Vsize, size_t Hsize, pack_indices<OI...> oi, pack_indices<VEI...> vei, pack_indices<HEI...> hei, pack_indices<AI...>, pack_indices<CI...>, CallArgs&&... args);
@@ -247,7 +245,7 @@ namespace skepu
 #include "impl/mappairsreduce/mappairsreduce_cpu.inl"
 #include "impl/mappairsreduce/mappairsreduce_omp.inl"
 #include "impl/mappairsreduce/mappairsreduce_cl.inl"
-//#include "impl/mappairsreduce/mappairsreduce_cu.inl"
+#include "impl/mappairsreduce/mappairsreduce_cu.inl"
 //#include "impl/mappairsreduce/mappairsreduce_hy.inl"
 
 #endif

@@ -69,12 +69,10 @@ struct add
 TEST_CASE("Rowwise zero arity mappairs reduce")
 {
 	REQUIRE_NOTHROW(
-		skepu::backend::MapPairsReduce<0,0, mappr_index, add, bool, bool, void>(
-			false,
+		skepu::backend::MapPairsReduce<0,0, mappr_index, add, bool, void>(
 			false));
 	auto mpr =
-		skepu::backend::MapPairsReduce<0,0, mappr_index, add, bool, bool, void>(
-			false,
+		skepu::backend::MapPairsReduce<0,0, mappr_index, add, bool, void>(
 			false);
 	REQUIRE_NOTHROW(mpr.setReduceMode(skepu::ReduceMode::RowWise));
 	REQUIRE_NOTHROW(mpr.setDefaultSize(0,0));
@@ -127,12 +125,10 @@ TEST_CASE("Rowwise zero arity mappairs reduce")
 TEST_CASE("Colwise zero arity mappairs reduce")
 {
 	REQUIRE_NOTHROW(
-		skepu::backend::MapPairsReduce<0,0, mappr_index, add, bool, bool, void>(
-			false,
+		skepu::backend::MapPairsReduce<0,0, mappr_index, add, bool, void>(
 			false));
 	auto mpr =
-		skepu::backend::MapPairsReduce<0,0, mappr_index, add, bool, bool, void>(
-			false,
+		skepu::backend::MapPairsReduce<0,0, mappr_index, add, bool, void>(
 			false);
 	REQUIRE_NOTHROW(mpr.setReduceMode(skepu::ReduceMode::ColWise));
 	REQUIRE_NOTHROW(mpr.setDefaultSize(0,0));
@@ -214,12 +210,10 @@ struct mappr_elwise
 TEST_CASE("Rowwise reduce with elwise map")
 {
 	REQUIRE_NOTHROW(
-		skepu::backend::MapPairsReduce<1,1, mappr_elwise, add, bool, bool, void>(
-			false,
+		skepu::backend::MapPairsReduce<1,1, mappr_elwise, add, bool, void>(
 			false));
 	auto mppr =
-		skepu::backend::MapPairsReduce<1,1, mappr_elwise, add, bool, bool, void>(
-			false,
+		skepu::backend::MapPairsReduce<1,1, mappr_elwise, add, bool, void>(
 			false);
 	REQUIRE_NOTHROW(mppr.setReduceMode(skepu::ReduceMode::RowWise));
 	REQUIRE_NOTHROW(mppr.setDefaultSize(0,0));
@@ -312,12 +306,10 @@ TEST_CASE("Rowwise reduce with elwise map")
 TEST_CASE("Colwise reduce with elwise map")
 {
 	REQUIRE_NOTHROW(
-		skepu::backend::MapPairsReduce<1,1, mappr_elwise, add, bool, bool, void>(
-			false,
+		skepu::backend::MapPairsReduce<1,1, mappr_elwise, add, bool, void>(
 			false));
 	auto mppr =
-		skepu::backend::MapPairsReduce<1,1, mappr_elwise, add, bool, bool, void>(
-			false,
+		skepu::backend::MapPairsReduce<1,1, mappr_elwise, add, bool, void>(
 			false);
 	REQUIRE_NOTHROW(mppr.setReduceMode(skepu::ReduceMode::ColWise));
 	REQUIRE_NOTHROW(mppr.setDefaultSize(0,0));
@@ -439,12 +431,10 @@ struct mult
 TEST_CASE("Multiplication reduce function")
 {
 	REQUIRE_NOTHROW(
-		skepu::backend::MapPairsReduce<0,0, mappr_index, mult, bool, bool, void>(
-			false,
+		skepu::backend::MapPairsReduce<0,0, mappr_index, mult, bool, void>(
 			false));
 	auto mppr =
-		skepu::backend::MapPairsReduce<0,0, mappr_index, mult, bool, bool, void>(
-			false,
+		skepu::backend::MapPairsReduce<0,0, mappr_index, mult, bool, void>(
 			false);
 	size_t constexpr N{100};
 	mppr.setDefaultSize(N,N);
@@ -535,11 +525,11 @@ struct multret_fn
 TEST_CASE("Multireturn rowwise")
 {
 	REQUIRE_NOTHROW(
-		skepu::backend::MapPairsReduce<1,1, multret_fn, add, bool, bool, void>(
-			false, false));
+		skepu::backend::MapPairsReduce<1,1, multret_fn, add, bool, void>(
+			false));
 	auto mappr =
-		skepu::backend::MapPairsReduce<1,1, multret_fn, add, bool, bool, void>(
-			false, false);
+		skepu::backend::MapPairsReduce<1,1, multret_fn, add, bool, void>(
+			false);
 	REQUIRE_NOTHROW(
 		mappr.setStartValue(std::tuple<int,int>{2,7}));
 

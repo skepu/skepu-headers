@@ -21,7 +21,7 @@ namespace skepu
 			const int overlap = (int)this->m_overlap;
 			const size_t size = arg.size();
 			
-			auto random = this->template prepareRandom<MapOverlapFunc::randomCount>(size);
+			auto random = this->template prepareRandom<MapOverlapFunc::randomCount>(size); // TODO: fix order and edge mode
 			
 			T start[3*overlap], end[3*overlap];
 			
@@ -49,23 +49,25 @@ namespace skepu
 			for (size_t i = 0, j = 0; i < 2*overlap; ++i, ++j)
 				end[i] = arg(j + size - 2*overlap);
 			
-			for (size_t i = 0; i < overlap; ++i)
-			{
-				auto res = F::forward(MapOverlapFunc::CPU, Index1D{i}, random, Region1D<T>{overlap, 1, &start[i + overlap]}, get<AI>(std::forward<CallArgs>(args)...).hostProxy()..., get<CI>(std::forward<CallArgs>(args)...)...);
-				SKEPU_VARIADIC_RETURN(get<OI>(std::forward<CallArgs>(args)...)(i)..., res);
-			}
-				
+			if (this->m_edge != Edge::None)
+				for (size_t i = 0; i < overlap; ++i)
+				{
+					auto res = F::forward(MapOverlapFunc::CPU, Index1D{i}, random, Region1D<T>{overlap, 1, &start[i + overlap]}, get<AI>(std::forward<CallArgs>(args)...).hostProxy()..., get<CI>(std::forward<CallArgs>(args)...)...);
+					SKEPU_VARIADIC_RETURN(get<OI>(std::forward<CallArgs>(args)...)(i)..., res);
+				}
+			
 			for (size_t i = overlap; i < size - overlap; ++i)
 			{
 				auto res = F::forward(MapOverlapFunc::CPU, Index1D{i}, random, Region1D<T>{overlap, 1, arg.getAddress() + i}, get<AI>(std::forward<CallArgs>(args)...).hostProxy()..., get<CI>(std::forward<CallArgs>(args)...)...);
 				SKEPU_VARIADIC_RETURN(get<OI>(std::forward<CallArgs>(args)...)(i)..., res);
 			}
-				
-			for (size_t i = size - overlap; i < size; ++i)
-			{
-				auto res = F::forward(MapOverlapFunc::CPU, Index1D{i}, random, Region1D<T>{overlap, 1, &end[i + 2 * overlap - size]}, get<AI>(std::forward<CallArgs>(args)...).hostProxy()..., get<CI>(std::forward<CallArgs>(args)...)...);
-				SKEPU_VARIADIC_RETURN(get<OI>(std::forward<CallArgs>(args)...)(i)..., res);
-			}
+			
+			if (this->m_edge != Edge::None)
+				for (size_t i = size - overlap; i < size; ++i)
+				{
+					auto res = F::forward(MapOverlapFunc::CPU, Index1D{i}, random, Region1D<T>{overlap, 1, &end[i + 2 * overlap - size]}, get<AI>(std::forward<CallArgs>(args)...).hostProxy()..., get<CI>(std::forward<CallArgs>(args)...)...);
+					SKEPU_VARIADIC_RETURN(get<OI>(std::forward<CallArgs>(args)...)(i)..., res);
+				}
 		}
 		
 		
@@ -92,6 +94,7 @@ namespace skepu
 			const T *inputBegin = arg.getAddress();
 			const T *inputEnd = inputBegin + size;
 			
+			size_t final_size = arg.total_cols() * colWidth;
 			auto random = this->template prepareRandom<MapOverlapFunc::randomCount>(colWidth);
 			
 			for (size_t col = 0; col < arg.total_cols(); ++col)
@@ -171,7 +174,8 @@ namespace skepu
 			const T *inputBegin = arg.getAddress();
 			const T *inputEnd = inputBegin + size;
 			
-			auto random = this->template prepareRandom<MapOverlapFunc::randomCount>(rowWidth);
+			size_t final_size = arg.total_rows() * rowWidth;
+			auto random = this->template prepareRandom<MapOverlapFunc::randomCount>(final_size);
 			
 			for (size_t row = 0; row < arg.total_rows(); ++row)
 			{

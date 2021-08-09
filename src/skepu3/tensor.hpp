@@ -166,7 +166,10 @@ namespace skepu
 		
 		// These do nothing special for now
 		iterator stridedBegin(size_t, int) { return this->begin(); };
-		const_iterator begin(size_t, int) const { return this->begin(); };
+		const_iterator begin(size_t, int) const
+		{
+			return const_iterator(*this, &Vector<T>::m_data[0]);
+		}
 		
 		template<typename Ignore>
 		proxy_type hostProxy(ProxyTag::Default, Ignore)
@@ -507,7 +510,10 @@ namespace skepu
 		
 		// These do nothing special for now
 		iterator stridedBegin(size_t, int) { return this->begin(); };
-		const_iterator begin(size_t, int) const { return this->begin(); };
+		const_iterator begin(size_t, int) const
+		{
+			return const_iterator(*this, &Vector<T>::m_data[0]);
+		};
 		
 		template<typename Ignore>
 		proxy_type hostProxy(ProxyTag::Default, Ignore)

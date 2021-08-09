@@ -29,6 +29,8 @@
 #include <skepu3/cluster/containers/vector/vector.hpp>
 #include <skepu3/cluster/containers/tensor3/tensor3.hpp>
 #include <skepu3/cluster/containers/tensor4/tensor4.hpp>
+#include <skepu3/impl/random.hpp>
+#include <skepu3/impl/stride_list.hpp>
 #include <skepu3/cluster/skeletons/map/map.hpp>
 #include <skepu3/cluster/skeletons/map/mapoverlap.hpp>
 #include <skepu3/cluster/skeletons/map/mappairs.hpp>

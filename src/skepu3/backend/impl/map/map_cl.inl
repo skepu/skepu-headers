@@ -43,7 +43,7 @@ namespace skepu
 				// Copies the elements to the device
 				auto elwiseMemP = std::make_tuple(get<EI>(std::forward<CallArgs>(args)...).getParent().updateDevice_CL(get<EI>(std::forward<CallArgs>(args)...).getAddress() + baseIndex, numElem * abs(this->m_strides[EI]), device, true)...);
 				auto anyMemP    = std::make_tuple(cl_helpers::randomAccessArg(get<AI>(std::forward<CallArgs>(args)...).getParent(), device, hasReadAccess(MapFunc::anyAccessMode[AI-arity-outArity]))...);
-				auto outMemP    = std::make_tuple(get<OI>(std::forward<CallArgs>(args)...).getParent().updateDevice_CL(get<OI>(std::forward<CallArgs>(args)...).getAddress() + baseIndex, numElem * abs(this->m_strides[OI]), device, false)...);
+				auto outMemP    = std::make_tuple(get<OI>(std::forward<CallArgs>(args)...).getParent().updateDevice_CL(get<OI>(std::forward<CallArgs>(args)...).getAddress() + baseIndex, numElem * abs(this->m_strides[OI]), device, abs(this->m_strides[OI]) != 1 /* upload if not unit stride */)...);
 			
 				size_t threads = std::min<size_t>(size, numBlocks * numThreads);
 				auto random = this->template prepareRandom_CL<MapFunc::randomCount>(size, threads);

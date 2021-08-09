@@ -355,8 +355,8 @@ inline void Matrix<T>::invalidateDeviceData(bool enable) const
 #endif
 
 #ifdef SKEPU_CUDA
-   if(m_noValidDeviceCopy)
-       assert(m_valid);
+//   if(m_noValidDeviceCopy)
+//       assert(m_valid);
    
    if(!m_noValidDeviceCopy)
    {

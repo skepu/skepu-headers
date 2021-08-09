@@ -46,6 +46,7 @@ RGBPixel convolution_kernel_rgb(skepu::Region1D<RGBPixel> in, skepu::Vec<float> 
 	float g = 0;
 	float b = 0;
 	
+	
 	for (int i = -in.oi; i <= in.oi; i++)
 	{
 		RGBPixel p = in(i);
@@ -81,7 +82,7 @@ GrayscalePixel distance_kernel(GrayscalePixel x, GrayscalePixel y)
 
 
 // Kernel for filter with raduis R
-RGBPixel median_kernel(skepu::Region2D<RGBPixel> image, size_t elemPerPx)
+RGBPixel median_kernel(skepu::Region2D<RGBPixel> image)
 {
 	long fineHistogram[3][256], coarseHistogram[3][16];
 	
@@ -95,7 +96,7 @@ RGBPixel median_kernel(skepu::Region2D<RGBPixel> image, size_t elemPerPx)
 	
 	for (int row = -image.oi; row <= image.oi; row++)
 	{
-		for (int column = -image.oj; column <= image.oj; column += elemPerPx)
+		for (int column = -image.oj; column <= image.oj; column++)
 		{ 
 			unsigned char imageValue = image(row, column).r;
 			fineHistogram[0][imageValue]++;

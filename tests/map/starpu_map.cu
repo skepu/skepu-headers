@@ -2,11 +2,13 @@
 #include <cuda.h>
 
 #define SKEPU_CUDA
-#include <skepu3/cluster/skeletons/map/map.hpp>
 #include <skepu3/cluster/containers/matrix/matrix.hpp>
 #include <skepu3/cluster/containers/vector/vector.hpp>
 #include <skepu3/cluster/containers/tensor3/tensor3.hpp>
 #include <skepu3/cluster/containers/tensor4/tensor4.hpp>
+#include <skepu3/impl/random.hpp>
+#include <skepu3/impl/stride_list.hpp>
+#include <skepu3/cluster/skeletons/map/map.hpp>
 
 struct simple_map_fn
 {
@@ -48,9 +50,11 @@ __managed__ bool simple_map_fn_cu_called;
 __global__
 void simple_map_fn_kernel(
 	int * res,
+	skepu::PRNG::Placeholder,
 	size_t, size_t, size_t,
 	size_t count,
-	size_t)
+	size_t,
+	skepu::StrideList<1> skepu_strides)
 {
 	for(size_t i{0}; i < count; ++i)
 		res[i] = simple_map_fn::CU();

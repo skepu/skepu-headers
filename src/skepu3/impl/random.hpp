@@ -1,6 +1,6 @@
+#pragma once
 
-#define SKEPU_DEBUG_PRNG
-//#define SKEPU_PRNG_VERIFY_FORWARD
+#define SKEPU_PRNG_PLACEHOLDER {}
 
 namespace skepu
 {	
@@ -40,6 +40,9 @@ namespace skepu
 #endif
 		{}
 		
+#ifdef SKEPU_CUDA
+	__host__ __device__
+#endif
 		State get()
 		{
 #ifdef SKEPU_PRNG_VERIFY_FORWARD
@@ -60,6 +63,9 @@ namespace skepu
 #endif
 		}
 		
+#ifdef SKEPU_CUDA
+	__host__ __device__
+#endif
 		Normalized getNormalized()
 		{
 			return (Normalized)this->get() / RND_MOD;
@@ -93,6 +99,8 @@ namespace skepu
 		struct Placeholder {
 			Placeholder operator()(size_t) { return {}; };
 			Placeholder updateDevice_CL(int, int, void*, bool) { return {}; }
+			Placeholder* updateDevice_CU(int, size_t, size_t, AccessMode, bool = false, size_t = 0) { return this; }
+			Placeholder getDeviceDataPointer() { return {}; }
 			int getAddress() { return 0; }
 		};
 		
@@ -196,7 +204,7 @@ namespace skepu
 	
 	/* METAPROGRAMMING */
 
-#define SKEPU_NO_RANDOM -1
+#define SKEPU_NO_RANDOM ((size_t)-1)
 	
 	
 	// Check if type is skepu::Random
@@ -212,7 +220,7 @@ namespace skepu
 	
 	// Get random count from type
 	template<typename... Ts>
-	struct get_random_count: std::integral_constant<int, SKEPU_NO_RANDOM> {};
+	struct get_random_count: std::integral_constant<size_t, SKEPU_NO_RANDOM> {};
 	
 	template<typename T, typename... Ts>
 	struct get_random_count<T, Ts...>: get_random_count<Ts...> {};

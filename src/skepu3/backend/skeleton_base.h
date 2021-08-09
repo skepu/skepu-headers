@@ -107,7 +107,7 @@ namespace skepu
 			{
 				if (this->m_prng == nullptr)
 					SKEPU_ERROR("No random stream set in skeleton instance");
-				return this->m_prng->template asRandom<randomCount>(size, copies);
+				return this->m_prng->template asRandom<randomCount>(size, copies, atomic_size);
 			}
 			
 			template<size_t randomCount, REQUIRES(randomCount == SKEPU_NO_RANDOM)>

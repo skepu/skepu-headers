@@ -131,7 +131,6 @@ template<
 		typename MapFunc,
 		typename ReduceFunc,
 		typename CUDAKernel,
-		typename CUDAReduceKernel,
 		typename CLKernel>
 class MapPairsReduce
 : private cluster::skeleton_task<
@@ -212,7 +211,7 @@ class MapPairsReduce
 public:
 	static constexpr auto skeletonType = SkeletonType::MapPairsReduce;
 
-	MapPairsReduce(CUDAKernel, CUDAReduceKernel)
+	MapPairsReduce(CUDAKernel)
 	: rowwise_task("MapPairsReduce RowWise"),
 		colwise_task("MapPairsReduce ColWise"),
 		default_size_i(0),
@@ -295,18 +294,16 @@ private:
 		pack_indices<PI...>,
 		CallArgs &&... args) noexcept
 	{
-		size_t Vsize =
-			get_noref<0>(get_noref<VEI>(args...).size()..., default_size_i);
-		size_t Hsize =
-			get_noref<0>(get_noref<HEI>(args...).size()..., default_size_j);
+		size_t Vsize = get<0>(get<VEI>(std::forward<CallArgs>(args)...).size()..., this->default_size_i);
+		size_t Hsize = get<0>(get<HEI>(std::forward<CallArgs>(args)...).size()..., this->default_size_j);
 
-		if(disjunction((get<OI>(args...).size() < Vsize)...))
+		if(disjunction((get<OI>(std::forward<CallArgs>(args)...).size() < Vsize)...))
 			SKEPU_ERROR("Non-matching output container size");
 
-		if(disjunction((get<VEI, CallArgs...>(args...).size() < Vsize)...))
+		if(disjunction((get<VEI>(std::forward<CallArgs>(args)...).size() < Vsize)...))
 			SKEPU_ERROR("Non-matching container sizes");
 
-		if(disjunction((get<HEI, CallArgs...>(args...).size() < Hsize)...))
+		if(disjunction((get<HEI>(std::forward<CallArgs>(args)...).size() < Hsize)...))
 			SKEPU_ERROR("Non-matching container sizes");
 
 		// Filters are not supported here, make sure containers are not filtered...
@@ -370,18 +367,16 @@ private:
 		pack_indices<PI...>,
 		CallArgs &&... args) noexcept
 	{
-		size_t Vsize =
-			get_noref<0>(get_noref<VEI>(args...).size()..., default_size_i);
-		size_t Hsize =
-			get_noref<0>(get_noref<HEI>(args...).size()..., default_size_j);
+		size_t Vsize = get<0>(get<VEI>(std::forward<CallArgs>(args)...).size()..., this->default_size_i);
+		size_t Hsize = get<0>(get<HEI>(std::forward<CallArgs>(args)...).size()..., this->default_size_j);
 
-		if(disjunction((get<OI>(args...).size() < Hsize)...))
+		if(disjunction((get<OI>(std::forward<CallArgs>(args)...).size() < Hsize)...))
 			SKEPU_ERROR("Non-matching output container size");
 
-		if(disjunction((get<VEI, CallArgs...>(args...).size() < Vsize)...))
+		if(disjunction((get<VEI>(std::forward<CallArgs>(args)...).size() < Vsize)...))
 			SKEPU_ERROR("Non-matching container sizes");
 
-		if(disjunction((get<HEI, CallArgs...>(args...).size() < Hsize)...))
+		if(disjunction((get<HEI>(std::forward<CallArgs>(args)...).size() < Hsize)...))
 			SKEPU_ERROR("Non-matching container sizes");
 
 		pack_expand(

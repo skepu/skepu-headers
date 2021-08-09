@@ -433,7 +433,7 @@ private:
 			std::forward<decltype(get<EI>(args...))>(get<EI>(args...))...,
 			std::tie(get<CI>(args...)...),
 			std::forward<decltype(get<UI>(args...))>(get<UI>(args...))...);
-	};
+	}
 
 	template<
 		size_t ... RI,
@@ -455,15 +455,15 @@ private:
 	{
 		static_assert(
 			conjunction(
-				is_skepu_vector<std::tuple_element<CI, decltype(res)>>::value...),
-			"[SkePU][MapOverlap][operator(skepu::Matrix ...)] "
-			"All result containers must be of type skepu::Matrix.");
+				is_skepu_vector<typename std::tuple_element<RI, decltype(res)>::type>::value...),
+			"[SkePU][MapOverlap][operator(skepu::Vector ...)] "
+			"All result containers must be of type skepu::Vector.");
 		static_assert(
 			conjunction(
 				std::is_same<
-					typename std::tuple_element<CI, decltype(res)>::type::value_type,
-					typename std::tuple_element<CI, ResultArgs>::type>::value...),
-			"[SkePU][MapOverlap][operator(skepu::Matrix ...)] "
+					typename std::decay<typename std::tuple_element<RI, decltype(res)>::type>::type::value_type,
+					typename std::tuple_element<RI, ResultArgs>::type>::value...),
+			"[SkePU][MapOverlap][operator(skepu::Vector ...)] "
 			"Output container types does not match the return types of the user "
 			"function");
 		static_assert(
@@ -557,14 +557,14 @@ private:
 	{
 		static_assert(
 			conjunction(
-				is_skepu_matrix<std::tuple_element<CI, decltype(res)>>::value...),
+				is_skepu_matrix<typename std::tuple_element<RI, decltype(res)>::type>::value...),
 			"[SkePU][MapOverlap][operator(skepu::Matrix ...)] "
 			"All result containers must be of type skepu::Matrix.");
 		static_assert(
 			conjunction(
 				std::is_same<
-					typename std::tuple_element<CI, decltype(res)>::type::value_type,
-					typename std::tuple_element<CI, ResultArgs>::type>::value...),
+					typename std::decay<typename std::tuple_element<RI, decltype(res)>::type>::type::value_type,
+					typename std::tuple_element<RI, ResultArgs>::type>::value...),
 			"[SkePU][MapOverlap][operator(skepu::Matrix ...)] "
 			"Output container types does not match the return types of the user "
 			"function");
@@ -664,9 +664,9 @@ private:
 		arg_ref.partition();
 
 		pack_expand((
-			cont::getParent(get<CI>(args...)).filter(0),
-			handle_container_arg(
-				cont::getParent(get<CI>(args...)),
+			cont::getParent(std::get<CI>(containers)).filter(0),
+			matrix_task::handle_container_arg(
+				cont::getParent(std::get<CI>(containers)),
 				std::get<CI>(proxy_tags)),
 			0)...);
 
@@ -690,9 +690,10 @@ private:
 				std::make_tuple(
 					std::get<RI>(res_parts).handle_for_row(row)...,
 					arg_ref.handle_for_row(row),
-					container_handle(
+					matrix_task::container_handle(
 						std::get<CI>(containers),
-						std::get<CI>(proxy_tags))...);
+						std::get<CI>(proxy_tags),
+						row)...);
 
 			matrix_task::schedule(
 				handles,

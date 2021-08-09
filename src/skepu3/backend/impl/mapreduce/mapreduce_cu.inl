@@ -24,17 +24,23 @@ namespace skepu
 			auto eArgs  = std::forward_as_tuple(get<EI>(std::forward<CallArgs>(args)...)...);
 			auto aArgs  = std::forward_as_tuple(get<AI>(std::forward<CallArgs>(args)...)...);
 			auto scArgs = std::forward_as_tuple(get<CI>(std::forward<CallArgs>(args)...)...);
+			static constexpr auto proxy_tags = typename MapFunc::ProxyTags{};
 			
 			// Number of threads per block, taken from NVIDIA source
 			size_t numBlocks, numThreads;
 			std::tie(numThreads, numBlocks) = getNumBlocksAndThreads(size, this->m_selected_spec->GPUBlocks(), this->m_selected_spec->GPUThreads());
 			
-			auto elwiseMemP = std::make_tuple(std::get<EI>(eArgs).getParent().updateDevice_CU(std::get<EI>(eArgs).getAddress() + startIdx, size, deviceID, AccessMode::Read)...);
-			auto anyMemP    = std::make_tuple(std::get<AI-arity>(aArgs).cudaProxy(deviceID, MapFunc::anyAccessMode[AI-arity])...);
+			auto elwiseMemP = std::make_tuple(std::get<EI>(eArgs).getParent().updateDevice_CU(std::get<EI>(eArgs).getAddress() + startIdx, size * abs(this->m_strides[EI]), deviceID, AccessMode::Read)...);
+			auto anyMemP    = std::make_tuple(std::get<AI-arity>(aArgs).cudaProxy(deviceID, MapFunc::anyAccessMode[AI-arity], std::get<AI-arity>(proxy_tags), Index1D{0})...);
 			
 			// Create the output memory
 			DeviceMemPointer_CU<Ret> outMemP(&res, numBlocks, device);
 			Ret *d_odata = outMemP.getDeviceDataPointer();
+			
+			// PRNG support
+			size_t prng_threads = std::min<size_t>(size, numBlocks * numThreads);
+			auto random = this->template prepareRandom<MapFunc::randomCount>(size, prng_threads);
+			auto randomMemP = random.updateDevice_CU(random.getAddress(), prng_threads, deviceID, AccessMode::ReadWrite);
 			
 			// First map and reduce all elements blockwise so that each block produces one element. After this the mapping is complete
 			const size_t sharedMemSize = (numThreads <= 32) ? 2 * numThreads * sizeof(Ret) : numThreads * sizeof(Ret);
@@ -48,12 +54,12 @@ namespace skepu
 #endif
 			(
 				d_odata,
+				randomMemP->getDeviceDataPointer(),
 				std::get<EI>(elwiseMemP)->getDeviceDataPointer()...,
 				std::get<AI-arity>(anyMemP).second...,
 				std::get<CI-arity-anyArity>(scArgs)...,
 				elwise_j(eArgs), elwise_k(eArgs), elwise_l(eArgs),
-				size,
-				startIdx
+				size, startIdx, this->m_strides
 			);
 			
 			size_t threads, blocks;
@@ -95,6 +101,7 @@ namespace skepu
 			auto eArgs  = std::forward_as_tuple(get<EI>(std::forward<CallArgs>(args)...)...);
 			auto aArgs  = std::forward_as_tuple(get<AI>(std::forward<CallArgs>(args)...)...);
 			auto scArgs = std::forward_as_tuple(get<CI>(std::forward<CallArgs>(args)...)...);
+			static constexpr auto proxy_tags = typename MapFunc::ProxyTags{};
 			
 			Ret result[numKernels];
 			typename to_device_pointer_cu<decltype(eArgs)>::type elwiseMemP[numKernels];
@@ -113,8 +120,8 @@ namespace skepu
 				
 				DEBUG_TEXT_LEVEL1("CUDA MapReduce: Kernel " << i << ", numElem = " << numElem << ", numBlocks = " << numBlocks[i] << ", numThreads = " << numThreads[i]);
 				
-				elwiseMemP[i] = std::make_tuple(std::get<EI>(eArgs).getParent().updateDevice_CU(std::get<EI>(eArgs).getAddress() + baseIndex, numElem, deviceID, AccessMode::None, false, i)...);
-				anyMemP[i]    = std::make_tuple(std::get<AI-arity>(aArgs).cudaProxy(deviceID, AccessMode::None, false, i)...);
+				elwiseMemP[i] = std::make_tuple(std::get<EI>(eArgs).getParent().updateDevice_CU(std::get<EI>(eArgs).getAddress() + baseIndex, numElem * abs(this->m_strides[EI]), deviceID, AccessMode::None, false, i)...);
+				anyMemP[i]    = std::make_tuple(std::get<AI-arity>(aArgs).cudaProxy(deviceID, AccessMode::None, std::get<AI-arity>(proxy_tags), Index1D{i})...);
 				outMemP[i] = new DeviceMemPointer_CU<Ret>(&result[i], numBlocks[i], m_environment->m_devices_CU.at(deviceID));
 			}
 
@@ -125,8 +132,8 @@ namespace skepu
 				const size_t numElem = numElemPerSlice + ((i == numKernels-1) ? rest : 0);
 				const size_t baseIndex = startIdx + i * numElemPerSlice;
 			
-				elwiseMemP[i] = std::make_tuple(std::get<EI>(eArgs).getParent().updateDevice_CU(std::get<EI>(eArgs).getAddress() + baseIndex, numElem, deviceID, AccessMode::Read, false, i)...);
-				anyMemP[i] = std::make_tuple(std::get<AI-arity>(aArgs).cudaProxy(deviceID, MapFunc::anyAccessMode[AI-arity], false, i)...);
+				elwiseMemP[i] = std::make_tuple(std::get<EI>(eArgs).getParent().updateDevice_CU(std::get<EI>(eArgs).getAddress() + baseIndex, numElem * abs(this->m_strides[EI]), deviceID, AccessMode::Read, false, i)...);
+				anyMemP[i] = std::make_tuple(std::get<AI-arity>(aArgs).cudaProxy(deviceID, MapFunc::anyAccessMode[AI-arity], std::get<AI-arity>(proxy_tags), Index1D{i})...);
 			}
 
 			// Kernel executions
@@ -136,6 +143,11 @@ namespace skepu
 				const size_t baseIndex = startIdx + i * numElemPerSlice;
 				const size_t sharedMemSize = (numThreads[i] <= 32) ? 2 * numThreads[i] * sizeof(Ret) : numThreads[i] * sizeof(Ret);
 				Ret *deviceOutMemP = outMemP[i]->getDeviceDataPointer();
+				
+				// PRNG support
+				size_t prng_threads = std::min<size_t>(size, numBlocks[i] * numThreads[i]);
+				auto random = this->template prepareRandom<MapFunc::randomCount>(size, prng_threads);
+				auto randomMemP = random.updateDevice_CU(random.getAddress(), prng_threads, deviceID, AccessMode::ReadWrite);
 
 #ifdef USE_PINNED_MEMORY
 				this->m_cuda_kernel<<<numBlocks[i], numThreads[i], sharedMemSize, device->m_streams[i]>>>
@@ -144,12 +156,12 @@ namespace skepu
 #endif
 				(
 					deviceOutMemP,
+					randomMemP->getDeviceDataPointer(),
 					std::get<EI>(elwiseMemP[i])->getDeviceDataPointer()...,
 					std::get<AI-arity>(anyMemP[i]).second...,
 					std::get<CI-arity-anyArity>(scArgs)...,
 					elwise_j(eArgs), elwise_k(eArgs), elwise_l(eArgs),
-					numElem,
-					baseIndex
+					numElem, baseIndex, this->m_strides
 				);
 				
 				size_t threads, blocks;
@@ -199,6 +211,7 @@ namespace skepu
 			auto eArgs  = std::forward_as_tuple(get<EI>(std::forward<CallArgs>(args)...)...);
 			auto aArgs  = std::forward_as_tuple(get<AI>(std::forward<CallArgs>(args)...)...);
 			auto scArgs = std::forward_as_tuple(get<CI>(std::forward<CallArgs>(args)...)...);
+			static constexpr auto proxy_tags = typename MapFunc::ProxyTags{};
 			
 			for (size_t i = 0; i < useNumGPU; ++i)
 			{
@@ -232,8 +245,8 @@ namespace skepu
 					
 					DEBUG_TEXT_LEVEL1("CUDA MapReduce: Device " << i << ", kernel = " << j << "numElem = " << numElem << ", numBlocks = " << numBlocks[i][j] << ", numThreads = " << numThreads[i][j]);
 					
-					elwiseMemP[i][j] = std::make_tuple(std::get<EI>(eArgs).getParent().updateDevice_CU((std::get<EI>(eArgs) + baseIndex).getAddress(), numElem, i, AccessMode::None, false, j)...);
-					anyMemP[i][j] = std::make_tuple(std::get<AI-arity>(aArgs).cudaProxy(i, AccessMode::None, false, j)...);
+					elwiseMemP[i][j] = std::make_tuple(std::get<EI>(eArgs).getParent().updateDevice_CU((std::get<EI>(eArgs) + baseIndex).getAddress(), numElem * abs(this->m_strides[EI]), i, AccessMode::None, false, j)...);
+					anyMemP[i][j] = std::make_tuple(std::get<AI-arity>(aArgs).cudaProxy(i, AccessMode::None, , std::get<AI-arity>(proxy_tags), Index1D{j})...);
 					outMemP[i][j] = new DeviceMemPointer_CU<Ret>(&result[i][j], numBlocks[i][j], m_environment->m_devices_CU.at(i));
 				}
 			}
@@ -247,8 +260,8 @@ namespace skepu
 					const size_t numElem = numElemPerStream[i] + ((j == numKernels[i]-1) ? streamRest[i] : 0);
 					const size_t baseIndex = startIdx + i * numElemPerDevice + j * numElemPerStream[i];
 					
-					elwiseMemP[i][j] = std::make_tuple(std::get<EI>(eArgs).getParent().updateDevice_CU((std::get<EI>(eArgs) + baseIndex).getAddress(), numElem, i, AccessMode::Read, false, j)...);
-					anyMemP[i][j]    = std::make_tuple(std::get<AI-arity>(aArgs).cudaProxy(i, MapFunc::anyAccessMode[AI-arity], false, j)...);
+					elwiseMemP[i][j] = std::make_tuple(std::get<EI>(eArgs).getParent().updateDevice_CU((std::get<EI>(eArgs) + baseIndex).getAddress(), numElem * abs(this->m_strides[EI]), i, AccessMode::Read, false, j)...);
+					anyMemP[i][j]    = std::make_tuple(std::get<AI-arity>(aArgs).cudaProxy(i, MapFunc::anyAccessMode[AI-arity], std::get<AI-arity>(proxy_tags), Index1D{j})...);
 				}
 			}
 			
@@ -263,14 +276,20 @@ namespace skepu
 					const size_t sharedMemSize = (numThreads[i][j] <= 32) ? 2 * numThreads[i][j] * sizeof(Ret) : numThreads[i][j] * sizeof(Ret);
 					Ret *deviceOutMemP = outMemP[i][j]->getDeviceDataPointer();
 					
+					// PRNG support
+					size_t prng_threads = std::min<size_t>(size, numBlocks * numThreads);
+					auto random = this->template prepareRandom<MapFunc::randomCount>(size, prng_threads);
+					auto randomMemP = random.updateDevice_CU(random.getAddress(), prng_threads, i, AccessMode::ReadWrite);
+					
 					this->m_cuda_kernel<<<numBlocks[i][j], numThreads[i][j], sharedMemSize, this->m_environment->m_devices_CU[i]->m_streams[j]>>>
 					(
 						deviceOutMemP,
+						randomMemP->getDeviceDataPointer(),
 						std::get<EI>(elwiseMemP[i][j])->getDeviceDataPointer()...,
 						std::get<AI-arity>(anyMemP[i][j]).second...,
 						std::get<CI-arity-anyArity>(scArgs)...,
 						elwise_j(eArgs), elwise_k(eArgs), elwise_l(eArgs),
-						numElem, baseIndex
+						numElem, baseIndex, this->m_strides
 					);
 					
 					size_t threads, blocks;
@@ -315,6 +334,7 @@ namespace skepu
 			auto eArgs  = std::forward_as_tuple(get<EI>(std::forward<CallArgs>(args)...)...);
 			auto aArgs  = std::forward_as_tuple(get<AI>(std::forward<CallArgs>(args)...)...);
 			auto scArgs = std::forward_as_tuple(get<CI>(std::forward<CallArgs>(args)...)...);
+			static constexpr auto proxy_tags = typename MapFunc::ProxyTags{};
 			
 			typename to_device_pointer_cu<decltype(eArgs)>::type elwiseMemP[MAX_GPU_DEVICES];
 			typename to_proxy_cu<typename MapFunc::ProxyTags, decltype(aArgs)>::type anyMemP[MAX_GPU_DEVICES];
@@ -335,8 +355,8 @@ namespace skepu
 				
 				DEBUG_TEXT_LEVEL1("CUDA MapReduce: device " << i << ", numElem = " << numElem << ", numBlocks = " << numBlocks[i] << ", numThreads = " << numThreads[i]);
 				
-				elwiseMemP[i] = std::make_tuple(std::get<EI>(eArgs).getParent().updateDevice_CU((std::get<EI>(eArgs) + baseIndex).getAddress(), numElem, i, AccessMode::None)...);
-				anyMemP[i]    = std::make_tuple(std::get<AI-arity>(aArgs).cudaProxy(i, AccessMode::None)...);
+				elwiseMemP[i] = std::make_tuple(std::get<EI>(eArgs).getParent().updateDevice_CU((std::get<EI>(eArgs) + baseIndex).getAddress(), numElem * abs(this->m_strides[EI]), i, AccessMode::None)...);
+				anyMemP[i]    = std::make_tuple(std::get<AI-arity>(aArgs).cudaProxy(i, AccessMode::None, std::get<AI-arity>(proxy_tags), Index1D{i})...);
 				outMemP[i] = new DeviceMemPointer_CU<Ret>(&result[i], numBlocks[i], this->m_environment->m_devices_CU[i]);
 			}
 			
@@ -349,9 +369,14 @@ namespace skepu
 				const size_t sharedMemSize = (numThreads[i] <= 32) ? 2 * numThreads[i] * sizeof(Ret) : numThreads[i] * sizeof(Ret);
 				Ret *deviceOutMemP = outMemP[i]->getDeviceDataPointer();
 				
+				// PRNG support
+				size_t prng_threads = std::min<size_t>(size, numBlocks[i] * numThreads[i]);
+				auto random = this->template prepareRandom<MapFunc::randomCount>(size, prng_threads);
+				auto randomMemP = random.updateDevice_CU(random.getAddress(), prng_threads, i, AccessMode::ReadWrite);
+				
 				// Copies the elements to the device
-				elwiseMemP[i] = std::make_tuple(std::get<EI>(eArgs).getParent().updateDevice_CU((std::get<EI>(eArgs) + baseIndex).getAddress(), numElem, i, AccessMode::Read)...);
-				anyMemP[i] = std::make_tuple(std::get<AI-arity>(aArgs).cudaProxy(i, MapFunc::anyAccessMode[AI-arity])...);
+				elwiseMemP[i] = std::make_tuple(std::get<EI>(eArgs).getParent().updateDevice_CU((std::get<EI>(eArgs) + baseIndex).getAddress(), numElem * abs(this->m_strides[EI]), i, AccessMode::Read)...);
+				anyMemP[i] = std::make_tuple(std::get<AI-arity>(aArgs).cudaProxy(i, MapFunc::anyAccessMode[AI-arity], std::get<AI-arity>(proxy_tags), Index1D{i})...);
 				
 				// First map and reduce all elements blockwise so that each block produces one element. After this the mapping is complete
 #ifdef USE_PINNED_MEMORY
@@ -361,12 +386,12 @@ namespace skepu
 #endif
 				(
 					deviceOutMemP,
+					randomMemP->getDeviceDataPointer(),
 					std::get<EI>(elwiseMemP[i])->getDeviceDataPointer()...,
 					std::get<AI-arity>(anyMemP[i]).second...,
 					std::get<CI-arity-anyArity>(scArgs)...,
 					elwise_j(eArgs), elwise_k(eArgs), elwise_l(eArgs),
-					numElem,
-					baseIndex
+					numElem, baseIndex, this->m_strides
 				);
 				
 				size_t threads, blocks;

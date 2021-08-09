@@ -89,28 +89,16 @@ namespace skepu
 			pad(arg_pad),
 			data(mat.getAddress())
 		{}
-			
-	/*	Region2D(const Region2D &copy)
-		:	oi(copy.oi), oj(copy.oj),
-			size_i(copy.size_i), size_j(copy.size_j),
-			stride(copy.stride),
-			edge(copy.edge),
-			pad(copy.pad),
-			data(copy.data)
-		{
-			std::cout << "Created a copy!\n";
-		}*/
 
 // For CUDA kernel
 #ifdef SKEPU_CUDA
 		__host__ __device__
 #endif
-		Region2D(int arg_oj, int arg_oi, size_t arg_stride, T *arg_data)
+		Region2D(int arg_oi, int arg_oj, size_t arg_stride, T *arg_data)
 		:	oi(arg_oi), oj(arg_oj),
-			size_i(static_cast<size_t>(-1)), size_j(static_cast<size_t>(-1)),
+			size_i(0), size_j(0), // unused
 			stride(arg_stride),
 			edge(Edge::None),
-			pad(0),
 			data(arg_data),
 			idx{0,0}
 		{}
@@ -162,9 +150,6 @@ namespace skepu
 			}
 		}
 		
-#ifdef SKEPU_CUDA
-		__host__ __device__
-#endif
 		Region3D(Tensor3<T> const& ten, int arg_oi, int arg_oj, int arg_ok, Edge arg_edge, T arg_pad)
 		:	oi(arg_oi), oj(arg_oj), ok(arg_ok),
 			size_i(ten.size_i()), size_j(ten.size_j()), size_k(ten.size_k()),
@@ -174,6 +159,19 @@ namespace skepu
 			edge(arg_edge),
 			pad(arg_pad),
 			data(ten.getAddress())
+		{}
+			
+		// For CUDA kernel
+#ifdef SKEPU_CUDA
+		__host__ __device__
+#endif
+		Region3D(int arg_oi, int arg_oj, int arg_ok, size_t arg_stride1, size_t arg_stride2, T *arg_data)
+		:	oi(arg_oi), oj(arg_oj), ok(arg_ok),
+			size_i(0), size_j(0), size_k(0), // unused
+			stride1(arg_stride1), stride2(arg_stride2),
+			edge(Edge::None),
+			data(arg_data),
+			idx{0,0,0}
 		{}
 	};
 	

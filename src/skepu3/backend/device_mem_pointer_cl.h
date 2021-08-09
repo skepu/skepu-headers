@@ -92,6 +92,7 @@ namespace skepu
 #endif
 			
 			cl_int err;
+			assert(numElements > 0);
 			size_t sizeVec = numElements * sizeof(T);
 			m_deviceDataPointer = clCreateBuffer(m_device->getContext(), CL_MEM_READ_WRITE, sizeVec, NULL, &err);
 			CL_CHECK_ERROR(err, "Error allocating memory on OpenCL device, size: ", sizeVec);

@@ -88,9 +88,12 @@ struct map
 		size_t size_j = begin.getParent().size_j();
 		size_t size_k = begin.getParent().size_k();
 		size_t size_l = begin.getParent().size_l();
+		
+		StrideList<sizeof...(RI) + sizeof...(EI)> strides{};
 
 		cu_kernel<<<grid, block, 0, stream>>>(
 			std::get<RI>(buffers)...,
+			SKEPU_PRNG_PLACEHOLDER,
 			std::get<EI>(buffers)...,
 			std::get<CI>(buffers)...,
 			args...,
@@ -98,7 +101,9 @@ struct map
 			size_k,
 			size_l,
 			count,
-			begin.offset());
+			begin.offset(),
+			strides
+		);
 
 		cudaStreamSynchronize(stream);
 	}
